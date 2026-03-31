@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { ExternalLink, DatabaseZap, RefreshCcw } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { useAuth } from '@/app/providers';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc } from 'firebase/firestore';
@@ -119,10 +119,6 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const handleClearDB = async () => {
-    setActionMessage("Database clearing is disabled on Live Cloud environments.");
-    setTimeout(() => setActionMessage(""), 3000);
-  };
 
   if (loading) return <div className="min-h-[50vh] flex items-center justify-center font-serif text-xl italic text-editorial-muted">Synchronizing encrypted database...</div>;
 
@@ -140,12 +136,6 @@ export default function Home() {
             {actionMessage && <p className="text-sm font-sans font-medium text-blue-600 mt-2">{actionMessage}</p>}
           </div>
           <div className="flex gap-4">
-            <button onClick={handleRunScraper} className="flex items-center gap-2 px-4 py-2 border border-editorial-border-dark bg-white hover:bg-editorial-border-dark hover:text-white transition-all text-xs font-sans uppercase tracking-widest font-bold shadow-[3px_3px_0px_#262626] hover:shadow-none translate-x-0 hover:translate-x-[3px] hover:translate-y-[3px]">
-              <DatabaseZap className="w-3 h-3" /> Execute Aggregator
-            </button>
-             <button onClick={handleClearDB} className="flex items-center justify-center p-2 text-editorial-muted hover:text-red-700 border border-editorial-border hover:border-red-200 bg-gray-50 hover:bg-red-50 transition-colors">
-                <RefreshCcw className="w-4 h-4" />
-             </button>
           </div>
         </div>
       </section>

@@ -84,7 +84,8 @@ async function fetchLiveData() {
           } else {
             try {
               const searchKeyword = getProminentWord(item.title);
-              const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(searchKeyword)}&per_page=15`, {
+              const KeywordQuery = searchKeyword + " science"
+              const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(KeywordQuery)}&per_page=15`, {
                 headers: { Authorization: "c5w6mctmy3dgyaA69iUsDjgccGUojIlKEa3Y8JtsLU2yJm2HUp2gjQy6" }
               });
               if (pexelsRes.ok) {
@@ -178,7 +179,7 @@ export async function POST() {
     // Purely serves as a CORS proxy that scrapes dynamic content and returns it.
     // Database commits occur securely on the frontend utilizing the browser's implicit Auth SDK keys.
     const liveData = await fetchLiveData();
-    
+
     return NextResponse.json({
       success: true,
       liveData
