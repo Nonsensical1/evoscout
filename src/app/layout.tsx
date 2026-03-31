@@ -4,6 +4,7 @@ import './globals.css';
 import { ReactNode } from 'react';
 import Link from 'next/link';
 import { AuthProvider } from './providers';
+import { UserMenu } from './UserMenu';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-serif' });
@@ -35,10 +36,11 @@ export default function RootLayout({
                  </h1>
                </Link>
             </div>
-            <nav className="max-w-7xl mx-auto px-6 h-12 flex items-center justify-center gap-10 text-[11px] md:text-xs font-sans font-bold text-editorial-text uppercase tracking-widest">
+            <nav className="max-w-7xl mx-auto px-6 h-12 flex items-center justify-center gap-10 text-[11px] md:text-xs font-sans font-bold text-editorial-text uppercase tracking-widest relative">
                <Link href="/" className="hover-underline">Dashboard</Link>
                <Link href="/history" className="hover-underline">Ledger</Link>
                <Link href="/settings" className="hover-underline">Settings</Link>
+               <UserMenu />
             </nav>
           </header>
 
