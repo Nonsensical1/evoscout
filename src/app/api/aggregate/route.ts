@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import Parser from 'rss-parser';
-import { adminDb } from '@/lib/firebase-admin';
 
 // Utility to shuffle array
 function shuffleArray(array: any[]) {
@@ -10,7 +9,7 @@ function shuffleArray(array: any[]) {
 async function fetchLiveData() {
   const parser = new Parser();
   const results: any = { grants: [], news: [], literature: [], positions: [] };
-  const usedImages = new Set<string>(); // Global pool to prevent duplicate photos across all articles
+  const usedImages = new Set<string>(); // Global pool to prevent duplicate photos
 
   const getProminentWord = (title: string) => {
     const preferredWords = ['CRISPR', 'Cas9', 'Cas12', 'RNA', 'DNA', 'gene', 'cell', 'cancer', 'tumor', 'bacteria', 'virus', 'molecular', 'synthetic', 'epigenetic', 'genetics', 'pathology', 'brain', 'immune', 'protein', 'proteomics', 'metabolism', 'quantum', 'neuro', 'biology', 'microbiome', 'therapy', 'zoology'];
@@ -174,86 +173,18 @@ async function fetchLiveData() {
   return results;
 }
 
-export async function POST(req: Request) {
+export async function POST() {
   try {
-    const body = await req.json();
-    const { uid } = body;
-    
-    if (!uid) {
-      return NextResponse.json({ error: "Unauthorized User ID" }, { status: 401 });
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-
-    // Fetch user-defined settings or defaults (50 items max as per request)
-    const settingsDoc = await adminDb.doc(`users/${uid}/settings/config`).get();
-    const settings = settingsDoc.exists ? settingsDoc.data() : { newsLimit: 50, literatureLimit: 50, grantsLimit: 50, positionsLimit: 50 };
-
-    // Fetch user novelty tracking history
-    const historyDoc = await adminDb.doc(`users/${uid}/scouted/history`).get();
-    const historyArr = historyDoc.exists ? historyDoc.data()?.hashes || [] : [];
-    const history = new Set(historyArr);
-
-    // Fetch user Daily Feed
-    const dailyFeedDoc = await adminDb.doc(`users/${uid}/daily/feed`).get();
-    let dailyFeed: any = dailyFeedDoc.exists ? dailyFeedDoc.data() : { date: today, grants: [], news: [], literature: [], positions: [] };
-
-    if (dailyFeed.date !== today) {
-      const hasItems = dailyFeed.grants?.length || dailyFeed.news?.length || dailyFeed.literature?.length || dailyFeed.positions?.length;
-      if (hasItems) {
-        await adminDb.collection(`users/${uid}/ledger`).add(dailyFeed);
-      }
-      dailyFeed = { date: today, grants: [], news: [], literature: [], positions: [] };
-    }
-
-    let addedCount = 0;
-    let skippedCount = 0;
-
+    // Purely serves as a CORS proxy that scrapes dynamic content and returns it.
+    // Database commits occur securely on the frontend utilizing the browser's implicit Auth SDK keys.
     const liveData = await fetchLiveData();
-
-    const processCategory = (categoryItems: any[], categoryName: string, limit: number) => {
-      let categoryLimit = 0;
-      if (!dailyFeed[categoryName]) dailyFeed[categoryName] = [];
-      
-      for (const item of categoryItems) {
-        if (!history.has(item.id)) {
-          if (categoryLimit < limit) {
-            dailyFeed[categoryName].push({ ...item, date: new Date().toISOString() });
-            historyArr.push(item.id);
-            history.add(item.id);
-            addedCount++;
-            categoryLimit++;
-          } else {
-            // Reached configured max
-            skippedCount++;
-          }
-        } else {
-          // Existed in user's history
-          skippedCount++;
-        }
-        if (categoryLimit >= limit) break;
-      }
-    };
-
-    processCategory(liveData.grants, 'grants', settings?.grantsLimit ?? 50);
-    processCategory(liveData.news, 'news', settings?.newsLimit ?? 50);
-    processCategory(liveData.literature, 'literature', settings?.literatureLimit ?? 50);
-    processCategory(liveData.positions, 'positions', settings?.positionsLimit ?? 50);
-
-    // Commit changes to Firestore Transactionally
-    const batch = adminDb.batch();
-    batch.set(adminDb.doc(`users/${uid}/daily/feed`), dailyFeed);
-    batch.set(adminDb.doc(`users/${uid}/scouted/history`), { hashes: historyArr });
-    await batch.commit();
-
+    
     return NextResponse.json({
       success: true,
-      added: addedCount,
-      skipped: skippedCount,
-      feed: dailyFeed
+      liveData
     });
   } catch (err: any) {
-    console.error("Aggregation Pipeline Error:", err);
+    console.error("Scraper Proxy Error:", err);
     return NextResponse.json({ error: "Pipeline Failure", msg: err.message }, { status: 500 });
   }
 }

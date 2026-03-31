@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { ExternalLink, DatabaseZap, RefreshCcw } from 'lucide-react';
 import { useAuth } from '@/app/providers';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc } from 'firebase/firestore';
 
 export default function Home() {
   const { user } = useAuth();
@@ -14,23 +14,78 @@ export default function Home() {
 
   const handleRunScraper = async () => {
     if (!user) return;
-    setActionMessage("Running Daily Scraper...");
+    setActionMessage("Extracting Global Feeds...");
     try {
-      const res = await fetch('/api/aggregate', { 
-         method: 'POST',
-         headers: { 'Content-Type': 'application/json' },
-         body: JSON.stringify({ uid: user.uid })
-      });
-      const result = await res.json();
-      if (result.success) {
-        setActionMessage(`Scraper Ran: Added ${result.added} items.`);
-      } else {
-        setActionMessage("Scraper Error: " + result.error);
+      const res = await fetch('/api/aggregate', { method: 'POST' });
+      const scrapRes = await res.json();
+      
+      if (!scrapRes.success || !scrapRes.liveData) {
+        setActionMessage("Pipeline Error: Failed to gather external feeds.");
+        return;
       }
-    } catch (e) {
-      setActionMessage("Error running scraper.");
+      const liveData = scrapRes.liveData;
+
+      setActionMessage("Synchronizing & Filtering...");
+      const today = new Date().toISOString().split('T')[0];
+
+      const [settingsSnap, historySnap, feedSnap] = await Promise.all([
+         getDoc(doc(db, 'users', user.uid, 'settings', 'config')),
+         getDoc(doc(db, 'users', user.uid, 'scouted', 'history')),
+         getDoc(doc(db, 'users', user.uid, 'daily', 'feed'))
+      ]);
+
+      const settings = settingsSnap.exists() ? settingsSnap.data() : { newsLimit: 50, grantsLimit: 50, literatureLimit: 50, positionsLimit: 50 };
+      const historyArr = historySnap.exists() ? historySnap.data()?.hashes || [] : [];
+      const history = new Set(historyArr);
+      let dailyFeed: any = feedSnap.exists() ? feedSnap.data() : { date: today, grants: [], news: [], literature: [], positions: [] };
+
+      // Archive if new day
+      if (dailyFeed.date !== today) {
+        const hasItems = dailyFeed.grants?.length || dailyFeed.news?.length || dailyFeed.literature?.length || dailyFeed.positions?.length;
+        if (hasItems) {
+           await addDoc(collection(db, 'users', user.uid, 'ledger'), dailyFeed);
+        }
+        dailyFeed = { date: today, grants: [], news: [], literature: [], positions: [] };
+      }
+
+      let addedCount = 0;
+      let skippedCount = 0;
+
+      const processCategory = (categoryItems: any[], categoryName: string, limit: number) => {
+        let currentLen = dailyFeed[categoryName]?.length || 0;
+        if (!dailyFeed[categoryName]) dailyFeed[categoryName] = [];
+        
+        for (const item of categoryItems) {
+          if (!history.has(item.id)) {
+            if (currentLen < limit) {
+              dailyFeed[categoryName].push({ ...item, date: new Date().toISOString() });
+              historyArr.push(item.id);
+              history.add(item.id);
+              addedCount++;
+              currentLen++;
+            } else { skippedCount++; }
+          } else { skippedCount++; }
+          if (currentLen >= limit) break;
+        }
+      };
+
+      processCategory(liveData.grants, 'grants', settings.grantsLimit || 50);
+      processCategory(liveData.news, 'news', settings.newsLimit || 50);
+      processCategory(liveData.literature, 'literature', settings.literatureLimit || 50);
+      processCategory(liveData.positions, 'positions', settings.positionsLimit || 50);
+
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'users', user.uid, 'daily', 'feed'), dailyFeed);
+      batch.set(doc(db, 'users', user.uid, 'scouted', 'history'), { hashes: historyArr });
+      await batch.commit();
+
+      setActionMessage(`Scraper Complete: Added ${addedCount} items, skipped ${skippedCount} duplicates/over-quota.`);
+
+    } catch (e: any) {
+      console.error(e);
+      setActionMessage("Error running scraper: " + e.message);
     }
-    setTimeout(() => setActionMessage(""), 4000);
+    setTimeout(() => setActionMessage(""), 5000);
   };
 
   useEffect(() => {
