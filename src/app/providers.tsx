@@ -22,6 +22,7 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState("");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -48,8 +49,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    setAuthError("");
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (err: any) {
+      console.error("Sign-in error:", err);
+      // Commonly throws auth/unauthorized-domain if Vercel URL isn't configured in Firebase
+      setAuthError(err.message || String(err));
+    }
   };
 
   const signOut = async () => {
@@ -76,6 +84,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             >
               Sign In with Google
             </button>
+            {authError && (
+              <p className="mt-4 text-xs text-red-600 font-sans break-words bg-red-50 border border-red-200 p-2">
+                <strong>Authentication Blocked:</strong><br/>
+                It looks like this domain isn't authorized in your Firebase console yet.<br/><br/>
+                Log into Firebase &rarr; Build &rarr; Authentication &rarr; Settings &rarr; Authorized Domains. Add your exact Vercel URL to the list.
+              </p>
+            )}
           </div>
         </div>
       ) : (
