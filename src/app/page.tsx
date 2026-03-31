@@ -25,18 +25,8 @@ export default function Home() {
 
   const handleRunScraper = async () => {
     if (!user) return;
-    setActionMessage("Extracting Global Feeds...");
+    setActionMessage("Extracting Context...");
     try {
-      const res = await fetch('/api/aggregate', { method: 'POST' });
-      const scrapRes = await res.json();
-      
-      if (!scrapRes.success || !scrapRes.liveData) {
-        setActionMessage("Pipeline Error: Failed to gather external feeds.");
-        return;
-      }
-      const liveData = scrapRes.liveData;
-
-      setActionMessage("Synchronizing & Filtering...");
       const today = new Date().toISOString().split('T')[0];
 
       const [settingsSnap, historySnap, feedSnap] = await Promise.all([
@@ -45,7 +35,7 @@ export default function Home() {
          getDoc(doc(db, 'users', user.uid, 'daily', 'feed'))
       ]);
 
-      const settings = settingsSnap.exists() ? settingsSnap.data() : { newsLimit: 50, grantsLimit: 50, literatureLimit: 50, positionsLimit: 50 };
+      const settings = settingsSnap.exists() ? settingsSnap.data() : { newsLimit: 50, grantsLimit: 50, literatureLimit: 50, positionsLimit: 50, topics: {} };
       const historyArr = historySnap.exists() ? historySnap.data()?.hashes || [] : [];
       const history = new Set(historyArr);
       let dailyFeed: any = feedSnap.exists() ? feedSnap.data() : { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
@@ -58,6 +48,22 @@ export default function Home() {
         }
         dailyFeed = { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
       }
+
+      setActionMessage("Harvesting Global Feeds...");
+      const res = await fetch('/api/aggregate', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topics: settings.topics || {} })
+      });
+      const scrapRes = await res.json();
+      
+      if (!scrapRes.success || !scrapRes.liveData) {
+        setActionMessage("Pipeline Error: Failed to gather external feeds.");
+        return;
+      }
+      const liveData = scrapRes.liveData;
+
+      setActionMessage("Synchronizing & Filtering...");
 
       let addedCount = 0;
       let skippedCount = 0;

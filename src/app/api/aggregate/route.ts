@@ -6,7 +6,8 @@ function shuffleArray(array: any[]) {
   return array.sort(() => 0.5 - Math.random());
 }
 
-async function fetchLiveData() {
+async function fetchLiveData(topicsMap: any = {}) {
+  const parseTopics = (str: string | undefined, fallback: string[]) => str ? str.split(',').map((s: string) => s.trim()).filter(Boolean) : fallback;
   const parser = new Parser();
   const results: any = { grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
   const usedImages = new Set<string>(); // Global pool to prevent duplicate photos
@@ -42,18 +43,18 @@ async function fetchLiveData() {
     const formatDateNSF = (date: Date) => `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear()}`;
     const formatDateNIH = (date: Date) => date.toISOString().split('T')[0];
 
-    const nsfTopics = [
+    const nsfTopics = parseTopics(topicsMap.grants, [
       "molecular+biology", "bioinformatics", "proteomics", "genomics",
       "epigenetics", "translational+science", "pathology", "zoology"
-    ];
-    const nihTopics = [
+    ]);
+    const nihTopics = parseTopics(topicsMap.grants, [
       "molecular biology", "bioinformatics", "proteomics", "genomics",
       "epigenetics", "translational science", "pathology", "zoology"
-    ];
+    ]);
 
     const topicIdx = Math.floor(Math.random() * nsfTopics.length);
     const randomKeywordNSF = nsfTopics[topicIdx];
-    const randomKeywordNIH = nihTopics[topicIdx];
+    const randomKeywordNIH = nihTopics[topicIdx % nihTopics.length];
 
     let allGrants: any[] = [];
 
@@ -112,6 +113,8 @@ async function fetchLiveData() {
     try {
       let activeGovGrants: any[] = [];
       const intervals = [48, 7 * 24, 14 * 24]; // hours limit
+      const govTopics = parseTopics(topicsMap.openGovGrants, nihTopics);
+      const randomKeywordGov = govTopics[Math.floor(Math.random() * govTopics.length)];
       
       for (const hours of intervals) {
         const timeLimit = Date.now() - hours * 60 * 60 * 1000;
@@ -119,7 +122,7 @@ async function fetchLiveData() {
         const govRes = await fetch(`https://apply07.grants.gov/grantsws/rest/opportunities/search/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ keyword: randomKeywordNIH })
+          body: JSON.stringify({ keyword: randomKeywordGov })
         });
         
         if (govRes.ok) {
@@ -158,7 +161,8 @@ async function fetchLiveData() {
       { url: 'https://www.cell.com/cell/inpress.rss', source: 'Cell Press' }
     ];
     let allNews: any[] = [];
-    const biologicalTerms = /CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|pathology|zoology/i;
+    const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|pathology|zoology";
+    const biologicalTerms = new RegExp(newsTermsSafe, 'i');
     const twentyFourHoursAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
 
     for (const feedConfig of rssFeeds) {
@@ -221,7 +225,8 @@ async function fetchLiveData() {
     if (bioRes.ok) {
       const bioData = await bioRes.json();
       let papers = bioData.collection || [];
-      const advancedTopics = /CRISPR|Cas9|RNA|DNA|synthetic biology|gene editing|cancer|oncology|metabolism|computational|epigenetic|genomics|SunTag|prime edit|base edit/i;
+      const litTermsSafe = topicsMap.literature ? topicsMap.literature.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|RNA|DNA|synthetic biology|gene editing|cancer|oncology|metabolism|computational|epigenetic|genomics|SunTag|prime edit|base edit";
+      const advancedTopics = new RegExp(litTermsSafe, 'i');
       let filtered = papers.filter((p: any) => advancedTopics.test(p.title || '') || advancedTopics.test(p.abstract || ''));
       if (filtered.length < 5) filtered = papers;
 
@@ -238,8 +243,8 @@ async function fetchLiveData() {
   } catch (e) { console.error("Lit Fetch Error:", e); }
 
   try {
-    const jobTitles = ["Undergraduate Research Assistant", "Rolling Postbaccalaureate Fellow", "Gap-Year Research Technologist", "Fall Co-op Biology Intern", "Undergraduate Lab Associate", "PREP Scholar", "Entry-Level Molecular Technician", "Research Assistant I", "Undergraduate Co-op Program", "Clinical Research Assistant"];
-    const institutions = ["Broad Institute", "HHMI Janelia", "Wyss Institute", "Ginkgo Bioworks", "Dana-Farber", "NIH", "The Jackson Laboratory", "Stowers Institute", "SENS Research", "Rockefeller University", "Scripps Research", "Vanderbilt", "MD Anderson", "Cold Spring Harbor", "Salk Institute"];
+    const jobTitles = parseTopics(topicsMap.careerTitles, ["Undergraduate Research Assistant", "Rolling Postbaccalaureate Fellow", "Gap-Year Research Technologist", "Fall Co-op Biology Intern", "Undergraduate Lab Associate", "PREP Scholar", "Entry-Level Molecular Technician", "Research Assistant I", "Undergraduate Co-op Program", "Clinical Research Assistant"]);
+    const institutions = parseTopics(topicsMap.careerInstitutions, ["Broad Institute", "HHMI Janelia", "Wyss Institute", "Ginkgo Bioworks", "Dana-Farber", "NIH", "The Jackson Laboratory", "Stowers Institute", "SENS Research", "Rockefeller University", "Scripps Research", "Vanderbilt", "MD Anderson", "Cold Spring Harbor", "Salk Institute"]);
     const locations = ["Cambridge, MA", "Ashburn, VA", "Boston, MA", "Bethesda, MD", "Bar Harbor, ME", "Kansas City, MO", "Mountain View, CA", "New York, NY", "La Jolla, CA", "Nashville, TN", "Houston, TX", "Seattle, WA"];
 
     const curatedJobs: any[] = [];
@@ -321,11 +326,10 @@ async function fetchLiveData() {
   return results;
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
-    // Purely serves as a CORS proxy that scrapes dynamic content and returns it.
-    // Database commits occur securely on the frontend utilizing the browser's implicit Auth SDK keys.
-    const liveData = await fetchLiveData();
+    const body = await req.json().catch(() => ({}));
+    const liveData = await fetchLiveData(body.topics);
 
     return NextResponse.json({
       success: true,
