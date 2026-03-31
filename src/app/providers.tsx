@@ -55,8 +55,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signInWithPopup(auth, provider);
     } catch (err: any) {
       console.error("Sign-in error:", err);
-      // Commonly throws auth/unauthorized-domain if Vercel URL isn't configured in Firebase
-      setAuthError(err.message || String(err));
+      const msg = err.message || String(err);
+      if (msg.toLowerCase().includes("initial state") || msg.toLowerCase().includes("popup") || msg.toLowerCase().includes("redirect")) {
+        setAuthError("Mobile Browser Blocked: Please tap the compass/menu icon and select 'Open in Safari' or 'Open in Chrome'. In-app browsers block secure login!");
+      } else {
+        setAuthError(msg);
+      }
     }
   };
 
@@ -85,10 +89,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               Sign In with Google
             </button>
             {authError && (
-              <p className="mt-4 text-xs text-red-600 font-sans break-words bg-red-50 border border-red-200 p-2">
+              <p className="mt-4 text-xs text-red-600 font-sans break-words bg-red-50 border border-red-200 p-2 text-left">
                 <strong>Authentication Blocked:</strong><br/>
-                It looks like this domain isn't authorized in your Firebase console yet.<br/><br/>
-                Log into Firebase &rarr; Build &rarr; Authentication &rarr; Settings &rarr; Authorized Domains. Add your exact Vercel URL to the list.
+                {authError.includes("Mobile Browser Blocked") ? (
+                   <span className="text-sm font-bold block mt-2">{authError}</span>
+                ) : (
+                   <>
+                     It looks like this domain isn't authorized in your Firebase console yet, or you are using an embedded browser.<br/><br/>
+                     Log into Firebase &rarr; Build &rarr; Authentication &rarr; Settings &rarr; Authorized Domains. Add your exact Vercel URL to the list.<br/><br/>
+                     Raw Error: {authError}
+                   </>
+                )}
               </p>
             )}
           </div>
