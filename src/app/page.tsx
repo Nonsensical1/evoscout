@@ -8,7 +8,7 @@ import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc } from 
 
 export default function Home() {
   const { user } = useAuth();
-  const [data, setData] = useState({ grants: [], news: [], literature: [], positions: [] });
+  const [data, setData] = useState({ grants: [], openGovGrants: [], news: [], literature: [], positions: [] });
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
 
@@ -48,7 +48,7 @@ export default function Home() {
       const settings = settingsSnap.exists() ? settingsSnap.data() : { newsLimit: 50, grantsLimit: 50, literatureLimit: 50, positionsLimit: 50 };
       const historyArr = historySnap.exists() ? historySnap.data()?.hashes || [] : [];
       const history = new Set(historyArr);
-      let dailyFeed: any = feedSnap.exists() ? feedSnap.data() : { date: today, grants: [], news: [], literature: [], positions: [] };
+      let dailyFeed: any = feedSnap.exists() ? feedSnap.data() : { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
 
       // Archive if new day
       if (dailyFeed.date !== today) {
@@ -56,7 +56,7 @@ export default function Home() {
         if (hasItems) {
            await addDoc(collection(db, 'users', user.uid, 'ledger'), dailyFeed);
         }
-        dailyFeed = { date: today, grants: [], news: [], literature: [], positions: [] };
+        dailyFeed = { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
       }
 
       let addedCount = 0;
@@ -81,6 +81,7 @@ export default function Home() {
       };
 
       processCategory(liveData.grants, 'grants', settings.grantsLimit || 50);
+      if (liveData.openGovGrants) processCategory(liveData.openGovGrants, 'openGovGrants', settings.grantsLimit || 50);
       processCategory(liveData.news, 'news', settings.newsLimit || 50);
       processCategory(liveData.literature, 'literature', settings.literatureLimit || 50);
       processCategory(liveData.positions, 'positions', settings.positionsLimit || 50);
@@ -114,6 +115,7 @@ export default function Home() {
         } else {
            setData({
              grants: feed.grants || [],
+             openGovGrants: feed.openGovGrants || [],
              news: feed.news || [],
              literature: feed.literature || [],
              positions: feed.positions || []
@@ -250,6 +252,35 @@ export default function Home() {
             ) : (
                 <div className="flex flex-col gap-6">
                   {data.grants.map((grant: any) => (
+                    <a href={grant.url} target="_blank" rel="noopener noreferrer" key={grant.id} className="block outline-none group cursor-pointer border-b border-editorial-border pb-6 last:border-0">
+                      <article>
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                           <div className="w-4 border-t border-editorial-text"></div>
+                           <span className="text-[9px] uppercase font-sans font-bold tracking-widest text-[#005587] text-center">{grant.agency}</span>
+                           <div className="w-4 border-t border-editorial-text"></div>
+                        </div>
+                        <h4 className="text-xl font-serif font-bold text-center leading-snug group-hover:underline decoration-1 underline-offset-4">{grant.title}</h4>
+                        <div className="text-sm font-sans font-bold mt-4 text-center bg-gray-50 py-2 border border-gray-200 group-hover:bg-[#005587] group-hover:text-white transition-colors">
+                           {grant.amount}
+                        </div>
+                      </article>
+                    </a>
+                  ))}
+                </div>
+            )}
+          </section>
+
+          {/* Active GovGrants Section */}
+          <section>
+             <div className="mb-6 border-b-2 border-editorial-border-dark pb-2 text-center mt-8">
+              <h3 className="font-serif font-black text-lg uppercase tracking-widest text-editorial-text">Active Postings</h3>
+            </div>
+            
+            {!data.openGovGrants || data.openGovGrants.length === 0 ? (
+               <p className="font-serif text-sm italic text-editorial-muted text-center border border-dashed border-gray-200 py-4 bg-gray-50">No urgent postings detected.</p>
+            ) : (
+                <div className="flex flex-col gap-6">
+                  {data.openGovGrants.map((grant: any) => (
                     <a href={grant.url} target="_blank" rel="noopener noreferrer" key={grant.id} className="block outline-none group cursor-pointer border-b border-editorial-border pb-6 last:border-0">
                       <article>
                         <div className="flex items-center justify-center gap-2 mb-2">

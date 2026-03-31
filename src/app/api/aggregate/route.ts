@@ -8,7 +8,7 @@ function shuffleArray(array: any[]) {
 
 async function fetchLiveData() {
   const parser = new Parser();
-  const results: any = { grants: [], news: [], literature: [], positions: [] };
+  const results: any = { grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
   const usedImages = new Set<string>(); // Global pool to prevent duplicate photos
 
   const getProminentWord = (title: string) => {
@@ -107,6 +107,47 @@ async function fetchLiveData() {
     } catch (e) { console.error("NIH Grant Fetch Error:", e); }
 
     results.grants = shuffleArray(allGrants);
+
+    // GovGrants Scrape (Expanding Window)
+    try {
+      let activeGovGrants: any[] = [];
+      const intervals = [48, 7 * 24, 14 * 24]; // hours limit
+      
+      for (const hours of intervals) {
+        const timeLimit = Date.now() - hours * 60 * 60 * 1000;
+        
+        const govRes = await fetch(`https://apply07.grants.gov/grantsws/rest/opportunities/search/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword: randomKeywordNIH })
+        });
+        
+        if (govRes.ok) {
+          const govData = await govRes.json();
+          const hits = govData.oppHits || [];
+          
+          const recentOpen = hits.filter((h: any) => {
+            if (h.oppStatus !== 'posted') return false;
+            if (!h.openDate) return false;
+            const openDate = new Date(h.openDate).getTime();
+            return openDate >= timeLimit;
+          });
+          
+          if (recentOpen.length > 0) {
+            activeGovGrants = recentOpen.map((h: any) => ({
+              id: `GOV-${h.id}`,
+              title: h.title,
+              agency: h.agencyCode || h.agency || "Grants.gov",
+              amount: "Details at Registry", // GovGrants search doesn't natively expose discrete obligation totals
+              url: `https://www.grants.gov/search-results-detail/${h.id}`
+            }));
+            break; // Stop expanding window
+          }
+        }
+      }
+      results.openGovGrants = shuffleArray(activeGovGrants);
+    } catch (e) { console.error("Gov Grants Fetch Error:", e); }
+
   } catch (e) { console.error("Master Grant Pipeline Error:", e); }
 
   try {
