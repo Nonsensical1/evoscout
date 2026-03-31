@@ -191,7 +191,7 @@ export default function Home() {
                              <div className="flex-grow border-t border-editorial-text hidden md:block"></div>
                           </div>
                           <h4 className={`font-serif font-bold leading-snug group-hover:text-gray-600 transition-colors group-hover:underline decoration-[1.5px] underline-offset-4 text-xl ${hasImage ? 'md:text-2xl' : 'md:text-xl'} leading-tight`}>{n.title}</h4>
-                          <p className={`font-serif text-editorial-muted text-sm italic mt-2 ${hasImage ? 'line-clamp-3' : 'line-clamp-2'}`}>Special editorial reporting on sector advancements, diving deep into technical feasibility and global deployment implications.</p>
+                          <p className={`font-serif text-editorial-muted text-sm italic mt-2 ${hasImage ? 'line-clamp-3' : 'line-clamp-2'}`}>{n.summary}</p>
                         </article>
                       </a>
                     );
@@ -220,7 +220,7 @@ export default function Home() {
                   <div className="md:col-span-3 space-y-2 pr-0 md:pr-4">
                      <h4 className="font-serif font-bold text-2xl leading-tight group-hover:text-blue-800 transition-colors group-hover:underline decoration-[1.5px] underline-offset-4">{paper.title}</h4>
                      <p className="font-serif text-editorial-muted italic text-base">{paper.authors}</p>
-                     <p className="font-sans text-sm text-editorial-text leading-relaxed mt-2">Early reviews indicate substantial progress in targeted methodologies, potentially altering widespread paradigms inside clinical translation processes.</p>
+                     <p className="font-sans text-sm text-editorial-text leading-relaxed mt-2">{paper.summary}</p>
                   </div>
                   <div className="md:col-span-1 flex flex-col items-start md:items-end justify-start gap-4 border-l-0 md:border-l border-editorial-border md:pl-5">
                      <span className="text-[10px] font-sans font-bold uppercase tracking-widest bg-gray-100 px-2 py-1 text-center border border-gray-200">{paper.journal}</span>
