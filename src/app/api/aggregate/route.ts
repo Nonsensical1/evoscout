@@ -37,25 +37,77 @@ async function fetchLiveData() {
   };
 
   try {
-    const grantTopics = [
+    const todayVal = new Date();
+    const thirtyDaysAgo = new Date(todayVal.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const formatDateNSF = (date: Date) => `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}/${date.getFullYear()}`;
+    const formatDateNIH = (date: Date) => date.toISOString().split('T')[0];
+
+    const nsfTopics = [
       "molecular+biology", "bioinformatics", "proteomics", "genomics",
       "epigenetics", "translational+science", "pathology", "zoology"
     ];
-    const randomKeyword = grantTopics[Math.floor(Math.random() * grantTopics.length)];
-    const nsfRes = await fetch(`https://api.nsf.gov/services/v1/awards.json?keyword=${randomKeyword}&printFields=id,title,awardeeName,fundsObligatedAmt`);
-    if (nsfRes.ok) {
-      const nsfData = await nsfRes.json();
-      const awards = nsfData.response?.award || [];
+    const nihTopics = [
+      "molecular biology", "bioinformatics", "proteomics", "genomics",
+      "epigenetics", "translational science", "pathology", "zoology"
+    ];
 
-      results.grants = shuffleArray(awards).map((a: any) => ({
-        id: `NSF-${a.id}`,
-        title: a.title,
-        agency: a.awardeeName || "National Science Foundation",
-        amount: a.fundsObligatedAmt ? `$${Number(a.fundsObligatedAmt).toLocaleString()}` : "N/A",
-        url: `https://www.nsf.gov/awardsearch/showAward?AWD_ID=${a.id}`
-      }));
-    }
-  } catch (e) { console.error("Grant Fetch Error:", e); }
+    const topicIdx = Math.floor(Math.random() * nsfTopics.length);
+    const randomKeywordNSF = nsfTopics[topicIdx];
+    const randomKeywordNIH = nihTopics[topicIdx];
+
+    let allGrants: any[] = [];
+
+    // NSF Scrape
+    try {
+      const nsfRes = await fetch(`https://api.nsf.gov/services/v1/awards.json?keyword=${randomKeywordNSF}&printFields=id,title,awardeeName,fundsObligatedAmt&dateStart=${formatDateNSF(thirtyDaysAgo)}`);
+      if (nsfRes.ok) {
+        const nsfData = await nsfRes.json();
+        const awards = nsfData.response?.award || [];
+        const mappedNSF = awards.map((a: any) => ({
+          id: `NSF-${a.id}`,
+          title: a.title,
+          agency: a.awardeeName || "National Science Foundation",
+          amount: a.fundsObligatedAmt ? `$${Number(a.fundsObligatedAmt).toLocaleString()}` : "N/A",
+          url: `https://www.nsf.gov/awardsearch/showAward?AWD_ID=${a.id}`
+        }));
+        allGrants = allGrants.concat(mappedNSF);
+      }
+    } catch (e) { console.error("NSF Grant Fetch Error:", e); }
+
+    // NIH Scrape
+    try {
+      const nihRes = await fetch(`https://api.reporter.nih.gov/v2/projects/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          criteria: {
+            advanced_text_search: { search_text: randomKeywordNIH },
+            project_start_date: {
+              from_date: formatDateNIH(thirtyDaysAgo),
+              to_date: formatDateNIH(todayVal)
+            }
+          },
+          offset: 0,
+          limit: 30
+        })
+      });
+
+      if (nihRes.ok) {
+        const nihData = await nihRes.json();
+        const awards = nihData.results || [];
+        const mappedNIH = awards.map((a: any) => ({
+          id: `NIH-${a.appl_id}`,
+          title: a.project_title,
+          agency: a.organization?.org_name || "NIH Research Institute",
+          amount: a.award_amount ? `$${Number(a.award_amount).toLocaleString()}` : "N/A",
+          url: a.project_detail_url || `https://reporter.nih.gov/project-details/${a.appl_id}`
+        }));
+        allGrants = allGrants.concat(mappedNIH);
+      }
+    } catch (e) { console.error("NIH Grant Fetch Error:", e); }
+
+    results.grants = shuffleArray(allGrants);
+  } catch (e) { console.error("Master Grant Pipeline Error:", e); }
 
   try {
     const rssFeeds = [
