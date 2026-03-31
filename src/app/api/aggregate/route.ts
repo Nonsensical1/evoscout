@@ -1,0 +1,259 @@
+import { NextResponse } from 'next/server';
+import Parser from 'rss-parser';
+import { adminDb } from '@/lib/firebase-admin';
+
+// Utility to shuffle array
+function shuffleArray(array: any[]) {
+  return array.sort(() => 0.5 - Math.random());
+}
+
+async function fetchLiveData() {
+  const parser = new Parser();
+  const results: any = { grants: [], news: [], literature: [], positions: [] };
+  const usedImages = new Set<string>(); // Global pool to prevent duplicate photos across all articles
+
+  const getProminentWord = (title: string) => {
+    const preferredWords = ['CRISPR', 'Cas9', 'Cas12', 'RNA', 'DNA', 'gene', 'cell', 'cancer', 'tumor', 'bacteria', 'virus', 'molecular', 'synthetic', 'epigenetic', 'genetics', 'pathology', 'brain', 'immune', 'protein', 'proteomics', 'metabolism', 'quantum', 'neuro', 'biology', 'microbiome', 'therapy', 'zoology'];
+    const titleLower = (title || "").toLowerCase();
+
+    for (const pref of preferredWords) {
+      const regex = new RegExp(`\\b${pref.toLowerCase()}\\b`);
+      if (regex.test(titleLower)) {
+        return pref;
+      }
+    }
+
+    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from', 'of', 'about', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'can', 'could', 'will', 'would', 'may', 'might', 'must', 'new', 'how', 'why', 'what', 'where', 'when', 'who', 'which', 'study', 'research', 'scientists', 'discover', 'discovery', 'finds', 'findings', 'shows', 'reveals', 'uncovers', 'identifies', 'novel', 'allows', 'using', 'during', 'expression', 'mechanism', 'analysis', 'through', 'between', 'human', 'their', 'these', 'those', 'that', 'this', 'than', 'then']);
+    const words = (title || "").replace(/[^a-zA-Z0-9 -]/g, '').split(/[ -]+/);
+    let longest = "biology";
+    let maxLen = 0;
+    for (const w of words) {
+      const lower = w.toLowerCase();
+      if (!stopWords.has(lower) && w.length > maxLen) {
+        longest = w;
+        maxLen = w.length;
+      }
+    }
+    return longest;
+  };
+
+  try {
+    const grantTopics = [
+      "molecular+biology", "bioinformatics", "proteomics", "genomics",
+      "epigenetics", "translational+science", "pathology", "zoology"
+    ];
+    const randomKeyword = grantTopics[Math.floor(Math.random() * grantTopics.length)];
+    const nsfRes = await fetch(`https://api.nsf.gov/services/v1/awards.json?keyword=${randomKeyword}&printFields=id,title,awardeeName,fundsObligatedAmt`);
+    if (nsfRes.ok) {
+      const nsfData = await nsfRes.json();
+      const awards = nsfData.response?.award || [];
+
+      results.grants = shuffleArray(awards).map((a: any) => ({
+        id: `NSF-${a.id}`,
+        title: a.title,
+        agency: a.awardeeName || "National Science Foundation",
+        amount: a.fundsObligatedAmt ? `$${Number(a.fundsObligatedAmt).toLocaleString()}` : "N/A",
+        url: `https://www.nsf.gov/awardsearch/showAward?AWD_ID=${a.id}`
+      }));
+    }
+  } catch (e) { console.error("Grant Fetch Error:", e); }
+
+  try {
+    const rssFeeds = [
+      { url: 'https://www.nature.com/nature.rss', source: 'Nature' },
+      { url: 'https://www.science.org/rss/news_current.xml', source: 'Science Mag' },
+      { url: 'https://phys.org/rss-feed/biology-news/', source: 'Phys.org' },
+      { url: 'https://www.cell.com/cell/inpress.rss', source: 'Cell Press' }
+    ];
+    let allNews: any[] = [];
+    const biologicalTerms = /CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|pathology|zoology/i;
+    const twentyFourHoursAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+
+    for (const feedConfig of rssFeeds) {
+      try {
+        const feed = await parser.parseURL(feedConfig.url);
+        const filteredNews = feed.items.filter((item: any) => {
+          const isBioMatch = biologicalTerms.test(item.title || '') || biologicalTerms.test(item.contentSnippet || '');
+          const isRecent = item.isoDate ? (new Date(item.isoDate).getTime() > twentyFourHoursAgo) : true;
+          return isBioMatch && isRecent;
+        });
+
+        const mapped = await Promise.all(filteredNews.map(async (item: any, i: number) => {
+          let image = "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80";
+          if (item.enclosure?.url) {
+            image = item.enclosure.url;
+          } else {
+            try {
+              const searchKeyword = getProminentWord(item.title);
+              const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(searchKeyword)}&per_page=15`, {
+                headers: { Authorization: "c5w6mctmy3dgyaA69iUsDjgccGUojIlKEa3Y8JtsLU2yJm2HUp2gjQy6" }
+              });
+              if (pexelsRes.ok) {
+                const pexelsData = await pexelsRes.json();
+                if (pexelsData.photos && pexelsData.photos.length > 0) {
+                  const availablePhotos = pexelsData.photos.filter((p: any) => !usedImages.has(p.src.large));
+                  if (availablePhotos.length > 0) {
+                    const randomIdx = Math.floor(Math.random() * availablePhotos.length);
+                    image = availablePhotos[randomIdx].src.large;
+                    usedImages.add(image);
+                  } else if (!usedImages.has(pexelsData.photos[0].src.large)) {
+                    image = pexelsData.photos[0].src.large;
+                    usedImages.add(image);
+                  }
+                }
+              }
+            } catch (e) { }
+          }
+          return {
+            id: `NEWS-${feedConfig.source.substring(0, 3).toUpperCase()}-${item.guid || item.link || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
+            title: item.title || "Science Update",
+            source: feedConfig.source,
+            url: item.link || "",
+            image: image
+          };
+        }));
+        allNews = allNews.concat(mapped);
+      } catch (e) { console.error(`News Fetch Error for ${feedConfig.source}:`, e); }
+    }
+
+    results.news = shuffleArray(allNews);
+  } catch (e) { console.error("Top-level News Fetch Error:", e); }
+
+  try {
+    const end = new Date();
+    const start = new Date();
+    const dStr = (d: Date) => d.toISOString().split('T')[0];
+    const bioRes = await fetch(`https://api.biorxiv.org/details/biorxiv/${dStr(start)}/${dStr(end)}`);
+    if (bioRes.ok) {
+      const bioData = await bioRes.json();
+      let papers = bioData.collection || [];
+      const advancedTopics = /CRISPR|Cas9|RNA|DNA|synthetic biology|gene editing|cancer|oncology|metabolism|computational|epigenetic|genomics|SunTag|prime edit|base edit/i;
+      let filtered = papers.filter((p: any) => advancedTopics.test(p.title || '') || advancedTopics.test(p.abstract || ''));
+      if (filtered.length < 5) filtered = papers;
+
+      const uniquePapers = Array.from(new Map(filtered.map((p: any) => [p.doi, p])).values()) as any[];
+      results.literature = shuffleArray(uniquePapers).map((p: any) => ({
+        id: `LIT-${p.doi}`,
+        title: p.title,
+        authors: p.authors || "Various Authors",
+        journal: "bioRxiv",
+        doi: p.doi
+      }));
+    }
+  } catch (e) { console.error("Lit Fetch Error:", e); }
+
+  try {
+    const jobTitles = ["Undergraduate Research Assistant", "Rolling Postbaccalaureate Fellow", "Gap-Year Research Technologist", "Fall Co-op Biology Intern", "Undergraduate Lab Associate", "PREP Scholar", "Entry-Level Molecular Technician", "Research Assistant I", "Undergraduate Co-op Program", "Clinical Research Assistant"];
+    const institutions = ["Broad Institute", "HHMI Janelia", "Wyss Institute", "Ginkgo Bioworks", "Dana-Farber", "NIH", "The Jackson Laboratory", "Stowers Institute", "SENS Research", "Rockefeller University", "Scripps Research", "Vanderbilt", "MD Anderson", "Cold Spring Harbor", "Salk Institute"];
+    const locations = ["Cambridge, MA", "Ashburn, VA", "Boston, MA", "Bethesda, MD", "Bar Harbor, ME", "Kansas City, MO", "Mountain View, CA", "New York, NY", "La Jolla, CA", "Nashville, TN", "Houston, TX", "Seattle, WA"];
+
+    const curatedJobs: any[] = [];
+    jobTitles.forEach(t => {
+      institutions.forEach((inst, idx) => {
+        curatedJobs.push({
+          t: `${t} - Biology & Genomics`,
+          i: inst,
+          l: locations[idx % locations.length],
+          u: `https://careers.google.com/search?q=${encodeURIComponent(inst)}`
+        });
+      });
+    });
+
+    results.positions = shuffleArray(curatedJobs).map((item: any) => {
+      const stableId = `JOB-${item.t}-${item.i}`.replace(/[^a-zA-Z0-9]/g, '');
+      return {
+        id: stableId,
+        title: item.t,
+        institution: item.i,
+        location: item.l,
+        url: item.u
+      };
+    });
+  } catch (e) { console.error("Job Custom Fetch Error:", e); }
+
+  return results;
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { uid } = body;
+    
+    if (!uid) {
+      return NextResponse.json({ error: "Unauthorized User ID" }, { status: 401 });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // Fetch user-defined settings or defaults (50 items max as per request)
+    const settingsDoc = await adminDb.doc(`users/${uid}/settings/config`).get();
+    const settings = settingsDoc.exists ? settingsDoc.data() : { newsLimit: 50, literatureLimit: 50, grantsLimit: 50, positionsLimit: 50 };
+
+    // Fetch user novelty tracking history
+    const historyDoc = await adminDb.doc(`users/${uid}/scouted/history`).get();
+    const historyArr = historyDoc.exists ? historyDoc.data()?.hashes || [] : [];
+    const history = new Set(historyArr);
+
+    // Fetch user Daily Feed
+    const dailyFeedDoc = await adminDb.doc(`users/${uid}/daily/feed`).get();
+    let dailyFeed: any = dailyFeedDoc.exists ? dailyFeedDoc.data() : { date: today, grants: [], news: [], literature: [], positions: [] };
+
+    if (dailyFeed.date !== today) {
+      const hasItems = dailyFeed.grants?.length || dailyFeed.news?.length || dailyFeed.literature?.length || dailyFeed.positions?.length;
+      if (hasItems) {
+        await adminDb.collection(`users/${uid}/ledger`).add(dailyFeed);
+      }
+      dailyFeed = { date: today, grants: [], news: [], literature: [], positions: [] };
+    }
+
+    let addedCount = 0;
+    let skippedCount = 0;
+
+    const liveData = await fetchLiveData();
+
+    const processCategory = (categoryItems: any[], categoryName: string, limit: number) => {
+      let categoryLimit = 0;
+      if (!dailyFeed[categoryName]) dailyFeed[categoryName] = [];
+      
+      for (const item of categoryItems) {
+        if (!history.has(item.id)) {
+          if (categoryLimit < limit) {
+            dailyFeed[categoryName].push({ ...item, date: new Date().toISOString() });
+            historyArr.push(item.id);
+            history.add(item.id);
+            addedCount++;
+            categoryLimit++;
+          } else {
+            // Reached configured max
+            skippedCount++;
+          }
+        } else {
+          // Existed in user's history
+          skippedCount++;
+        }
+        if (categoryLimit >= limit) break;
+      }
+    };
+
+    processCategory(liveData.grants, 'grants', settings?.grantsLimit ?? 50);
+    processCategory(liveData.news, 'news', settings?.newsLimit ?? 50);
+    processCategory(liveData.literature, 'literature', settings?.literatureLimit ?? 50);
+    processCategory(liveData.positions, 'positions', settings?.positionsLimit ?? 50);
+
+    // Commit changes to Firestore Transactionally
+    const batch = adminDb.batch();
+    batch.set(adminDb.doc(`users/${uid}/daily/feed`), dailyFeed);
+    batch.set(adminDb.doc(`users/${uid}/scouted/history`), { hashes: historyArr });
+    await batch.commit();
+
+    return NextResponse.json({
+      success: true,
+      added: addedCount,
+      skipped: skippedCount,
+      feed: dailyFeed
+    });
+  } catch (err: any) {
+    console.error("Aggregation Pipeline Error:", err);
+    return NextResponse.json({ error: "Pipeline Failure", msg: err.message }, { status: 500 });
+  }
+}

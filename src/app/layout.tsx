@@ -1,0 +1,56 @@
+import { Metadata } from 'next';
+import { Inter, Playfair_Display } from 'next/font/google';
+import './globals.css';
+import { ReactNode } from 'react';
+import Link from 'next/link';
+import { AuthProvider } from './providers';
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-serif' });
+
+export const metadata: Metadata = {
+  title: 'EvoScout | The Blueprint for Synthetic Biology',
+  description: 'Automated 24-hour scouting dashboard for grants, jobs, and key literature in Synthetic Biology.',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return (
+    <html lang="en" className={`${inter.variable} ${playfair.variable} antialiased`}>
+      <body className="bg-editorial-bg text-editorial-text min-h-screen selection:bg-gray-200">
+        <AuthProvider>
+          {/* Masthead */}
+          <header className="bg-editorial-paper border-b border-editorial-border-dark sticky top-0 z-50 shadow-sm transition-all duration-300">
+            <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col items-center border-b border-gray-200 pb-4 relative">
+               <div className="w-full flex justify-between items-center text-[10px] md:text-xs font-sans text-editorial-muted uppercase tracking-widest mb-4">
+                  <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                  <span>Synthetic Biology Edition</span>
+               </div>
+               <Link href="/" className="hover:opacity-80 transition-opacity">
+                 <h1 className="text-5xl md:text-7xl font-serif font-black tracking-tighter text-editorial-text py-2 italic pr-4">
+                   The EvoScout
+                 </h1>
+               </Link>
+            </div>
+            <nav className="max-w-7xl mx-auto px-6 h-12 flex items-center justify-center gap-10 text-[11px] md:text-xs font-sans font-bold text-editorial-text uppercase tracking-widest">
+               <Link href="/" className="hover-underline">Dashboard</Link>
+               <Link href="/history" className="hover-underline">Ledger</Link>
+               <Link href="/settings" className="hover-underline">Settings</Link>
+            </nav>
+          </header>
+
+          <main className="py-12 px-6 max-w-7xl mx-auto bg-editorial-paper shadow-sm min-h-screen my-8 border border-editorial-border relative">
+            {children}
+          </main>
+
+          <footer className="text-center py-10 font-sans text-xs text-editorial-muted uppercase tracking-widest border-t border-editorial-border-dark bg-editorial-paper">
+            © {new Date().getFullYear()} The EvoScout Company. All Rights Reserved.
+          </footer>
+        </AuthProvider>
+      </body>
+    </html>
+  );
+}

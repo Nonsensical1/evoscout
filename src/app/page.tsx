@@ -1,0 +1,238 @@
+"use client";
+
+import { useState, useEffect } from 'react';
+import { ExternalLink, DatabaseZap, RefreshCcw } from 'lucide-react';
+import { useAuth } from '@/app/providers';
+import { db } from '@/lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+
+export default function Home() {
+  const { user } = useAuth();
+  const [data, setData] = useState({ grants: [], news: [], literature: [], positions: [] });
+  const [loading, setLoading] = useState(true);
+  const [actionMessage, setActionMessage] = useState("");
+
+  const handleRunScraper = async () => {
+    if (!user) return;
+    setActionMessage("Running Daily Scraper...");
+    try {
+      const res = await fetch('/api/aggregate', { 
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({ uid: user.uid })
+      });
+      const result = await res.json();
+      if (result.success) {
+        setActionMessage(`Scraper Ran: Added ${result.added} items.`);
+      } else {
+        setActionMessage("Scraper Error: " + result.error);
+      }
+    } catch (e) {
+      setActionMessage("Error running scraper.");
+    }
+    setTimeout(() => setActionMessage(""), 4000);
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    
+    // Listen to live database feed locally to auto-refresh the UI when scraper finishes!
+    const unsub = onSnapshot(doc(db, 'users', user.uid, 'daily', 'feed'), (docSnap) => {
+      if (docSnap.exists()) {
+        const feed = docSnap.data();
+        const today = new Date().toISOString().split('T')[0];
+        
+        if (feed.date && feed.date !== today) {
+           setActionMessage("New day detected. Initializing engine...");
+           handleRunScraper();
+        } else {
+           setData({
+             grants: feed.grants || [],
+             news: feed.news || [],
+             literature: feed.literature || [],
+             positions: feed.positions || []
+           });
+           setLoading(false);
+        }
+      } else {
+        // Document does not exist yet (first sign-in)
+        handleRunScraper();
+      }
+    });
+
+    return () => unsub();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  const handleClearDB = async () => {
+    setActionMessage("Database clearing is disabled on Live Cloud environments.");
+    setTimeout(() => setActionMessage(""), 3000);
+  };
+
+  if (loading) return <div className="min-h-[50vh] flex items-center justify-center font-serif text-xl italic text-editorial-muted">Synchronizing encrypted database...</div>;
+
+  return (
+    <div className="animate-in fade-in duration-700">
+      
+      {/* Top Banner / Controls */}
+      <section className="mb-10 border-b-2 border-editorial-border-dark pb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+          <div className="space-y-2">
+            <h2 className="text-3xl font-serif font-bold text-editorial-text">Daily Scouting Briefing</h2>
+            <p className="font-sans text-editorial-muted max-w-2xl text-base">
+              Automated global aggregation of Microbiology, Cellular Sciences, and Synthetic Biology releases.
+            </p>
+            {actionMessage && <p className="text-sm font-sans font-medium text-blue-600 mt-2">{actionMessage}</p>}
+          </div>
+          <div className="flex gap-4">
+            <button onClick={handleRunScraper} className="flex items-center gap-2 px-4 py-2 border border-editorial-border-dark bg-white hover:bg-editorial-border-dark hover:text-white transition-all text-xs font-sans uppercase tracking-widest font-bold shadow-[3px_3px_0px_#262626] hover:shadow-none translate-x-0 hover:translate-x-[3px] hover:translate-y-[3px]">
+              <DatabaseZap className="w-3 h-3" /> Execute Aggregator
+            </button>
+             <button onClick={handleClearDB} className="flex items-center justify-center p-2 text-editorial-muted hover:text-red-700 border border-editorial-border hover:border-red-200 bg-gray-50 hover:bg-red-50 transition-colors">
+                <RefreshCcw className="w-4 h-4" />
+             </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 relative">
+        
+        {/* Left Column: Editor's Picks (News & Literature) */}
+        <div className="lg:col-span-8 flex flex-col gap-10">
+          
+          {/* Breaking News Section */}
+          <section>
+            <div className="flex items-baseline justify-between mb-6 border-b border-editorial-border pb-2">
+              <h3 className="text-2xl font-serif font-black uppercase tracking-tight">Industry & Scientific News</h3>
+              <span className="text-xs font-sans font-bold text-editorial-muted uppercase tracking-wider">
+                {data.news.length} Reports
+              </span>
+            </div>
+            
+            {data.news.length === 0 ? (
+               <p className="font-serif italic text-editorial-muted px-4 border-l-2 border-gray-200">The wire is quiet.</p>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10 md:grid-flow-dense">
+                  {data.news.map((n: any, i: number) => {
+                    const isHero = i === 0;
+                    const isTall = i === 2 || i === 5 || i === 8 || i === 11;
+                    const hasImage = isHero || isTall;
+                    
+                    return (
+                      <a href={n.url || "#"} target="_blank" key={n.id} className={`block outline-none h-full ${isHero ? 'md:col-span-2' : ''} ${isTall ? 'md:row-span-2' : ''}`}>
+                        <article className={`article-card group cursor-pointer relative flex flex-col h-full ${hasImage ? 'border-b border-editorial-border pb-6' : 'border-b border-gray-200 pb-4'}`}>
+                          {hasImage && n.image && (
+                             <div className={`relative mb-4 overflow-hidden rounded-sm w-full ${isHero ? 'h-64' : 'h-48 md:h-auto md:flex-grow min-h-[220px]'}`}>
+                               <img src={n.image} alt="Article Thumbnail" className="absolute inset-0 w-full h-full object-cover grayscale opacity-90 transition-transform duration-700 group-hover:scale-105" />
+                               <div className="absolute inset-0 border border-black/10"></div>
+                             </div>
+                          )}
+                          <div className={`flex items-center gap-2 mb-2 opacity-80 ${isTall ? 'mt-auto' : ''}`}>
+                             <span className="text-[10px] uppercase font-sans font-bold tracking-widest text-[#005587]">{n.source}</span>
+                             <div className="flex-grow border-t border-editorial-text hidden md:block"></div>
+                          </div>
+                          <h4 className={`font-serif font-bold leading-snug group-hover:text-gray-600 transition-colors group-hover:underline decoration-[1.5px] underline-offset-4 text-xl ${hasImage ? 'md:text-2xl' : 'md:text-xl'} leading-tight`}>{n.title}</h4>
+                          <p className={`font-serif text-editorial-muted text-sm italic mt-2 ${hasImage ? 'line-clamp-3' : 'line-clamp-2'}`}>Special editorial reporting on sector advancements, diving deep into technical feasibility and global deployment implications.</p>
+                        </article>
+                      </a>
+                    );
+                  })}
+                </div>
+            )}
+          </section>
+
+          <hr className="border-t-4 border-editorial-border-dark" />
+
+          {/* Key Literature */}
+          <section>
+            <div className="flex items-baseline justify-between mb-6 border-b border-editorial-border pb-2">
+              <h3 className="text-2xl font-serif font-black uppercase tracking-tight">Latest Pre-Prints & Literature</h3>
+               <span className="text-xs font-sans font-bold text-editorial-muted uppercase tracking-wider">
+                {data.literature.length} Publications
+              </span>
+            </div>
+            
+            {data.literature.length === 0 ? (
+               <p className="font-serif italic text-editorial-muted px-4 border-l-2 border-gray-200">No scholarly literature integrated today.</p>
+            ) : (
+            <div className="flex flex-col gap-8">
+              {data.literature.map((paper: any) => (
+                <article key={paper.id} className="group grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-gray-100 pb-8 last:border-0 last:pb-0 cursor-pointer">
+                  <div className="md:col-span-3 space-y-2 pr-0 md:pr-4">
+                     <h4 className="font-serif font-bold text-2xl leading-tight group-hover:text-blue-800 transition-colors group-hover:underline decoration-[1.5px] underline-offset-4">{paper.title}</h4>
+                     <p className="font-serif text-editorial-muted italic text-base">{paper.authors}</p>
+                     <p className="font-sans text-sm text-editorial-text leading-relaxed mt-2">Early reviews indicate substantial progress in targeted methodologies, potentially altering widespread paradigms inside clinical translation processes.</p>
+                  </div>
+                  <div className="md:col-span-1 flex flex-col items-start md:items-end justify-start gap-4 border-l-0 md:border-l border-editorial-border md:pl-5">
+                     <span className="text-[10px] font-sans font-bold uppercase tracking-widest bg-gray-100 px-2 py-1 text-center border border-gray-200">{paper.journal}</span>
+                     <a href={`https://doi.org/${paper.doi}`} className="hover-underline text-xs font-sans font-bold flex items-center gap-1 mt-auto whitespace-nowrap text-editorial-muted">
+                       View Registry <ExternalLink className="w-3 h-3" />
+                     </a>
+                  </div>
+                </article>
+              ))}
+            </div>
+            )}
+          </section>
+        </div>
+
+        {/* Separator Line */}
+        <div className="hidden lg:block absolute top-0 bottom-0 right-[33.33%] w-[1px] bg-editorial-border"></div>
+
+        {/* Right Column: Grants & Positions */}
+        <div className="lg:col-span-4 flex flex-col gap-10 pl-0 lg:pl-6">
+          
+          {/* Grants Section */}
+          <section>
+             <div className="mb-6 border-b-2 border-editorial-border-dark pb-2 text-center">
+              <h3 className="font-serif font-black text-lg uppercase tracking-widest">Funding Specs</h3>
+            </div>
+            
+            {data.grants.length === 0 ? (
+               <p className="font-serif text-sm italic text-editorial-muted text-center border border-dashed border-gray-200 py-4 bg-gray-50">No funding updates.</p>
+            ) : (
+                <div className="flex flex-col gap-6">
+                  {data.grants.map((grant: any) => (
+                    <article key={grant.id} className="group cursor-pointer border-b border-editorial-border pb-6 last:border-0">
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                         <div className="w-4 border-t border-editorial-text"></div>
+                         <span className="text-[9px] uppercase font-sans font-bold tracking-widest text-[#005587] text-center">{grant.agency}</span>
+                         <div className="w-4 border-t border-editorial-text"></div>
+                      </div>
+                      <h4 className="text-xl font-serif font-bold text-center leading-snug group-hover:underline decoration-1 underline-offset-4">{grant.title}</h4>
+                      <div className="text-sm font-sans font-bold mt-4 text-center bg-gray-50 py-2 border border-gray-200 group-hover:bg-[#005587] group-hover:text-white transition-colors">
+                         {grant.amount}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+            )}
+          </section>
+
+          {/* Open Positions */}
+          <section className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-[#fafafa] border border-editorial-border p-6 shadow-[4px_4px_0px_#e5e5e5]">
+            <div className="mb-5 border-b border-editorial-border pb-2 text-center">
+              <h3 className="font-serif font-black text-sm uppercase tracking-widest">Open Classifieds</h3>
+            </div>
+            {data.positions.length === 0 ? (
+               <p className="font-serif text-sm italic text-center text-editorial-muted">No listings.</p>
+            ) : (
+             <ul className="flex flex-col divide-y divide-editorial-border">
+              {data.positions.map((job: any) => (
+                <li key={job.id} className="py-4 group cursor-pointer block">
+                  <a href={job.url} target="_blank" className="flex flex-col items-center text-center">
+                     <h4 className="text-md font-serif font-bold group-hover:underline decoration-1 underline-offset-2 text-[#b02a2a]">{job.title}</h4>
+                     <p className="text-[10px] font-sans text-editorial-muted mt-2 uppercase tracking-widest font-bold">{job.institution}</p>
+                  </a>
+                </li>
+              ))}
+             </ul>
+            )}
+          </section>
+
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,448 @@
+{
+  "ScoutedHistory": [
+    "NSF-2408753",
+    "NSF-2533680",
+    "NSF-2501041",
+    "NSF-2334732",
+    "NSF-2514624",
+    "NSF-2423517",
+    "NSF-2500961",
+    "NSF-2503686",
+    "NSF-2539043",
+    "NSF-2401409",
+    "NSF-2430270",
+    "NSF-2521664",
+    "NEWS-PHY-news694095939",
+    "NEWS-PHY-news694082942",
+    "NEWS-NAT-httpswwwnaturecomarticlesd41586-026-00970-6",
+    "NEWS-PHY-news694078081",
+    "NEWS-PHY-news694093801",
+    "NEWS-CEL-httpswwwcellcomcellfulltextS0092-86742600279-5rssyes",
+    "NEWS-PHY-news694109402",
+    "NEWS-PHY-news694108982",
+    "NEWS-PHY-news694104422",
+    "NEWS-PHY-news694103132",
+    "NEWS-PHY-news694167842",
+    "NEWS-PHY-news694157858",
+    "LIT-10.64898/2026.03.27.714844",
+    "LIT-10.1101/2025.11.25.689574",
+    "LIT-10.64898/2026.03.27.714811",
+    "LIT-10.64898/2026.03.27.714840",
+    "LIT-10.64898/2026.03.28.714971",
+    "LIT-10.1101/2025.10.15.682714",
+    "LIT-10.64898/2026.03.13.711628",
+    "LIT-10.64898/2026.03.27.714788",
+    "LIT-10.64898/2026.03.26.714643",
+    "LIT-10.1101/2025.08.25.672092",
+    "LIT-10.64898/2026.03.27.714838",
+    "LIT-10.64898/2026.03.27.714770",
+    "JOBUndergraduateCoopProgramBiologyGenomicsDanaFarber",
+    "JOBPREPScholarBiologyGenomicsHHMIJanelia",
+    "JOBEntryLevelMolecularTechnicianBiologyGenomicsVanderbilt",
+    "JOBResearchAssistantIBiologyGenomicsBroadInstitute",
+    "JOBPREPScholarBiologyGenomicsVanderbilt",
+    "JOBEntryLevelMolecularTechnicianBiologyGenomicsDanaFarber",
+    "JOBPREPScholarBiologyGenomicsSENSResearch",
+    "JOBPREPScholarBiologyGenomicsSalkInstitute",
+    "JOBUndergraduateCoopProgramBiologyGenomicsHHMIJanelia",
+    "JOBResearchAssistantIBiologyGenomicsTheJacksonLaboratory",
+    "JOBResearchAssistantIBiologyGenomicsGinkgoBioworks",
+    "JOBClinicalResearchAssistantBiologyGenomicsMDAnderson"
+  ],
+  "DailyFeed": {
+    "date": "2026-03-31",
+    "grants": [
+      {
+        "id": "NSF-2408753",
+        "title": "Research Infrastructure: MRI: Acquisition of the computational hardware to derive value from high-throughput whole-slide imaging",
+        "agency": "Mayo Clinic Rochester",
+        "amount": "$330,333",
+        "url": "https://www.nsf.gov/awardsearch/showAward?AWD_ID=2408753",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NSF-2533680",
+        "title": "Optical Phase Detection and Imaging by a Multimode Silicon Photonic Chip",
+        "agency": "University of Pennsylvania",
+        "amount": "$435,000",
+        "url": "https://www.nsf.gov/awardsearch/showAward?AWD_ID=2533680",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NSF-2501041",
+        "title": "SCH: Enhancing Women Musculoskeletal Disorder Understanding and Rehabilitation through Wearable Intelligent Soft Exosuits",
+        "agency": "University of Virginia Main Campus",
+        "amount": "$1,000,000",
+        "url": "https://www.nsf.gov/awardsearch/showAward?AWD_ID=2501041",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NSF-2334732",
+        "title": "BRC-BIO: Towards mechanistic elucidation of wall-associated kinase immunity receptors in barley-spot blotch interaction",
+        "agency": "South Dakota State University",
+        "amount": "$494,829",
+        "url": "https://www.nsf.gov/awardsearch/showAward?AWD_ID=2334732",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NSF-2514624",
+        "title": "Conference: Cytoskeletal Structure, Function, and Dynamics",
+        "agency": "Federation of Amer Societies For Exper Biology",
+        "amount": "$15,000",
+        "url": "https://www.nsf.gov/awardsearch/showAward?AWD_ID=2514624",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NSF-2423517",
+        "title": "SBIR Phase I:  Enhancing Pathology Efficiency with On-Chip Optical Coherence Tomography (OCT) Imaging Technology",
+        "agency": "PATHFLOW INC.",
+        "amount": "$275,000",
+        "url": "https://www.nsf.gov/awardsearch/showAward?AWD_ID=2423517",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NSF-2500961",
+        "title": "Collaborative Research: SCH: Protecting Privacy and Promoting Fairness in Advanced Genomic Research using Federated Learning",
+        "agency": "Northeastern University",
+        "amount": "$420,000",
+        "url": "https://www.nsf.gov/awardsearch/showAward?AWD_ID=2500961",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NSF-2503686",
+        "title": "Super-Resolution Cell and Tissue Imaging via Parallel Multifocal Scanning Microscopy",
+        "agency": "Georgia Tech Research Corporation",
+        "amount": "$861,467",
+        "url": "https://www.nsf.gov/awardsearch/showAward?AWD_ID=2503686",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NSF-2539043",
+        "title": "CAREER: Elucidating and Leveraging the Connection Between Label-Free Biomedical Imaging and Gene Network Regulation",
+        "agency": "University of Arizona",
+        "amount": "$625,000",
+        "url": "https://www.nsf.gov/awardsearch/showAward?AWD_ID=2539043",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NSF-2401409",
+        "title": "Collaborative Research: Unraveling secrets of Rapid Ohi'a Death resistance: assessing carbohydrates and chemical defenses in the response of Hawaiian forests to a fungal pathogen",
+        "agency": "Purdue University",
+        "amount": "$542,137",
+        "url": "https://www.nsf.gov/awardsearch/showAward?AWD_ID=2401409",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NSF-2430270",
+        "title": "CC* Compute-Campus: Louisville Academic Research Compute Cluster (LARCC)",
+        "agency": "University of Louisville Research Foundation Inc",
+        "amount": "$720,000",
+        "url": "https://www.nsf.gov/awardsearch/showAward?AWD_ID=2430270",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NSF-2521664",
+        "title": "Collaborative Research: Developing kinetic 3D computational models of bipedal walking",
+        "agency": "Midwestern University",
+        "amount": "$138,805",
+        "url": "https://www.nsf.gov/awardsearch/showAward?AWD_ID=2521664",
+        "date": "2026-03-31T16:52:50.927Z"
+      }
+    ],
+    "news": [
+      {
+        "id": "NEWS-PHY-news694095939",
+        "title": "Study uncovers internal cell 'trade winds' that drive movement and repair",
+        "source": "Phys.org",
+        "url": "https://phys.org/news/2026-03-uncovers-internal-cell-movement.html",
+        "image": "https://images.pexels.com/photos/16328960/pexels-photo-16328960.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NEWS-PHY-news694082942",
+        "title": "Two organs, one brain area: How fish orient themselves in the water",
+        "source": "Phys.org",
+        "url": "https://phys.org/news/2026-03-brain-area-fish.html",
+        "image": "https://images.pexels.com/photos/9228386/pexels-photo-9228386.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NEWS-NAT-httpswwwnaturecomarticlesd41586-026-00970-6",
+        "title": "Dawkins’s paradox: dissecting the body’s battle to keep selfish genes in check",
+        "source": "Nature",
+        "url": "https://www.nature.com/articles/d41586-026-00970-6",
+        "image": "https://images.pexels.com/photos/15851257/pexels-photo-15851257.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NEWS-PHY-news694078081",
+        "title": "Viruses 'eavesdrop' on each other—but it can backfire",
+        "source": "Phys.org",
+        "url": "https://phys.org/news/2026-03-viruses-eavesdrop-backfire.html",
+        "image": "https://images.pexels.com/photos/13520161/pexels-photo-13520161.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NEWS-PHY-news694093801",
+        "title": "Cells under stress: How a chemotherapy drug damages RNA",
+        "source": "Phys.org",
+        "url": "https://phys.org/news/2026-03-cells-stress-chemotherapy-drug-rna.html",
+        "image": "https://images.pexels.com/photos/22938617/pexels-photo-22938617.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NEWS-CEL-httpswwwcellcomcellfulltextS0092-86742600279-5rssyes",
+        "title": "Sulfur partitioning from cysteine controls T cell proliferation and effector function",
+        "source": "Cell Press",
+        "url": "https://www.cell.com/cell/fulltext/S0092-8674(26)00279-5?rss=yes",
+        "image": "https://images.pexels.com/photos/11198526/pexels-photo-11198526.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NEWS-PHY-news694109402",
+        "title": "Unexpected potential bacterial symbiosis found in fungus that causes angular leaf spot",
+        "source": "Phys.org",
+        "url": "https://phys.org/news/2026-03-unexpected-potential-bacterial-symbiosis-fungus.html",
+        "image": "https://images.pexels.com/photos/6605132/pexels-photo-6605132.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NEWS-PHY-news694108982",
+        "title": "Understanding cell structures: Novel tool enables analysis of the plant actin cytoskeleton",
+        "source": "Phys.org",
+        "url": "https://phys.org/news/2026-03-cell-tool-enables-analysis-actin.html",
+        "image": "https://images.pexels.com/photos/16598692/pexels-photo-16598692.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NEWS-PHY-news694104422",
+        "title": "Gut bacteria may influence social behavior through smell",
+        "source": "Phys.org",
+        "url": "https://phys.org/news/2026-03-gut-bacteria-social-behavior.html",
+        "image": "https://images.pexels.com/photos/5841748/pexels-photo-5841748.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NEWS-PHY-news694103132",
+        "title": "Why cells stick differently: New clues could inform skin and inflammatory disease research",
+        "source": "Phys.org",
+        "url": "https://phys.org/news/2026-03-cells-differently-clues-skin-inflammatory.html",
+        "image": "https://images.pexels.com/photos/7298657/pexels-photo-7298657.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NEWS-PHY-news694167842",
+        "title": "Unlocking designer roots for future cereal crops",
+        "source": "Phys.org",
+        "url": "https://phys.org/news/2026-03-roots-future-cereal-crops.html",
+        "image": "https://images.pexels.com/photos/7825343/pexels-photo-7825343.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+        "date": "2026-03-31T16:52:50.927Z"
+      },
+      {
+        "id": "NEWS-PHY-news694157858",
+        "title": "Into the fungal unknown: New tool maps fungal gene functions without reference genomes",
+        "source": "Phys.org",
+        "url": "https://phys.org/news/2026-03-fungal-unknown-tool-gene-functions.html",
+        "image": "https://images.pexels.com/photos/18069424/pexels-photo-18069424.png?auto=compress&cs=tinysrgb&h=650&w=940",
+        "date": "2026-03-31T16:52:50.927Z"
+      }
+    ],
+    "literature": [
+      {
+        "id": "LIT-10.64898/2026.03.27.714844",
+        "title": "Pan-Metabolomics Repository Mapping of the Carnitine Landscape",
+        "authors": "Mannochio-Russo, H.; Ferreira, P. C.; Kvitne, K. E.; Patan, A.; Deleray, V.; Agongo, J.; Gouda, H.; Goncalves Nunes, W. D.; Xing, S.; Zemlin, J.; van Faassen, M.; Reilly, E. R.; Koo, I.; Patterson, A. D.; Tsunoda, S. M.; Wang, M.; Siegel, D.; Burnett, L. A.; Dorrestein, P. C.",
+        "journal": "bioRxiv",
+        "doi": "10.64898/2026.03.27.714844",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "LIT-10.1101/2025.11.25.689574",
+        "title": "The BRCA1-RAD51 Axis Regulates SCAI/REV3 Dependent Replication Fork Maintenance",
+        "authors": "Unterseher, C.; Tsuchida, H.; Bosire, R.; Kieffer, S.; Jin, X.; Adeyemi, R.",
+        "journal": "bioRxiv",
+        "doi": "10.1101/2025.11.25.689574",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "LIT-10.64898/2026.03.27.714811",
+        "title": "Cell type composition drives patient stratification in single-cell RNA-seq cohorts",
+        "authors": "Halter, C.; Andreatta, M.; Carmona, S.",
+        "journal": "bioRxiv",
+        "doi": "10.64898/2026.03.27.714811",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "LIT-10.64898/2026.03.27.714840",
+        "title": "Tumour marker analysis using a machine learning assisted vibrational spectroscopy approach",
+        "authors": "Fatayer, R.; Sammut, S.-J.; Senthil Murugan, G.",
+        "journal": "bioRxiv",
+        "doi": "10.64898/2026.03.27.714840",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "LIT-10.64898/2026.03.28.714971",
+        "title": "The antipsychotic drug clozapine suppresses autoimmunity driving psychosis-like behavior in mice",
+        "authors": "He, L.; Feldman, H.; Nguyen, T.; Bosc, M.; Polisetty, V.; Kriel, O.; Landwehr, A.; Borg, A.; Subtil, F. T.; Khakpour, M.; Zhou, J.; Kjaer, S.; MacCabe, J.; Pollak, T. A.; Tremblay, M.-E.; Vinuesa, C. G.; Hayday, A.; Schmack, K.",
+        "journal": "bioRxiv",
+        "doi": "10.64898/2026.03.28.714971",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "LIT-10.1101/2025.10.15.682714",
+        "title": "3' Nucleotide Asymmetry Directs miRNA Strand Selection",
+        "authors": "Medley, J. C.; Kurosu Moriya, S.; Ouyang, H.; Crawshaw, H.; Zhang, S. Y.; Panzade, G.; Sydzyik, W. J.; Sydzyik, J. T.; Bhandari, M.; Hammell, C. M.; Zinovyeva, A.",
+        "journal": "bioRxiv",
+        "doi": "10.1101/2025.10.15.682714",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "LIT-10.64898/2026.03.13.711628",
+        "title": "Flipper: An advanced framework for identifyingdifferential RNA binding behavior with eCLIP data",
+        "authors": "Flanagan, K.; Xu, S.; Yeo, G. W.",
+        "journal": "bioRxiv",
+        "doi": "10.64898/2026.03.13.711628",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "LIT-10.64898/2026.03.27.714788",
+        "title": "WayFindR: Investigating Feedback in Biological Pathways",
+        "authors": "Bombina, P.; McGee, R. L.; Reed, J.; Abrams, Z.; Abruzzo, L. V.; Coombes, K. R.",
+        "journal": "bioRxiv",
+        "doi": "10.64898/2026.03.27.714788",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "LIT-10.64898/2026.03.26.714643",
+        "title": "CCIDeconv: Hierarchical model for deconvolution of subcellular cell-cell interactions in single-cell data",
+        "authors": "Jayakumar, R.; Panwar, P.; Yang, J. Y. H.; Ghazanfar, S.",
+        "journal": "bioRxiv",
+        "doi": "10.64898/2026.03.26.714643",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "LIT-10.1101/2025.08.25.672092",
+        "title": "Understanding Shape and Residual Stress Dynamics in Rod-Like Plant Organs",
+        "authors": "Porat, A.",
+        "journal": "bioRxiv",
+        "doi": "10.1101/2025.08.25.672092",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "LIT-10.64898/2026.03.27.714838",
+        "title": "rAAV prostaglandin-based gene therapy lowers intraocular pressure and preserves optic nerve health in glaucomatous DBA/2J mice",
+        "authors": "Chern, K. J.; Fehrman, R. L.; Marcoe, G. J.; Lipinski, D. M.",
+        "journal": "bioRxiv",
+        "doi": "10.64898/2026.03.27.714838",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "LIT-10.64898/2026.03.27.714770",
+        "title": "Modeling gene regulatory perturbations via deep learning from high-throughput reporter assays",
+        "authors": "Venukuttan, R.; Doty, R.; Thomson, A.; Chen, Y.; Li, B.; Duan, Y.; Barrera, A.; Dura, K.; Ko, K.-Y.; Lapp, H.; Reddy, T. E.; Allen, A. S.; Majoros, W. H.",
+        "journal": "bioRxiv",
+        "doi": "10.64898/2026.03.27.714770",
+        "date": "2026-03-31T16:52:50.928Z"
+      }
+    ],
+    "positions": [
+      {
+        "id": "JOBUndergraduateCoopProgramBiologyGenomicsDanaFarber",
+        "title": "Undergraduate Co-op Program - Biology & Genomics",
+        "institution": "Dana-Farber",
+        "location": "Bar Harbor, ME",
+        "url": "https://careers.google.com/search?q=Dana-Farber",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "JOBPREPScholarBiologyGenomicsHHMIJanelia",
+        "title": "PREP Scholar - Biology & Genomics",
+        "institution": "HHMI Janelia",
+        "location": "Ashburn, VA",
+        "url": "https://careers.google.com/search?q=HHMI%20Janelia",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "JOBEntryLevelMolecularTechnicianBiologyGenomicsVanderbilt",
+        "title": "Entry-Level Molecular Technician - Biology & Genomics",
+        "institution": "Vanderbilt",
+        "location": "Seattle, WA",
+        "url": "https://careers.google.com/search?q=Vanderbilt",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "JOBResearchAssistantIBiologyGenomicsBroadInstitute",
+        "title": "Research Assistant I - Biology & Genomics",
+        "institution": "Broad Institute",
+        "location": "Cambridge, MA",
+        "url": "https://careers.google.com/search?q=Broad%20Institute",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "JOBPREPScholarBiologyGenomicsVanderbilt",
+        "title": "PREP Scholar - Biology & Genomics",
+        "institution": "Vanderbilt",
+        "location": "Seattle, WA",
+        "url": "https://careers.google.com/search?q=Vanderbilt",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "JOBEntryLevelMolecularTechnicianBiologyGenomicsDanaFarber",
+        "title": "Entry-Level Molecular Technician - Biology & Genomics",
+        "institution": "Dana-Farber",
+        "location": "Bar Harbor, ME",
+        "url": "https://careers.google.com/search?q=Dana-Farber",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "JOBPREPScholarBiologyGenomicsSENSResearch",
+        "title": "PREP Scholar - Biology & Genomics",
+        "institution": "SENS Research",
+        "location": "La Jolla, CA",
+        "url": "https://careers.google.com/search?q=SENS%20Research",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "JOBPREPScholarBiologyGenomicsSalkInstitute",
+        "title": "PREP Scholar - Biology & Genomics",
+        "institution": "Salk Institute",
+        "location": "Boston, MA",
+        "url": "https://careers.google.com/search?q=Salk%20Institute",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "JOBUndergraduateCoopProgramBiologyGenomicsHHMIJanelia",
+        "title": "Undergraduate Co-op Program - Biology & Genomics",
+        "institution": "HHMI Janelia",
+        "location": "Ashburn, VA",
+        "url": "https://careers.google.com/search?q=HHMI%20Janelia",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "JOBResearchAssistantIBiologyGenomicsTheJacksonLaboratory",
+        "title": "Research Assistant I - Biology & Genomics",
+        "institution": "The Jackson Laboratory",
+        "location": "Mountain View, CA",
+        "url": "https://careers.google.com/search?q=The%20Jackson%20Laboratory",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "JOBResearchAssistantIBiologyGenomicsGinkgoBioworks",
+        "title": "Research Assistant I - Biology & Genomics",
+        "institution": "Ginkgo Bioworks",
+        "location": "Bethesda, MD",
+        "url": "https://careers.google.com/search?q=Ginkgo%20Bioworks",
+        "date": "2026-03-31T16:52:50.928Z"
+      },
+      {
+        "id": "JOBClinicalResearchAssistantBiologyGenomicsMDAnderson",
+        "title": "Clinical Research Assistant - Biology & Genomics",
+        "institution": "MD Anderson",
+        "location": "Cambridge, MA",
+        "url": "https://careers.google.com/search?q=MD%20Anderson",
+        "date": "2026-03-31T16:52:50.928Z"
+      }
+    ]
+  },
+  "Ledger": []
+}

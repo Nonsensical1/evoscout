@@ -1,0 +1,88 @@
+"use client";
+
+import { createContext, useContext, useEffect, useState } from "react";
+import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  signIn: () => Promise<void>;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  signIn: async () => {},
+  signOut: async () => {}
+});
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          // Init settings if new user (will fail gracefully if Firestore rules aren't set yet)
+          const settingsRef = doc(db, 'users', user.uid, 'settings', 'config');
+          const snap = await getDoc(settingsRef);
+          if (!snap.exists()) {
+            await setDoc(settingsRef, {
+              newsLimit: 50,
+              literatureLimit: 50,
+              grantsLimit: 50
+            }, { merge: true });
+          }
+        } catch (err) {
+          console.error("Firestore Init Error (Safe to ignore if setting up fresh):", err);
+        }
+      }
+      setUser(user);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const signIn = async () => {
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+  };
+
+  const signOut = async () => {
+    await firebaseSignOut(auth);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+      {loading ? (
+        <div className="min-h-screen bg-[#fafafa] flex items-center justify-center font-serif text-editorial-text">
+          Initializing secure database connection...
+        </div>
+      ) : !user ? (
+        <div className="min-h-screen bg-[#fafafa] bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] flex items-center justify-center p-4">
+          <div className="max-w-md w-full border-2 border-editorial-border p-8 text-center bg-white shadow-sm">
+            <h1 className="text-3xl font-serif font-black mb-2 uppercase tracking-tight text-editorial-text">EvoScout Auth</h1>
+            <div className="w-16 h-1 bg-editorial-text mx-auto mb-6"></div>
+            <p className="font-serif italic text-editorial-muted mb-8">
+              Sign in to access your secure, personalized research aggregation pipeline.
+            </p>
+            <button 
+              onClick={signIn}
+              className="w-full bg-editorial-text text-white py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm hover:bg-black transition-colors"
+            >
+              Sign In with Google
+            </button>
+          </div>
+        </div>
+      ) : (
+        children
+      )}
+    </AuthContext.Provider>
+  );
+}
+
+export const useAuth = () => useContext(AuthContext);
