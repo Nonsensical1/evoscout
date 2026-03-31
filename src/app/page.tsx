@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { useAuth } from '@/app/providers';
 import { db } from '@/lib/firebase';
@@ -11,6 +11,17 @@ export default function Home() {
   const [data, setData] = useState({ grants: [], news: [], literature: [], positions: [] });
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
+
+  const imageIndices = useMemo(() => {
+    if (data.news.length === 0) return new Set<number>();
+    const count = Math.ceil(data.news.length / 2);
+    const indices = new Set<number>();
+    indices.add(0); // Keep the top news as hero banner
+    while (indices.size < count) {
+      indices.add(Math.floor(Math.random() * data.news.length));
+    }
+    return indices;
+  }, [data.news]);
 
   const handleRunScraper = async () => {
     if (!user) return;
@@ -161,8 +172,8 @@ export default function Home() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10 md:grid-flow-dense">
                   {data.news.map((n: any, i: number) => {
                     const isHero = i === 0;
-                    const isTall = i === 2 || i === 5 || i === 8 || i === 11;
-                    const hasImage = isHero || isTall;
+                    const hasImage = imageIndices.has(i);
+                    const isTall = hasImage && !isHero;
                     
                     return (
                       <a href={n.url || "#"} target="_blank" key={n.id} className={`block outline-none h-full ${isHero ? 'md:col-span-2' : ''} ${isTall ? 'md:row-span-2' : ''}`}>
