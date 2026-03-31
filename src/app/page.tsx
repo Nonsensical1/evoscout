@@ -239,17 +239,19 @@ export default function Home() {
             ) : (
                 <div className="flex flex-col gap-6">
                   {data.grants.map((grant: any) => (
-                    <article key={grant.id} className="group cursor-pointer border-b border-editorial-border pb-6 last:border-0">
-                      <div className="flex items-center justify-center gap-2 mb-2">
-                         <div className="w-4 border-t border-editorial-text"></div>
-                         <span className="text-[9px] uppercase font-sans font-bold tracking-widest text-[#005587] text-center">{grant.agency}</span>
-                         <div className="w-4 border-t border-editorial-text"></div>
-                      </div>
-                      <h4 className="text-xl font-serif font-bold text-center leading-snug group-hover:underline decoration-1 underline-offset-4">{grant.title}</h4>
-                      <div className="text-sm font-sans font-bold mt-4 text-center bg-gray-50 py-2 border border-gray-200 group-hover:bg-[#005587] group-hover:text-white transition-colors">
-                         {grant.amount}
-                      </div>
-                    </article>
+                    <a href={grant.url} target="_blank" rel="noopener noreferrer" key={grant.id} className="block outline-none group cursor-pointer border-b border-editorial-border pb-6 last:border-0">
+                      <article>
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                           <div className="w-4 border-t border-editorial-text"></div>
+                           <span className="text-[9px] uppercase font-sans font-bold tracking-widest text-[#005587] text-center">{grant.agency}</span>
+                           <div className="w-4 border-t border-editorial-text"></div>
+                        </div>
+                        <h4 className="text-xl font-serif font-bold text-center leading-snug group-hover:underline decoration-1 underline-offset-4">{grant.title}</h4>
+                        <div className="text-sm font-sans font-bold mt-4 text-center bg-gray-50 py-2 border border-gray-200 group-hover:bg-[#005587] group-hover:text-white transition-colors">
+                           {grant.amount}
+                        </div>
+                      </article>
+                    </a>
                   ))}
                 </div>
             )}
