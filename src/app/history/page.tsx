@@ -60,13 +60,13 @@ export default function LedgerPage() {
                    <div className="flex flex-col gap-4 border-r-0 md:border-r border-editorial-border pr-0 md:pr-6">
                       <h4 className="text-sm font-sans font-bold uppercase tracking-widest mb-2 border-b border-gray-200 pb-1">Funding</h4>
                       {!edition.grants || edition.grants.length === 0 ? <p className="text-xs italic text-gray-500">None</p> : edition.grants.map((g: any, i: number) => (
-                         <div key={i} className="mb-3 border-b border-gray-100 pb-3 last:border-0">
-                           <h5 className="font-serif font-bold leading-tight">{g.title}</h5>
+                         <a href={g.url} target="_blank" rel="noopener noreferrer" key={i} className="group block mb-3 border-b border-gray-100 pb-3 last:border-0 hover:bg-gray-50 transition-colors -mx-2 px-2">
+                           <h5 className="font-serif font-bold leading-tight group-hover:underline decoration-1 underline-offset-2">{g.title}</h5>
                            <div className="flex justify-between items-center text-xs mt-1">
                               <span className="text-[#005587] font-bold">{g.agency}</span>
                               <span className="text-gray-500 font-mono">{g.amount}</span>
                            </div>
-                         </div>
+                         </a>
                       ))}
                    </div>
 
@@ -74,11 +74,11 @@ export default function LedgerPage() {
                    <div className="flex flex-col gap-4 border-r-0 md:border-r border-editorial-border pr-0 md:pr-6">
                       <h4 className="text-sm font-sans font-bold uppercase tracking-widest mb-2 border-b border-gray-200 pb-1">Literature & Pre-Prints</h4>
                       {!edition.literature || edition.literature.length === 0 ? <p className="text-xs italic text-gray-500">None</p> : edition.literature.map((l: any, i: number) => (
-                         <div key={i} className="mb-3 border-b border-gray-100 pb-3 last:border-0 hover:bg-gray-50 transition-colors p-2 -mx-2">
+                         <a href={`https://doi.org/${l.doi}`} target="_blank" rel="noopener noreferrer" key={i} className="group mb-3 border-b border-gray-100 pb-3 last:border-0 hover:bg-gray-50 transition-colors p-2 -mx-2 block">
                            <h5 className="font-serif font-bold leading-tight group-hover:underline">{l.title}</h5>
                            <p className="text-xs text-gray-500 italic mt-1">{l.authors}</p>
                            <span className="text-[10px] uppercase font-bold text-gray-400 mt-1 block">{l.journal}</span>
-                         </div>
+                         </a>
                       ))}
                    </div>
                    
@@ -86,10 +86,10 @@ export default function LedgerPage() {
                    <div className="flex flex-col gap-4">
                       <h4 className="text-sm font-sans font-bold uppercase tracking-widest mb-2 border-b border-gray-200 pb-1">Positions & News</h4>
                       {!edition.positions || edition.positions.length === 0 ? null : edition.positions.map((p: any, i: number) => (
-                         <div key={`p-${i}`} className="mb-2">
-                           <h5 className="font-serif text-sm font-bold text-[#b02a2a]">{p.title}</h5>
+                         <a href={p.url} target="_blank" rel="noopener noreferrer" key={`p-${i}`} className="group block mb-4 border-b border-dashed border-gray-100 pb-4 last:border-0 hover:bg-gray-50 transition-colors p-2 -mx-2">
+                           <h5 className="font-serif text-sm font-bold text-[#b02a2a] group-hover:underline">{p.title}</h5>
                            <span className="text-[10px] uppercase font-bold text-gray-400">{p.institution}</span>
-                         </div>
+                         </a>
                       ))}
                       {!edition.news || edition.news.length === 0 ? null : edition.news.map((n: any, i: number) => (
                          <a href={n.url || "#"} target="_blank" key={`n-${i}`} className="block mt-4 pt-4 border-t border-dashed border-gray-200 hover:opacity-80 transition-opacity">
