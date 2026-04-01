@@ -27,7 +27,8 @@ export default function Home() {
     if (!user) return;
     setActionMessage("Extracting Context...");
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const today = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
 
       const [settingsSnap, historySnap, feedSnap] = await Promise.all([
          getDoc(doc(db, 'users', user.uid, 'settings', 'config')),
@@ -113,7 +114,8 @@ export default function Home() {
     const unsub = onSnapshot(doc(db, 'users', user.uid, 'daily', 'feed'), (docSnap) => {
       if (docSnap.exists()) {
         const feed = docSnap.data();
-        const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const today = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
         
         if (feed.date && feed.date !== today) {
            setActionMessage("New day detected. Initializing engine...");

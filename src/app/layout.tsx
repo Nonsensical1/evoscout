@@ -5,6 +5,7 @@ import { ReactNode } from 'react';
 import Link from 'next/link';
 import { AuthProvider } from './providers';
 import { UserMenu } from './UserMenu';
+import { CurrentDate } from './CurrentDate';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-serif' });
@@ -27,7 +28,7 @@ export default function RootLayout({
           <header className="bg-editorial-paper border-b border-editorial-border-dark sticky top-0 z-50 shadow-sm transition-all duration-300">
             <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col items-center border-b border-gray-200 pb-4 relative">
                <div className="w-full flex justify-between items-center text-[10px] md:text-xs font-sans text-editorial-muted uppercase tracking-widest mb-4">
-                  <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                  <CurrentDate />
                   <span>Synthetic Biology Edition</span>
                </div>
                <Link href="/" className="hover:opacity-80 transition-opacity">
