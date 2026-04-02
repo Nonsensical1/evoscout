@@ -190,7 +190,7 @@ export default function Home() {
                         <article className={`article-card group cursor-pointer relative flex flex-col h-full ${hasImage ? 'border-b border-editorial-border pb-6' : 'border-b border-gray-200 pb-4'}`}>
                           {hasImage && n.image && (
                              <div className={`relative mb-4 overflow-hidden rounded-sm w-full ${isHero ? 'h-64' : 'h-48 md:h-auto md:flex-grow min-h-[220px]'}`}>
-                               <img src={n.image} alt="Article Thumbnail" className="absolute inset-0 w-full h-full object-cover grayscale opacity-90 transition-transform duration-700 group-hover:scale-105" />
+                               <img src={n.image} alt="Article Thumbnail" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                                <div className="absolute inset-0 border border-black/10"></div>
                              </div>
                           )}
