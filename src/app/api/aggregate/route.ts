@@ -254,7 +254,7 @@ async function fetchLiveData(topicsMap: any = {}) {
           t: `${t} - Biology & Genomics`,
           i: inst,
           l: locations[idx % locations.length],
-          u: `https://careers.google.com/search?q=${encodeURIComponent(inst)}`
+          u: `https://www.google.com/search?q=${encodeURIComponent(`${inst} ${t} careers`)}`
         });
       });
     });
