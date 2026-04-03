@@ -33,9 +33,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const snap = await getDoc(settingsRef);
           if (!snap.exists()) {
             await setDoc(settingsRef, {
-              newsLimit: 50,
-              literatureLimit: 50,
-              grantsLimit: 50
+              newsLimit: 12,
+              literatureLimit: 12,
+              grantsLimit: 12
             }, { merge: true });
           }
         } catch (err) {

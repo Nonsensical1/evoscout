@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { ExternalLink, Clock } from 'lucide-react';
 import { useAuth } from '@/app/providers';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc } from 'firebase/firestore';
@@ -11,6 +11,8 @@ export default function Home() {
   const [data, setData] = useState({ grants: [], openGovGrants: [], news: [], literature: [], positions: [] });
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
+  const [quotaNotice, setQuotaNotice] = useState<string | null>(null);
+  const scrapeInProgress = useRef(false);
 
   const imageIndices = useMemo(() => {
     if (data.news.length === 0) return new Set<number>();
@@ -23,8 +25,12 @@ export default function Home() {
     return indices;
   }, [data.news]);
 
-  const handleRunScraper = async () => {
-    if (!user) return;
+  const SCRAPE_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+
+  const handleRunScraper = useCallback(async () => {
+    if (!user || scrapeInProgress.current) return;
+    scrapeInProgress.current = true;
+    setQuotaNotice(null);
     setActionMessage("Extracting Context...");
     try {
       const now = new Date();
@@ -36,7 +42,7 @@ export default function Home() {
          getDoc(doc(db, 'users', user.uid, 'daily', 'feed'))
       ]);
 
-      const settings = settingsSnap.exists() ? settingsSnap.data() : { newsLimit: 50, grantsLimit: 50, literatureLimit: 50, positionsLimit: 50, topics: {} };
+      const settings = settingsSnap.exists() ? settingsSnap.data() : { newsLimit: 12, grantsLimit: 12, literatureLimit: 12, positionsLimit: 12, topics: {} };
       const historyArr = historySnap.exists() ? historySnap.data()?.hashes || [] : [];
       const history = new Set(historyArr);
       let dailyFeed: any = feedSnap.exists() ? feedSnap.data() : { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
@@ -60,6 +66,7 @@ export default function Home() {
       
       if (!scrapRes.success || !scrapRes.liveData) {
         setActionMessage("Pipeline Error: Failed to gather external feeds.");
+        scrapeInProgress.current = false;
         return;
       }
       const liveData = scrapRes.liveData;
@@ -87,28 +94,55 @@ export default function Home() {
         }
       };
 
-      processCategory(liveData.grants, 'grants', settings.grantsLimit || 50);
-      if (liveData.openGovGrants) processCategory(liveData.openGovGrants, 'openGovGrants', settings.grantsLimit || 50);
-      processCategory(liveData.news, 'news', settings.newsLimit || 50);
-      processCategory(liveData.literature, 'literature', settings.literatureLimit || 50);
-      processCategory(liveData.positions, 'positions', settings.positionsLimit || 50);
+      const newsLimit = settings.newsLimit || 12;
+      const litLimit = settings.literatureLimit || 12;
+      const grantsLimit = settings.grantsLimit || 12;
+
+      processCategory(liveData.grants, 'grants', grantsLimit);
+      if (liveData.openGovGrants) processCategory(liveData.openGovGrants, 'openGovGrants', grantsLimit);
+      processCategory(liveData.news, 'news', newsLimit);
+      processCategory(liveData.literature, 'literature', litLimit);
+      processCategory(liveData.positions, 'positions', settings.positionsLimit || 12);
+
+      // Compute quota-filled flags for the three participating categories
+      const quotaFilled = {
+        news: (dailyFeed.news?.length || 0) >= newsLimit,
+        literature: (dailyFeed.literature?.length || 0) >= litLimit,
+        grants: (dailyFeed.grants?.length || 0) >= grantsLimit,
+      };
+
+      // Write feed + timestamp + quota status
+      dailyFeed.lastScrapeTimestamp = new Date().toISOString();
+      dailyFeed.quotaFilled = quotaFilled;
 
       const batch = writeBatch(db);
       batch.set(doc(db, 'users', user.uid, 'daily', 'feed'), dailyFeed);
       batch.set(doc(db, 'users', user.uid, 'scouted', 'history'), { hashes: historyArr });
       await batch.commit();
 
+      // Show notice if quota is not fully met
+      const allFilled = quotaFilled.news && quotaFilled.literature && quotaFilled.grants;
+      if (!allFilled) {
+        setQuotaNotice("It's still early — some feeds haven't fully populated yet. EvoScout will attempt to gather more content on your next visit after the hourly cooldown.");
+      } else {
+        setQuotaNotice(null);
+      }
+
       setActionMessage(`Scraper Complete: Added ${addedCount} items, skipped ${skippedCount} duplicates/over-quota.`);
 
     } catch (e: any) {
       console.error(e);
       setActionMessage("Error running scraper: " + e.message);
+    } finally {
+      scrapeInProgress.current = false;
     }
     setTimeout(() => setActionMessage(""), 5000);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
+    let hasFiredInitialScrapeCheck = false;
     
     // Listen to live database feed locally to auto-refresh the UI when scraper finishes!
     const unsub = onSnapshot(doc(db, 'users', user.uid, 'daily', 'feed'), (docSnap) => {
@@ -117,28 +151,60 @@ export default function Home() {
         const now = new Date();
         const today = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
         
+        // Always update UI with current feed data first
+        setData({
+          grants: feed.grants || [],
+          openGovGrants: feed.openGovGrants || [],
+          news: feed.news || [],
+          literature: feed.literature || [],
+          positions: feed.positions || []
+        });
+        setLoading(false);
+
+        // Only run scrape decision logic once per mount (not on every snapshot)
+        if (hasFiredInitialScrapeCheck) return;
+        hasFiredInitialScrapeCheck = true;
+
+        // CASE 1: New day detected — archive and scrape fresh
         if (feed.date && feed.date !== today) {
-           setActionMessage("New day detected. Initializing engine...");
-           handleRunScraper();
-        } else {
-           setData({
-             grants: feed.grants || [],
-             openGovGrants: feed.openGovGrants || [],
-             news: feed.news || [],
-             literature: feed.literature || [],
-             positions: feed.positions || []
-           });
-           setLoading(false);
+          setActionMessage("New day detected. Initializing engine...");
+          handleRunScraper();
+          return;
         }
+
+        // CASE 2: Same day — check if quota-filling cycle should trigger
+        const qf = feed.quotaFilled || { news: false, literature: false, grants: false };
+        const allFilled = qf.news && qf.literature && qf.grants;
+
+        if (allFilled) {
+          // All quotas met — done for the day
+          setQuotaNotice(null);
+          return;
+        }
+
+        // Quotas not filled — check cooldown
+        const lastScrape = feed.lastScrapeTimestamp ? new Date(feed.lastScrapeTimestamp).getTime() : 0;
+        const elapsed = Date.now() - lastScrape;
+
+        if (elapsed >= SCRAPE_COOLDOWN_MS) {
+          // Cooldown expired — re-scrape to try filling quota
+          setActionMessage("Quota not yet met. Re-scanning feeds...");
+          handleRunScraper();
+        } else {
+          // Cooldown active — show notice
+          const minutesLeft = Math.ceil((SCRAPE_COOLDOWN_MS - elapsed) / 60000);
+          setQuotaNotice(`It's still early — some feeds haven't fully populated yet. EvoScout will attempt to gather more content if you check back in ~${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.`);
+        }
+
       } else {
         // Document does not exist yet (first sign-in)
+        hasFiredInitialScrapeCheck = true;
         handleRunScraper();
       }
     });
 
     return () => unsub();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, handleRunScraper, SCRAPE_COOLDOWN_MS]);
 
 
   if (loading) return <div className="min-h-[50vh] flex items-center justify-center font-serif text-xl italic text-editorial-muted">Synchronizing encrypted database...</div>;
@@ -160,6 +226,19 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Quota Notice Banner */}
+      {quotaNotice && (
+        <section className="mb-8 animate-in fade-in duration-500">
+          <div className="flex items-start gap-4 px-6 py-4 bg-[#fffbeb] border border-[#f5d98c] text-[#7c6a1a] font-sans text-sm leading-relaxed">
+            <Clock className="w-5 h-5 mt-0.5 flex-shrink-0 opacity-70" />
+            <p>
+              <span className="font-bold uppercase tracking-wider text-xs block mb-1">Content Still Accumulating</span>
+              {quotaNotice}
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 relative">
