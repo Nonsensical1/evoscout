@@ -48,11 +48,13 @@ export default function Home() {
       let dailyFeed: any = feedSnap.exists() ? feedSnap.data() : { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
 
       // Archive if new day
+      let oldFeed: any = null;
       if (dailyFeed.date !== today) {
         const hasItems = dailyFeed.grants?.length || dailyFeed.news?.length || dailyFeed.literature?.length || dailyFeed.positions?.length;
         if (hasItems) {
            await addDoc(collection(db, 'users', user.uid, 'ledger'), dailyFeed);
         }
+        oldFeed = JSON.parse(JSON.stringify(dailyFeed));
         dailyFeed = { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
       }
 
@@ -102,7 +104,23 @@ export default function Home() {
       if (liveData.openGovGrants) processCategory(liveData.openGovGrants, 'openGovGrants', grantsLimit);
       processCategory(liveData.news, 'news', newsLimit);
       processCategory(liveData.literature, 'literature', litLimit);
-      processCategory(liveData.positions, 'positions', settings.positionsLimit || 12);
+      // Positions are processed but NOT tracked in 'history.has' backfilling to avoid stale listings.
+      // We always refresh positions entirely.
+      dailyFeed.positions = liveData.positions ? liveData.positions.slice(0, settings.positionsLimit || 12) : [];
+
+      // Backfill missing items from the previous feed to prevent slow-weekend empty states
+      if (oldFeed) {
+         ['news', 'literature', 'grants', 'openGovGrants'].forEach(cat => {
+            const limit = settings[`${cat}Limit`] || 12; // fallback
+            if (oldFeed[cat] && oldFeed[cat].length > 0 && (!dailyFeed[cat] || dailyFeed[cat].length < limit)) {
+               const needed = limit - (dailyFeed[cat]?.length || 0);
+               const existingIds = new Set((dailyFeed[cat] || []).map((i: any) => i.id));
+               const candidates = oldFeed[cat].filter((i: any) => !existingIds.has(i.id));
+               if (!dailyFeed[cat]) dailyFeed[cat] = [];
+               dailyFeed[cat] = [...dailyFeed[cat], ...candidates.slice(0, needed)];
+            }
+         });
+      }
 
       // Compute quota-filled flags for the three participating categories
       const quotaFilled = {

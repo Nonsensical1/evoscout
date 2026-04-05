@@ -243,19 +243,37 @@ async function fetchLiveData(topicsMap: any = {}) {
   } catch (e) { console.error("Lit Fetch Error:", e); }
 
   try {
-    const jobTitles = parseTopics(topicsMap.careerTitles, ["Undergraduate Research Assistant", "Rolling Postbaccalaureate Fellow", "Gap-Year Research Technologist", "Fall Co-op Biology Intern", "Undergraduate Lab Associate", "PREP Scholar", "Entry-Level Molecular Technician", "Research Assistant I", "Undergraduate Co-op Program", "Clinical Research Assistant"]);
-    const institutions = parseTopics(topicsMap.careerInstitutions, ["Broad Institute", "HHMI Janelia", "Wyss Institute", "Ginkgo Bioworks", "Dana-Farber", "NIH", "The Jackson Laboratory", "Stowers Institute", "SENS Research", "Rockefeller University", "Scripps Research", "Vanderbilt", "MD Anderson", "Cold Spring Harbor", "Salk Institute"]);
-    const locations = ["Cambridge, MA", "Ashburn, VA", "Boston, MA", "Bethesda, MD", "Bar Harbor, ME", "Kansas City, MO", "Mountain View, CA", "New York, NY", "La Jolla, CA", "Nashville, TN", "Houston, TX", "Seattle, WA"];
+    const defaultPortals = [
+      { i: "Broad Institute", u: "https://broadinstitute.wd1.myworkdayjobs.com/broad_institute_careers?q=biology" },
+      { i: "HHMI Janelia", u: "https://www.hhmi.org/careers" },
+      { i: "Wyss Institute", u: "https://wyss.harvard.edu/about/careers/" },
+      { i: "Ginkgo Bioworks", u: "https://www.ginkgobioworks.com/careers/" },
+      { i: "Dana-Farber", u: "https://careers.dana-farber.org/" },
+      { i: "NIH", u: "https://hr.nih.gov/jobs/search/scientific" },
+      { i: "Cold Spring Harbor", u: "https://cshl.edu/careers/" },
+      { i: "Nature Careers", u: "https://www.nature.com/naturecareers/jobs/biology" },
+      { i: "Science Careers", u: "https://jobs.sciencecareers.org/jobs/biology/" },
+      { i: "Scripps Research", u: "https://careers.scripps.edu/" },
+      { i: "Salk Institute", u: "https://www.salk.edu/about/careers/" }
+    ];
+
+    const requestedInstitutions = parseTopics(topicsMap.careerInstitutions, defaultPortals.map(p => p.i));
+    const requestedTitles = parseTopics(topicsMap.careerTitles, ["Entry-Level Biology", "Genomics Research", "Postdoctoral Fellow"]);
 
     const curatedJobs: any[] = [];
-    jobTitles.forEach(t => {
-      institutions.forEach((inst, idx) => {
-        curatedJobs.push({
-          t: `${t} - Biology & Genomics`,
-          i: inst,
-          l: locations[idx % locations.length],
-          u: `https://www.google.com/search?q=${encodeURIComponent(`${inst} ${t} careers`)}`
-        });
+    
+    // Mix and match user-requested topics or fallback to the live portal mappings
+    requestedInstitutions.forEach(inst => {
+      const portal = defaultPortals.find(p => p.i.toLowerCase() === inst.toLowerCase());
+      const jobDomainUrl = portal ? portal.u : `https://www.linkedin.com/jobs/search?keywords=${encodeURIComponent(inst + " science")}`;
+      
+      requestedTitles.forEach(t => {
+         curatedJobs.push({
+            t: `Active Openings: ${t}`,
+            i: inst,
+            l: "See posting",
+            u: jobDomainUrl
+         });
       });
     });
 
@@ -266,7 +284,8 @@ async function fetchLiveData(topicsMap: any = {}) {
         title: item.t,
         institution: item.i,
         location: item.l,
-        url: item.u
+        url: item.u,
+        dateAdded: new Date().toISOString()
       };
     });
   } catch (e) { console.error("Job Custom Fetch Error:", e); }
