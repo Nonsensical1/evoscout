@@ -175,31 +175,34 @@ async function fetchLiveData(topicsMap: any = {}) {
         });
 
         const mapped = await Promise.all(filteredNews.map(async (item: any, i: number) => {
-          let image = "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80";
-          if (item.enclosure?.url) {
+          let image = "";
+          if (item.enclosure?.url && !usedImages.has(item.enclosure.url)) {
             image = item.enclosure.url;
-          } else {
+            usedImages.add(image);
+          } else if (!item.enclosure?.url) {
             try {
               const searchKeyword = getProminentWord(item.title);
               const KeywordQuery = searchKeyword + " science"
-              const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(KeywordQuery)}&per_page=15`, {
+              const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(KeywordQuery)}&per_page=30&size=large`, {
                 headers: { Authorization: "c5w6mctmy3dgyaA69iUsDjgccGUojIlKEa3Y8JtsLU2yJm2HUp2gjQy6" }
               });
               if (pexelsRes.ok) {
                 const pexelsData = await pexelsRes.json();
                 if (pexelsData.photos && pexelsData.photos.length > 0) {
-                  const availablePhotos = pexelsData.photos.filter((p: any) => !usedImages.has(p.src.large));
+                  // Filter out any photos already used across the entire dashboard
+                  const availablePhotos = pexelsData.photos.filter((p: any) => !usedImages.has(p.src.large2x));
                   if (availablePhotos.length > 0) {
                     const randomIdx = Math.floor(Math.random() * availablePhotos.length);
-                    image = availablePhotos[randomIdx].src.large;
-                    usedImages.add(image);
-                  } else if (!usedImages.has(pexelsData.photos[0].src.large)) {
-                    image = pexelsData.photos[0].src.large;
+                    image = availablePhotos[randomIdx].src.large2x;
                     usedImages.add(image);
                   }
                 }
               }
             } catch (e) { }
+          }
+          // Ultimate fallback — only if nothing was assigned
+          if (!image) {
+            image = "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80";
           }
           return {
             id: `NEWS-${feedConfig.source.substring(0, 3).toUpperCase()}-${item.guid || item.link || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
