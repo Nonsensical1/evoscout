@@ -48,7 +48,7 @@ def generate_podcast_script(news, lit, grants):
     """
     
     # Use the exact same REST endpoint that works in the Next.js aggregator
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     res = requests.post(url, json={
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"responseMimeType": "application/json"}

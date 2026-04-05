@@ -329,7 +329,7 @@ async function fetchLiveData(topicsMap: any = {}) {
     const batchPromises = batches.map(async (batch) => {
       try {
         const prompt = `Summarize the following scientific articles into a 2-3 sentence AI summary. Return ONLY a strict JSON object mapping the article 'id' to the 'summary' string. Do not use markdown wrappers. Articles: ${JSON.stringify(batch)}`;
-        const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIzaSyAXG4wjpWKj7eMng9ClEA27vmCRVUZnWPM`, {
+        const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyAXG4wjpWKj7eMng9ClEA27vmCRVUZnWPM`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
