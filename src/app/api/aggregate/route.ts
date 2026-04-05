@@ -218,12 +218,23 @@ async function fetchLiveData(topicsMap: any = {}) {
   } catch (e) { console.error("Top-level News Fetch Error:", e); }
 
   try {
-    const end = new Date();
-    const start = new Date();
+    let end = new Date();
+    let start = new Date();
     const dStr = (d: Date) => d.toISOString().split('T')[0];
-    const bioRes = await fetch(`https://api.biorxiv.org/details/biorxiv/${dStr(start)}/${dStr(end)}`);
-    if (bioRes.ok) {
-      const bioData = await bioRes.json();
+    
+    let bioRes = await fetch(`https://api.biorxiv.org/details/biorxiv/${dStr(start)}/${dStr(end)}`);
+    let bioText = await bioRes.text();
+    
+    // BioRxiv crashes and returns HTML if you query a UTC date that hasn't started in the US yet.
+    if (bioText.startsWith('<')) {
+        end.setDate(end.getDate() - 1);
+        start.setDate(start.getDate() - 1);
+        bioRes = await fetch(`https://api.biorxiv.org/details/biorxiv/${dStr(start)}/${dStr(end)}`);
+        bioText = await bioRes.text();
+    }
+    
+    if (bioRes.ok && !bioText.startsWith('<')) {
+      const bioData = JSON.parse(bioText);
       let papers = bioData.collection || [];
       const litTermsSafe = topicsMap.literature ? topicsMap.literature.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|RNA|DNA|synthetic biology|gene editing|cancer|oncology|metabolism|computational|epigenetic|genomics|SunTag|prime edit|base edit";
       const advancedTopics = new RegExp(litTermsSafe, 'i');

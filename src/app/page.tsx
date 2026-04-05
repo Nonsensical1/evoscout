@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { ExternalLink, Clock } from 'lucide-react';
 import { useAuth } from '@/app/providers';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc, query, orderBy, limit as firestoreLimit, getDocs } from 'firebase/firestore';
 
 export default function Home() {
   const { user } = useAuth();
@@ -109,15 +109,38 @@ export default function Home() {
       dailyFeed.positions = liveData.positions ? liveData.positions.slice(0, settings.positionsLimit || 12) : [];
 
       // Backfill missing items from the previous feed to prevent slow-weekend empty states
-      if (oldFeed) {
+      const needsBackfill = ['news', 'literature', 'grants', 'openGovGrants'].some(cat => {
+         const limit = settings[`${cat}Limit`] || 12;
+         return (!dailyFeed[cat] || dailyFeed[cat].length < limit);
+      });
+
+      if (needsBackfill) {
+         let historicFeeds: any[] = [];
+         if (oldFeed) historicFeeds.push(oldFeed);
+         // If oldFeed isn't enough (e.g. yesterday was also an empty weekend), dip into the ledger
+         try {
+            const ledgerQuery = query(collection(db, 'users', user.uid, 'ledger'), orderBy('date', 'desc'), firestoreLimit(7));
+            const ledgerSnaps = await getDocs(ledgerQuery);
+            historicFeeds = [...historicFeeds, ...ledgerSnaps.docs.map(d => d.data())];
+         } catch (e) {
+            console.error("Ledger historic fallback failed", e);
+         }
+
          ['news', 'literature', 'grants', 'openGovGrants'].forEach(cat => {
-            const limit = settings[`${cat}Limit`] || 12; // fallback
-            if (oldFeed[cat] && oldFeed[cat].length > 0 && (!dailyFeed[cat] || dailyFeed[cat].length < limit)) {
-               const needed = limit - (dailyFeed[cat]?.length || 0);
-               const existingIds = new Set((dailyFeed[cat] || []).map((i: any) => i.id));
-               const candidates = oldFeed[cat].filter((i: any) => !existingIds.has(i.id));
-               if (!dailyFeed[cat]) dailyFeed[cat] = [];
-               dailyFeed[cat] = [...dailyFeed[cat], ...candidates.slice(0, needed)];
+            const limit = settings[`${cat}Limit`] || 12;
+            if (!dailyFeed[cat] || dailyFeed[cat].length < limit) {
+               for (const historicFeed of historicFeeds) {
+                  if (!historicFeed[cat] || historicFeed[cat].length === 0) continue;
+                  
+                  const needed = limit - (dailyFeed[cat]?.length || 0);
+                  if (needed <= 0) break;
+
+                  const existingIds = new Set((dailyFeed[cat] || []).map((i: any) => i.id));
+                  const candidates = historicFeed[cat].filter((i: any) => !existingIds.has(i.id));
+                  
+                  if (!dailyFeed[cat]) dailyFeed[cat] = [];
+                  dailyFeed[cat] = [...dailyFeed[cat], ...candidates.slice(0, needed)];
+               }
             }
          });
       }
