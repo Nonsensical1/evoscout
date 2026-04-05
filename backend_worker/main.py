@@ -2,7 +2,7 @@ import os
 import json
 import asyncio
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 import firebase_admin
 from firebase_admin import credentials, firestore, storage, auth
 from google.cloud import texttospeech
@@ -145,8 +145,10 @@ def main():
             
         feed_data = feed_snap.to_dict()
         
-        if 'podcastUrl' in feed_data and feed_data.get('podcastUrl'):
-            print(f"Skipping {user.id} - Podcast already generated.")
+        # Check if a WORKING podcast already exists (signed URLs contain 'X-Goog-Signature')
+        existing_url = feed_data.get('podcastUrl', '')
+        if existing_url and 'X-Goog-Signature' in existing_url:
+            print(f"Skipping {user.id} - Podcast already generated with valid signed URL.")
             continue
             
         news = feed_data.get('news', [])
@@ -216,7 +218,12 @@ def main():
             blob = bucket.blob(blob_path)
             blob.upload_from_filename(master_mp3, content_type='audio/mpeg')
             
-            audio_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/{quote(blob_path, safe='')}?alt=media"
+            # Generate a signed URL (7-day expiry) so the audio is playable without storage rules
+            audio_url = blob.generate_signed_url(
+                version="v4",
+                expiration=timedelta(days=7),
+                method="GET",
+            )
             
             feed_ref.update({
                 'podcastUrl': audio_url,
