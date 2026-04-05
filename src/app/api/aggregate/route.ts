@@ -8,7 +8,7 @@ function shuffleArray(array: any[]) {
 
 async function fetchLiveData(topicsMap: any = {}) {
   const parseTopics = (str: string | undefined, fallback: string[]) => str ? str.split(',').map((s: string) => s.trim()).filter(Boolean) : fallback;
-  const parser = new Parser();
+  const parser = new Parser({ customFields: { item: [['media:thumbnail', 'mediaThumbnail']] } });
   const results: any = { grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
   const usedImages = new Set<string>(); // Global pool to prevent duplicate photos
 
@@ -176,24 +176,28 @@ async function fetchLiveData(topicsMap: any = {}) {
 
         const mapped = await Promise.all(filteredNews.map(async (item: any, i: number) => {
           let image = "";
-          if (item.enclosure?.url && !usedImages.has(item.enclosure.url)) {
-            image = item.enclosure.url;
+          let sourceImg = item.enclosure?.url || item.mediaThumbnail?.['$']?.url;
+          if (sourceImg && sourceImg.includes('/tmb/')) {
+            sourceImg = sourceImg.replace('/tmb/', '/800w/');
+          }
+          if (sourceImg && !usedImages.has(sourceImg)) {
+            image = sourceImg;
             usedImages.add(image);
-          } else if (!item.enclosure?.url) {
+          } else if (!sourceImg) {
             try {
               const searchKeyword = getProminentWord(item.title);
               const KeywordQuery = searchKeyword + " science"
-              const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(KeywordQuery)}&per_page=30&size=large`, {
+              const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(KeywordQuery)}&per_page=30&size=large&orientation=landscape`, {
                 headers: { Authorization: "c5w6mctmy3dgyaA69iUsDjgccGUojIlKEa3Y8JtsLU2yJm2HUp2gjQy6" }
               });
               if (pexelsRes.ok) {
                 const pexelsData = await pexelsRes.json();
                 if (pexelsData.photos && pexelsData.photos.length > 0) {
                   // Filter out any photos already used across the entire dashboard
-                  const availablePhotos = pexelsData.photos.filter((p: any) => !usedImages.has(p.src.large2x));
+                  const availablePhotos = pexelsData.photos.filter((p: any) => !usedImages.has(p.src.original));
                   if (availablePhotos.length > 0) {
                     const randomIdx = Math.floor(Math.random() * availablePhotos.length);
-                    image = availablePhotos[randomIdx].src.large2x;
+                    image = availablePhotos[randomIdx].src.original;
                     usedImages.add(image);
                   }
                 }
@@ -202,7 +206,7 @@ async function fetchLiveData(topicsMap: any = {}) {
           }
           // Ultimate fallback — only if nothing was assigned
           if (!image) {
-            image = "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80";
+            image = "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100";
           }
           return {
             id: `NEWS-${feedConfig.source.substring(0, 3).toUpperCase()}-${item.guid || item.link || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
