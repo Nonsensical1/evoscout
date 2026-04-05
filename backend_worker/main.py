@@ -5,7 +5,8 @@ import requests
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
-import edge_tts
+from google.cloud import texttospeech
+from google.oauth2 import service_account
 from pydub import AudioSegment
 from urllib.parse import quote
 
@@ -14,17 +15,22 @@ def setup_firebase():
     if not firebase_creds_json:
         raise ValueError("Missing FIREBASE_SERVICE_ACCOUNT")
     
-    cred = credentials.Certificate(json.loads(firebase_creds_json))
+    cred_dict = json.loads(firebase_creds_json)
+    cred = credentials.Certificate(cred_dict)
     if not firebase_admin._apps:
         firebase_admin.initialize_app(cred, {
             'storageBucket': 'evoscout-bd7d1.firebasestorage.app'
         })
-    return firestore.client(), storage.bucket()
+    
+    # Also create TTS client using the same service account
+    tts_creds = service_account.Credentials.from_service_account_info(cred_dict)
+    tts_client = texttospeech.TextToSpeechClient(credentials=tts_creds)
+    
+    return firestore.client(), storage.bucket(), tts_client
 
 def generate_podcast_script(news, lit, grants):
     api_key = os.environ.get('GEMINI_API_KEY')
     
-    # Restrict arrays slightly to save tokens context window
     safe_news = news[:4] if news else []
     safe_lit = lit[:3] if lit else []
     safe_grants = grants[:2] if grants else []
@@ -47,7 +53,6 @@ def generate_podcast_script(news, lit, grants):
     ]
     """
     
-    # Use the exact same REST endpoint that works in the Next.js aggregator
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     res = requests.post(url, json={
         "contents": [{"parts": [{"text": prompt}]}],
@@ -62,41 +67,66 @@ def generate_podcast_script(news, lit, grants):
     
     return json.loads(raw_text.strip())
 
-async def generate_audio_segments(script):
+def generate_audio_segments(tts_client, script):
+    """Use Google Cloud TTS Neural2 voices — free tier 1M chars/month."""
     files = []
+    
     voice_map = {
-        "Alex": "en-US-GuyNeural",
-        "Sarah": "en-US-AriaNeural"
+        "Alex": texttospeech.VoiceSelectionParams(
+            language_code="en-US",
+            name="en-US-Neural2-J",  # Male
+        ),
+        "Sarah": texttospeech.VoiceSelectionParams(
+            language_code="en-US",
+            name="en-US-Neural2-F",  # Female
+        ),
     }
+    
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3,
+        speaking_rate=1.05,  # Slightly faster for a natural podcast feel
+        pitch=0.0,
+    )
     
     for i, line in enumerate(script):
         speaker = line.get('speaker', 'Alex')
         text = line.get('text', '')
-        voice = voice_map.get(speaker, "en-US-GuyNeural")
+        if not text.strip():
+            continue
+        
+        voice = voice_map.get(speaker, voice_map["Alex"])
+        
+        synthesis_input = texttospeech.SynthesisInput(text=text)
+        response = tts_client.synthesize_speech(
+            input=synthesis_input,
+            voice=voice,
+            audio_config=audio_config,
+        )
         
         filepath = f"/tmp/segment_{i}.mp3"
-        communicate = edge_tts.Communicate(text, voice)
-        await communicate.save(filepath)
+        with open(filepath, "wb") as out:
+            out.write(response.audio_content)
         files.append(filepath)
+        print(f"  Synthesized segment {i} ({speaker}: {len(text)} chars)")
     
     return files
 
 def merge_audio(files, output_path):
     final_audio = AudioSegment.empty()
-    combined_crossfade = 100 # ms
+    crossfade_ms = 80
     for f in files:
         seg = AudioSegment.from_mp3(f)
         if len(final_audio) > 0:
-            final_audio = final_audio.append(seg, crossfade=min(len(final_audio), len(seg), combined_crossfade))
+            final_audio = final_audio.append(seg, crossfade=min(len(final_audio), len(seg), crossfade_ms))
         else:
             final_audio += seg
     final_audio.export(output_path, format="mp3")
 
 def main():
     try:
-        db, bucket = setup_firebase()
+        db, bucket, tts_client = setup_firebase()
     except Exception as e:
-        print("Failed to setup firebase credentials (Did you create the FIREBASE_SERVICE_ACCOUNT secret?)", e)
+        print("Failed to setup firebase:", e)
         raise e
 
     users = db.collection('users').stream()
@@ -112,7 +142,6 @@ def main():
             
         feed_data = feed_snap.to_dict()
         
-        # If the podcast is already generated for this exact feed instance, skip it to save costs!
         if 'podcastUrl' in feed_data and feed_data.get('podcastUrl'):
             print(f"Skipping {user.id} - Podcast already generated.")
             continue
@@ -130,9 +159,9 @@ def main():
             script = generate_podcast_script(news, lit, grants)
             print(f"Generated {len(script)} lines of dialogue.")
             
-            # Synthesize
-            loop = asyncio.get_event_loop()
-            files = loop.run_until_complete(generate_audio_segments(script))
+            # Synthesize with Google Cloud TTS
+            print("Synthesizing audio with Google Cloud TTS Neural2 voices...")
+            files = generate_audio_segments(tts_client, script)
             
             # Merge
             master_mp3 = f"/tmp/master_{user.id}.mp3"
@@ -147,12 +176,11 @@ def main():
             
             audio_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/{quote(blob_path, safe='')}?alt=media"
             
-            # Subtly inject ONLY the podcast payload via update() to leave their quotas and data entirely untouched!
             feed_ref.update({
                 'podcastUrl': audio_url,
                 'podcastScript': script
             })
-            print(f"Podcast attached natively at {audio_url}")
+            print(f"Podcast attached at {audio_url}")
             
         except Exception as e:
             print(f"Failed to generate/upload audio for {user.id}:", e)
