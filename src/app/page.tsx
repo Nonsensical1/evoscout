@@ -183,13 +183,16 @@ export default function Home() {
 
   useEffect(() => {
     if (!user) return;
+    let hasFiredInitialScrapeCheck = false;
     
     // Listen to live database feed locally to auto-refresh the UI when scraper finishes!
     const unsub = onSnapshot(doc(db, 'users', user.uid, 'daily', 'feed'), (docSnap) => {
       if (docSnap.exists()) {
         const feed = docSnap.data();
+        const now = new Date();
+        const today = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
         
-        // Always update UI with current feed data
+        // Always update UI with current feed data first
         setData({
           grants: feed.grants || [],
           openGovGrants: feed.openGovGrants || [],
@@ -200,14 +203,51 @@ export default function Home() {
           podcastScript: feed.podcastScript || null
         });
         setLoading(false);
+
+        // Only run scrape decision logic once per mount (not on every snapshot)
+        if (hasFiredInitialScrapeCheck) return;
+        hasFiredInitialScrapeCheck = true;
+
+        // CASE 1: New day detected — archive and scrape fresh
+        if (feed.date && feed.date !== today) {
+          setActionMessage("New day detected. Initializing engine...");
+          handleRunScraper();
+          return;
+        }
+
+        // CASE 2: Same day — check if quota-filling cycle should trigger
+        const qf = feed.quotaFilled || { news: false, literature: false, grants: false };
+        const allFilled = qf.news && qf.literature && qf.grants;
+
+        if (allFilled) {
+          // All quotas met — done for the day
+          setQuotaNotice(null);
+          return;
+        }
+
+        // Quotas not filled — check cooldown
+        const lastScrape = feed.lastScrapeTimestamp ? new Date(feed.lastScrapeTimestamp).getTime() : 0;
+        const elapsed = Date.now() - lastScrape;
+
+        if (elapsed >= SCRAPE_COOLDOWN_MS) {
+          // Cooldown expired — re-scrape to try filling quota
+          setActionMessage("Quota not yet met. Re-scanning feeds...");
+          handleRunScraper();
+        } else {
+          // Cooldown active — show notice
+          const minutesLeft = Math.ceil((SCRAPE_COOLDOWN_MS - elapsed) / 60000);
+          setQuotaNotice(`It's still early — some feeds haven't fully populated yet. EvoScout will attempt to gather more content if you check back in ~${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.`);
+        }
+
       } else {
         // Document does not exist yet (first sign-in)
+        hasFiredInitialScrapeCheck = true;
         handleRunScraper();
       }
     });
 
     return () => unsub();
-  }, [user, handleRunScraper]);
+  }, [user, handleRunScraper, SCRAPE_COOLDOWN_MS]);
 
 
   if (loading) return <div className="min-h-[50vh] flex items-center justify-center font-serif text-xl italic text-editorial-muted">Synchronizing encrypted database...</div>;
