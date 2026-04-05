@@ -1,10 +1,10 @@
 import os
 import json
 import asyncio
+import requests
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
-from google import genai
 import edge_tts
 from pydub import AudioSegment
 from urllib.parse import quote
@@ -22,7 +22,7 @@ def setup_firebase():
     return firestore.client(), storage.bucket()
 
 def generate_podcast_script(news, lit, grants):
-    client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY'))
+    api_key = os.environ.get('GEMINI_API_KEY')
     
     # Restrict arrays slightly to save tokens context window
     safe_news = news[:4] if news else []
@@ -47,15 +47,18 @@ def generate_podcast_script(news, lit, grants):
     ]
     """
     
-    res = client.models.generate_content(
-        model='gemini-1.5-flash',
-        contents=prompt
-    )
-    raw_text = res.text.strip()
-    if raw_text.startswith("```json"):
-        raw_text = raw_text.replace("```json", "", 1)
-    if raw_text.endswith("```"):
-        raw_text = raw_text[::-1].replace("```"[::-1], "", 1)[::-1]
+    # Use the exact same REST endpoint that works in the Next.js aggregator
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    res = requests.post(url, json={
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseMimeType": "application/json"}
+    })
+    
+    if not res.ok:
+        raise Exception(f"Gemini REST API Error: {res.status_code} {res.text}")
+    
+    data = res.json()
+    raw_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
     
     return json.loads(raw_text.strip())
 
