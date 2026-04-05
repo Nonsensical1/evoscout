@@ -19,7 +19,7 @@ def setup_firebase():
     cred = credentials.Certificate(cred_dict)
     if not firebase_admin._apps:
         firebase_admin.initialize_app(cred, {
-            'storageBucket': 'evoscout-bd7d1.firebasestorage.app'
+            'storageBucket': 'evoscout-bd7d1.appspot.com'
         })
     
     # Also create TTS client using the same service account
