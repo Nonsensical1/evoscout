@@ -241,6 +241,17 @@ export default function Home() {
             {actionMessage && <p className="text-sm font-sans font-medium text-blue-600 mt-2">{actionMessage}</p>}
           </div>
           <div className="flex gap-4">
+            {user?.email === "elijahryal@gmail.com" && (
+              <button 
+                onClick={() => {
+                  scrapeInProgress.current = false;
+                  handleRunScraper();
+                }}
+                className="bg-red-900 hover:bg-red-800 text-white font-sans text-xs uppercase tracking-wider font-bold py-2 px-4 shadow-sm transition-colors"
+              >
+                Force Aggregate
+              </button>
+            )}
           </div>
         </div>
       </section>
