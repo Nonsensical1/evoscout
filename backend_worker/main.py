@@ -234,7 +234,8 @@ def main():
             'grants': grants,
             'openGovGrants': gov,
             'positions': pos,
-            'lastScrapeTimestamp': datetime.utcnow().isoformat()
+            'lastScrapeTimestamp': datetime.utcnow().isoformat(),
+            'quotaFilled': { 'news': True, 'literature': True, 'grants': True }
         }
         
         # Generate Podcast Script
@@ -258,10 +259,9 @@ def main():
             blob = bucket.blob(blob_path)
             blob.upload_from_filename(master_mp3, content_type='audio/mpeg')
             
-            # Make public or construct standard alt=media URL
-            blob.make_public()
-            # fallback to explicit tokenized url if necessary, but make_public provides public_url
-            audio_url = blob.public_url
+            # Construct deterministic public download URL
+            from urllib.parse import quote
+            audio_url = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/{quote(blob_path, safe='')}?alt=media"
             
             liveData['podcastUrl'] = audio_url
             liveData['podcastScript'] = script
