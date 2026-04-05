@@ -4,7 +4,7 @@ import asyncio
 import requests
 from datetime import datetime
 import firebase_admin
-from firebase_admin import credentials, firestore, storage
+from firebase_admin import credentials, firestore, storage, auth
 from google.cloud import texttospeech
 from google.oauth2 import service_account
 from pydub import AudioSegment
@@ -28,19 +28,22 @@ def setup_firebase():
     
     return firestore.client(), storage.bucket(), tts_client
 
-def generate_podcast_script(news, lit, grants):
+def generate_podcast_script(news, lit, grants, duration_minutes=5):
     api_key = os.environ.get('GEMINI_API_KEY')
     
     safe_news = news[:4] if news else []
     safe_lit = lit[:3] if lit else []
     safe_grants = grants[:2] if grants else []
     
+    # Scale word count to match target duration (~150 words per minute of speech)
+    target_words = duration_minutes * 150
+    
     prompt = f"""
-    You are writing a ~5 to 10-minute dynamic podcast script based on today's biological advancements.
+    You are writing a ~{duration_minutes}-minute dynamic podcast script based on today's biological advancements.
     The podcast features two hosts: 'Alex' (male) and 'Sarah' (female).
     They are energetic, natural, banter a lot, and deeply analyze the science.
     
-    Make the script thorough (around 1000 words).
+    Make the script thorough (around {target_words} words total across all lines).
     Use the following news, literature, and grants for material:
     NEWS: {json.dumps(safe_news)}
     LIT: {json.dumps(safe_lit)}
@@ -155,13 +158,52 @@ def main():
             continue
             
         try:
+            # Look up user email via Firebase Auth
+            user_record = auth.get_user(user.id)
+            user_email = user_record.email or ""
+            print(f"  Email: {user_email}")
+        except Exception:
+            user_email = ""
+        
+        # Check user settings for custom TTS credentials and podcast preferences
+        settings_ref = db.collection('users').document(user.id).collection('settings').document('config')
+        settings_snap = settings_ref.get()
+        user_settings = settings_snap.to_dict() if settings_snap.exists else {}
+        
+        custom_tts_json = user_settings.get('googleCloudTtsCredentials', None)
+        is_admin = (user_email == "elijahryal@gmail.com")
+        has_custom_tts = bool(custom_tts_json)
+        
+        # Determine podcast duration tier
+        if is_admin or has_custom_tts:
+            duration_minutes = 15
+        else:
+            duration_minutes = 5
+        
+        # If user has their own Google Cloud TTS credentials, create a dedicated client
+        if has_custom_tts:
+            try:
+                user_creds = service_account.Credentials.from_service_account_info(json.loads(custom_tts_json))
+                user_tts_client = texttospeech.TextToSpeechClient(credentials=user_creds)
+                print(f"  Using custom TTS credentials (15-min tier)")
+            except Exception as e:
+                print(f"  Custom TTS creds invalid, falling back to default: {e}")
+                user_tts_client = tts_client
+                if not is_admin:
+                    duration_minutes = 5
+        else:
+            user_tts_client = tts_client
+        
+        print(f"  Podcast tier: {duration_minutes}-minute generation")
+            
+        try:
             print("Generating podcast script from Gemini...")
-            script = generate_podcast_script(news, lit, grants)
+            script = generate_podcast_script(news, lit, grants, duration_minutes=duration_minutes)
             print(f"Generated {len(script)} lines of dialogue.")
             
             # Synthesize with Google Cloud TTS
             print("Synthesizing audio with Google Cloud TTS Neural2 voices...")
-            files = generate_audio_segments(tts_client, script)
+            files = generate_audio_segments(user_tts_client, script)
             
             # Merge
             master_mp3 = f"/tmp/master_{user.id}.mp3"

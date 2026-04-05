@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Settings, Save, RefreshCw } from 'lucide-react';
+import { Settings, Save, RefreshCw, Cloud } from 'lucide-react';
 import { useAuth } from '@/app/providers';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -20,6 +20,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [ttsCredentials, setTtsCredentials] = useState('');
 
   useEffect(() => {
     async function loadSettings() {
@@ -41,6 +42,9 @@ export default function SettingsPage() {
             careerInstitutions: tops.careerInstitutions || "",
             careerTitles: tops.careerTitles || ""
           });
+          if (snap.data().googleCloudTtsCredentials) {
+            setTtsCredentials(snap.data().googleCloudTtsCredentials);
+          }
         }
       } catch (e) {
         console.error("Error loading settings", e);
@@ -55,7 +59,11 @@ export default function SettingsPage() {
     if (!user) return;
     setSaving(true);
     try {
-      await setDoc(doc(db, 'users', user.uid, 'settings', 'config'), { ...limits, topics }, { merge: true });
+      await setDoc(doc(db, 'users', user.uid, 'settings', 'config'), {
+        ...limits,
+        topics,
+        ...(ttsCredentials ? { googleCloudTtsCredentials: ttsCredentials } : {})
+      }, { merge: true });
       setSuccessMsg("Configuration committed successfully.");
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (e) {
@@ -201,6 +209,50 @@ export default function SettingsPage() {
             </div>
           </div>
           
+          {/* PODCAST TTS TIER */}
+          <div className="mt-16 pt-10 border-t-2 border-editorial-border-dark">
+            <div className="flex items-center gap-3 mb-2">
+              <Cloud className="w-6 h-6 text-[#005587]" />
+              <h2 className="text-2xl font-bold uppercase tracking-widest inline-block pb-1">Podcast Generation Tier</h2>
+            </div>
+            <p className="text-sm font-sans text-editorial-muted mt-2 mb-6">
+              By default, your AI Deep Dive podcast is generated at <strong>5 minutes</strong>. 
+              To unlock <strong>15-minute</strong> extended episodes, link your own Google Cloud Text-to-Speech service account below. 
+              The TTS usage will be billed to your own Google Cloud project.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex flex-col gap-2">
+                <label className="font-bold font-sans uppercase tracking-wider text-sm">Google Cloud Service Account JSON</label>
+                <textarea
+                  value={ttsCredentials}
+                  onChange={(e) => setTtsCredentials(e.target.value)}
+                  placeholder='Paste your full service account JSON here (e.g. {"type": "service_account", "project_id": "...", ...})'
+                  rows={4}
+                  className="p-3 border border-editorial-border font-mono text-xs focus:outline-editorial-text w-full resize-y bg-white"
+                />
+                <p className="text-xs font-sans text-editorial-muted">
+                  Generate at <a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" className="underline text-[#005587]">Google Cloud Console</a>. 
+                  Ensure <strong>Cloud Text-to-Speech API</strong> is enabled on your project.
+                </p>
+              </div>
+
+              {ttsCredentials && (
+                <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 text-green-800 text-sm font-sans">
+                  <Cloud className="w-4 h-4" />
+                  <span>Custom credentials linked — your podcast will generate at the <strong>15-minute extended tier</strong>.</span>
+                </div>
+              )}
+
+              {!ttsCredentials && (
+                <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 text-gray-500 text-sm font-sans">
+                  <Cloud className="w-4 h-4" />
+                  <span>No custom credentials — podcast generates at the standard <strong>5-minute tier</strong>.</span>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Submit Button Resituated */}
           <div className="pt-6 border-t border-editorial-border">
             <button
