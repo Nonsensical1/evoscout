@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ExternalLink, Clock } from 'lucide-react';
+import { ExternalLink, Clock, Headphones } from 'lucide-react';
 import { useAuth } from '@/app/providers';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc, query, orderBy, limit as firestoreLimit, getDocs } from 'firebase/firestore';
 
 export default function Home() {
   const { user } = useAuth();
-  const [data, setData] = useState({ grants: [], openGovGrants: [], news: [], literature: [], positions: [] });
+  const [data, setData] = useState<any>({ grants: [], openGovGrants: [], news: [], literature: [], positions: [], podcastUrl: null, podcastScript: null });
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
   const [quotaNotice, setQuotaNotice] = useState<string | null>(null);
@@ -198,7 +198,9 @@ export default function Home() {
           openGovGrants: feed.openGovGrants || [],
           news: feed.news || [],
           literature: feed.literature || [],
-          positions: feed.positions || []
+          positions: feed.positions || [],
+          podcastUrl: feed.podcastUrl || null,
+          podcastScript: feed.podcastScript || null
         });
         setLoading(false);
 
@@ -278,6 +280,45 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Podcast Audio Player */}
+      {data.podcastUrl && (
+        <section className="mb-10 bg-[#f8f9fa] border border-editorial-border p-6 shadow-sm relative overflow-hidden animate-in zoom-in-95 duration-500">
+          <div className="absolute top-0 left-0 w-1 h-full bg-[#005587]"></div>
+          <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
+            <div className="flex-1 space-y-2">
+              <h3 className="text-xl font-serif font-black uppercase tracking-tight text-[#005587] flex items-center gap-2">
+                <Headphones className="w-5 h-5 opacity-80" /> The 10-Minute Deep Dive
+              </h3>
+              <p className="font-sans text-sm text-editorial-muted max-w-xl">
+                An AI-generated conversational podcast covering today's most crucial synthetic biology breakthroughs, generated exclusively for you by the Github Actions backend.
+              </p>
+            </div>
+            <div className="w-full md:w-auto bg-white px-4 py-2 border border-gray-200 shadow-inner flex items-center justify-center">
+              <audio controls className="w-full md:w-80 h-10 outline-none">
+                <source src={data.podcastUrl} type="audio/mpeg" />
+                Browser does not support native audio.
+              </audio>
+            </div>
+          </div>
+          
+          {data.podcastScript && (
+             <details className="mt-4 pt-4 border-t border-gray-200 cursor-pointer group">
+               <summary className="font-sans text-xs font-bold uppercase tracking-widest text-[#005587] hover:text-[#003d61] list-none flex items-center gap-2">
+                 + View Full Transcript
+               </summary>
+               <div className="mt-4 space-y-3 max-h-64 overflow-y-auto pr-4 pointer-events-auto cursor-auto">
+                 {data.podcastScript.map((line: any, idx: number) => (
+                   <div key={idx} className={`p-3 rounded-md font-sans text-sm ${line.speaker === 'Alex' ? 'bg-blue-50/50 border-l-2 border-blue-200' : 'bg-gray-50/50 border-l-2 border-gray-300'}`}>
+                     <span className="font-bold opacity-70 uppercase text-[10px] tracking-wider block mb-1 text-gray-600">{line.speaker}</span>
+                     <span className="text-gray-800 leading-relaxed font-serif">{line.text}</span>
+                   </div>
+                 ))}
+               </div>
+             </details>
+          )}
+        </section>
+      )}
 
       {/* Quota Notice Banner */}
       {quotaNotice && (
