@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
-import google.generativeai as genai
+from google import genai
 import edge_tts
 from pydub import AudioSegment
 from urllib.parse import quote
@@ -22,8 +22,7 @@ def setup_firebase():
     return firestore.client(), storage.bucket()
 
 def generate_podcast_script(news, lit, grants):
-    genai.configure(api_key=os.environ.get('GEMINI_API_KEY'))
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    client = genai.Client(api_key=os.environ.get('GEMINI_API_KEY'))
     
     # Restrict arrays slightly to save tokens context window
     safe_news = news[:4] if news else []
@@ -48,7 +47,10 @@ def generate_podcast_script(news, lit, grants):
     ]
     """
     
-    res = model.generate_content(prompt)
+    res = client.models.generate_content(
+        model='gemini-1.5-flash',
+        contents=prompt
+    )
     raw_text = res.text.strip()
     if raw_text.startswith("```json"):
         raw_text = raw_text.replace("```json", "", 1)
