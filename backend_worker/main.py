@@ -43,6 +43,8 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     The podcast features two hosts: 'Alex' (male) and 'Sarah' (female).
     They are energetic, natural, banter a lot, and deeply analyze the science.
     
+    Include natural conversational fillers like 'hmm', 'right', and 'exactly'. Use ellipses (...) for natural pauses and em-dashes (\u2014) for interruptions or sudden shifts in thought. The TTS engine will use this punctuation to pace the audio realistically.
+    
     Make the script thorough (around {target_words} words total across all lines).
     Use the following news, literature, and grants for material:
     NEWS: {json.dumps(safe_news)}
@@ -77,11 +79,11 @@ def generate_audio_segments(tts_client, script):
     voice_map = {
         "Alex": texttospeech.VoiceSelectionParams(
             language_code="en-US",
-            name="en-US-Neural2-J",  # Male
+            name="en-US-Journey-D",  # Male — NotebookLM-quality
         ),
         "Sarah": texttospeech.VoiceSelectionParams(
             language_code="en-US",
-            name="en-US-Neural2-F",  # Female
+            name="en-US-Journey-F",  # Female — NotebookLM-quality
         ),
     }
     
