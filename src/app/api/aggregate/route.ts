@@ -371,6 +371,9 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const liveData = await fetchLiveData(body.topics);
 
+    let dispatchStatus = "Not attempted (Automated run)";
+    let dispatchError = null;
+
     // If this is NOT an automated run, trigger the GitHub Action for the podcast
     if (!body.isAutomated) {
       const githubToken = process.env.GITHUB_TOKEN;
@@ -378,9 +381,9 @@ export async function POST(req: Request) {
       const repoName = "evoscout";
       
       if (githubToken) {
-        console.log("Triggering GitHub Podcast Worker...");
+        dispatchStatus = `Triggering GitHub Podcast Worker for ${repoOwner}/${repoName}...`;
         try {
-          await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/dispatches`, {
+          const dispatchRes = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/dispatches`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${githubToken}`,
@@ -392,17 +395,29 @@ export async function POST(req: Request) {
               event_type: 'manual-trigger'
             })
           });
-        } catch (e) {
-          console.error("Failed to dispatch GitHub Action:", e);
+
+          if (dispatchRes.ok) {
+            dispatchStatus = "Success: GitHub Action triggered!";
+          } else {
+            const errText = await dispatchRes.text();
+            dispatchStatus = `Error: GitHub API returned ${dispatchRes.status}`;
+            dispatchError = errText;
+          }
+        } catch (e: any) {
+          dispatchStatus = "Failed: Network error triggering GitHub Action.";
+          dispatchError = e.message;
         }
       } else {
-        console.warn("Missing GITHUB_TOKEN. Cannot trigger real-time podcast synthesis.");
+        dispatchStatus = "Incomplete: Missing GITHUB_TOKEN environment variable in Vercel.";
+        console.warn(dispatchStatus);
       }
     }
 
     return NextResponse.json({
       success: true,
-      liveData
+      liveData,
+      dispatch_status: dispatchStatus,
+      dispatch_error: dispatchError
     });
   } catch (err: any) {
     console.error("Scraper Proxy Error:", err);
