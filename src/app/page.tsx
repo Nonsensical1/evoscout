@@ -163,8 +163,8 @@ export default function Home() {
       }
 
       const batch = writeBatch(db);
-      batch.set(doc(db, user.uid, 'daily', 'feed'), dailyFeed);
-      batch.set(doc(db, user.uid, 'scouted', 'history'), { hashes: historyArr });
+      batch.set(doc(db, 'users', user.uid, 'daily', 'feed'), dailyFeed);
+      batch.set(doc(db, 'users', user.uid, 'scouted', 'history'), { hashes: historyArr });
       await batch.commit();
 
       // Show notice if quota is not fully met

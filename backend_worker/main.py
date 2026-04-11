@@ -190,7 +190,8 @@ def main():
         print("Failed to setup firebase:", e)
         raise e
 
-    users = db.collection('users').stream()
+    users = list(db.collection('users').stream())
+    print(f"Loaded {len(users)} users from Firestore.")
     
     for user in users:
         print(f"Checking user {user.id} for podcast generation...")
@@ -217,7 +218,7 @@ def main():
         grants = feed_data.get('grants', [])
         
         if not news and not lit:
-            print(f"Skipping {user.id} - Insufficient data for a podcast.")
+            print(f"Skipping {user.id} - Insufficient data for a podcast (Found {len(news)} news, {len(lit)} lit).")
             continue
             
         try:
@@ -246,7 +247,7 @@ def main():
             
             # Merge
             master_mp3 = f"/tmp/master_{user.id}.mp3"
-            print("Merging audio segments...")
+            print(f"Merging {len(files)} audio segments...")
             merge_audio(files, master_mp3)
             
             # Upload

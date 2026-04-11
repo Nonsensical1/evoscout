@@ -381,6 +381,7 @@ export async function POST(req: Request) {
       const repoName = "evoscout";
       
       if (githubToken) {
+        console.log(`[GitHub Trigger] Initiating dispatch for ${repoOwner}/${repoName}...`);
         dispatchStatus = `Triggering GitHub Podcast Worker for ${repoOwner}/${repoName}...`;
         try {
           const dispatchRes = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/dispatches`, {
@@ -400,8 +401,9 @@ export async function POST(req: Request) {
             dispatchStatus = "Success: GitHub Action triggered!";
           } else {
             const errText = await dispatchRes.text();
-            dispatchStatus = `Error: GitHub API returned ${dispatchRes.status}`;
+            dispatchStatus = `GitHub Trigger Failed: API returned ${dispatchRes.status}`;
             dispatchError = errText;
+            console.error(`[GitHub Trigger] Error: ${dispatchRes.status} - ${errText}`);
           }
         } catch (e: any) {
           dispatchStatus = "Failed: Network error triggering GitHub Action.";
