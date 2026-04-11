@@ -2,11 +2,12 @@ import os
 import json
 import asyncio
 import requests
+import shutil
+import time
 from datetime import datetime, timedelta
 import firebase_admin
 from firebase_admin import credentials, firestore, storage, auth
-from google.cloud import texttospeech
-from google.oauth2 import service_account
+from gradio_client import Client, handle_file
 from pydub import AudioSegment
 from urllib.parse import quote
 
@@ -22,11 +23,7 @@ def setup_firebase():
             'storageBucket': 'evoscout-bd7d1.firebasestorage.app'
         })
     
-    # Also create TTS client using the same service account
-    tts_creds = service_account.Credentials.from_service_account_info(cred_dict)
-    tts_client = texttospeech.TextToSpeechClient(credentials=tts_creds)
-    
-    return firestore.client(), storage.bucket(), tts_client
+    return firestore.client(), storage.bucket()
 
 def generate_podcast_script(news, lit, grants, duration_minutes=5):
     api_key = os.environ.get('GEMINI_API_KEY')
@@ -40,10 +37,14 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     
     prompt = f"""
     You are writing a ~{duration_minutes}-minute dynamic podcast script based on today's biological advancements.
-    The podcast features two hosts: 'Alex' (male) and 'Sarah' (female).
+    The podcast features two hosts: 'Al' (male) and 'Matt' (male).
     They are energetic, natural, banter a lot, and deeply analyze the science.
     
-    Include natural conversational fillers like 'hmm', 'right', and 'exactly'. Use ellipses (...) for natural pauses and em-dashes (\u2014) for interruptions or sudden shifts in thought. The TTS engine will use this punctuation to pace the audio realistically.
+    STRICT TTS FORMATTING (MANDATORY):
+    - You MUST include emotion tags at the start of almost every line or when the tone shifts.
+    - Supported tags: [excited], [thoughtful], [laughing], [serious], [surprised], [whispering], [happy], [sad], [loud], [low voice], [sigh].
+    - Use conversational fillers like 'hmm', 'right', 'exactly', and 'you know'.
+    - Use ellipses (...) for natural pauses.
     
     Make the script thorough (around {target_words} words total across all lines).
     Use the following news, literature, and grants for material:
@@ -53,8 +54,8 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     
     Return EXACTLY a pure JSON array containing the dialogue, with NO markdown formatting, like this:
     [
-      {{"speaker": "Alex", "text": "Welcome back to the Deep Dive..."}},
-      {{"speaker": "Sarah", "text": "That's right, today we're looking at..."}}
+      {{"speaker": "Al", "text": "[excited] Welcome back to the Deep Dive! [happy] Today we have some incredible news."}},
+      {{"speaker": "Matt", "text": "[thoughtful] That's right, Al. [laughing] I couldn't believe it when I read the report on..."}}
     ]
     """
     
@@ -72,64 +73,119 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     
     return json.loads(raw_text.strip())
 
-def generate_audio_segments(tts_client, script):
-    """Use Google Cloud TTS Neural2 voices — free tier 1M chars/month."""
+def generate_audio_segments(script):
+    """Use Fish Audio S2 Pro via Hugging Face Gradio API (Higher Quality)."""
+    # Use HF_TOKEN from environment if available to bypass ZeroGPU limits
+    hf_token = os.getenv("HF_TOKEN")
+    client = Client("fguilleme/fish-s2-pro-zero", token=hf_token)
     files = []
     
-    voice_map = {
-        "Alex": texttospeech.VoiceSelectionParams(
-            language_code="en-US",
-            name="en-US-Journey-D",  # Male — NotebookLM-quality
-        ),
-        "Sarah": texttospeech.VoiceSelectionParams(
-            language_code="en-US",
-            name="en-US-Journey-F",  # Female — NotebookLM-quality
-        ),
+    # Get the directory where this script is located
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    voices_dir = os.path.join(base_dir, "voices")
+    
+    # Paths to reference audio and transcriptions
+    voice_refs = {
+        "Al": {
+            "audio": os.path.join(voices_dir, "al.mp3"),
+            "text": os.path.join(voices_dir, "al.txt")
+        },
+        "Matt": {
+            "audio": os.path.join(voices_dir, "matt.mp3"),
+            "text": os.path.join(voices_dir, "matt.txt")
+        }
     }
     
-    audio_config = texttospeech.AudioConfig(
-        audio_encoding=texttospeech.AudioEncoding.MP3,
-        speaking_rate=1.05,  # Slightly faster for a natural podcast feel
-        pitch=0.0,
-    )
-    
+    # Pre-load reference texts
+    ref_texts = {}
+    for speaker, paths in voice_refs.items():
+        if os.path.exists(paths["text"]):
+            with open(paths["text"], "r", encoding="utf-8") as f:
+                ref_texts[speaker] = f.read().strip()
+        else:
+            print(f"Warning: Reference text for {speaker} not found at {paths['text']}")
+            ref_texts[speaker] = ""
+
     for i, line in enumerate(script):
         speaker = line.get('speaker', 'Alex')
         text = line.get('text', '')
         if not text.strip():
             continue
         
-        voice = voice_map.get(speaker, voice_map["Alex"])
+        ref = voice_refs.get(speaker, voice_refs["Al"])
+        ref_text = ref_texts.get(speaker, "")
         
-        synthesis_input = texttospeech.SynthesisInput(text=text)
-        response = tts_client.synthesize_speech(
-            input=synthesis_input,
-            voice=voice,
-            audio_config=audio_config,
-        )
+        print(f"  Synthesizing segment {i} with Fish Audio ({speaker})...")
         
-        filepath = f"/tmp/segment_{i}.mp3"
-        with open(filepath, "wb") as out:
-            out.write(response.audio_content)
-        files.append(filepath)
-        print(f"  Synthesized segment {i} ({speaker}: {len(text)} chars)")
+        # Implement retry logic with exponential backoff for rate limits
+        max_retries = 3
+        success = False
+        for attempt in range(max_retries):
+            try:
+                # S2 Pro endpoint expects 8 parameters
+                result = client.predict(
+                    text=text,
+                    ref_audio=handle_file(ref["audio"]) if os.path.exists(ref["audio"]) else None,
+                    ref_text=ref_text if ref_text else " ", # Required by S2 Pro
+                    max_new_tokens=1024,
+                    chunk_length=200,
+                    top_p=0.7,
+                    repetition_penalty=1.1, # Lowered for more natural flow
+                    temperature=0.35,       # Lowered for higher stability
+                    api_name="/tts_inference"
+                )
+                
+                # S2 Pro returns a string path or a FileData dict
+                if isinstance(result, dict):
+                    temp_file = result.get('value', result.get('path'))
+                else:
+                    temp_file = result
+                
+                if not temp_file:
+                    raise Exception("Model returned empty result")
+                
+                final_segment_path = f"/tmp/segment_{i}.mp3"
+                shutil.copy(temp_file, final_segment_path)
+                files.append(final_segment_path)
+                print(f"    Done: {len(text)} chars -> {final_segment_path}")
+                success = True
+                break
+                
+            except Exception as e:
+                err_str = str(e)
+                if "429" in err_str or "Too Many Requests" in err_str:
+                    wait_time = (2 ** attempt) * 5
+                    print(f"    Rate limited (429). Attempt {attempt + 1}/{max_retries}. Waiting {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"    Error synthesizing segment {i} on attempt {attempt + 1}: {e}")
+                    if attempt == max_retries - 1:
+                        break
+                    time.sleep(2)
+        
+        if not success:
+            print(f"    Failed to synthesize segment {i} after {max_retries} attempts.")
+            continue
     
     return files
 
 def merge_audio(files, output_path):
     final_audio = AudioSegment.empty()
-    crossfade_ms = 80
+    # Add a tiny bit of silence between segments for a natural conversational pace
+    silence = AudioSegment.silent(duration=300) 
+    
     for f in files:
-        seg = AudioSegment.from_mp3(f)
+        seg = AudioSegment.from_file(f) # S2 Pro returns wav/mp3, from_file is safer
         if len(final_audio) > 0:
-            final_audio = final_audio.append(seg, crossfade=min(len(final_audio), len(seg), crossfade_ms))
+            final_audio += silence + seg
         else:
             final_audio += seg
-    final_audio.export(output_path, format="mp3")
+            
+    final_audio.export(output_path, format="mp3", bitrate="192k")
 
 def main():
     try:
-        db, bucket, tts_client = setup_firebase()
+        db, bucket = setup_firebase()
     except Exception as e:
         print("Failed to setup firebase:", e)
         raise e
@@ -146,11 +202,14 @@ def main():
             continue
             
         feed_data = feed_snap.to_dict()
+        today = datetime.utcnow().strftime('%Y-%m-%d')
+        feed_date = feed_data.get('date', '')
         
-        # Check if a WORKING podcast already exists (signed URLs contain 'X-Goog-Signature')
+        # Check if a WORKING podcast already exists for TODAY
+        # (signed URLs contain 'X-Goog-Signature')
         existing_url = feed_data.get('podcastUrl', '')
-        if existing_url and 'X-Goog-Signature' in existing_url:
-            print(f"Skipping {user.id} - Podcast already generated with valid signed URL.")
+        if existing_url and 'X-Goog-Signature' in existing_url and feed_date == today:
+            print(f"Skipping {user.id} - Today's podcast ({today}) already generated.")
             continue
             
         news = feed_data.get('news', [])
@@ -169,34 +228,10 @@ def main():
         except Exception:
             user_email = ""
         
-        # Check user settings for custom TTS credentials and podcast preferences
-        settings_ref = db.collection('users').document(user.id).collection('settings').document('config')
-        settings_snap = settings_ref.get()
-        user_settings = settings_snap.to_dict() if settings_snap.exists else {}
-        
-        custom_tts_json = user_settings.get('googleCloudTtsCredentials', None)
         is_admin = (user_email == "elijahryal@gmail.com")
-        has_custom_tts = bool(custom_tts_json)
         
-        # Determine podcast duration tier
-        if is_admin or has_custom_tts:
-            duration_minutes = 15
-        else:
-            duration_minutes = 5
-        
-        # If user has their own Google Cloud TTS credentials, create a dedicated client
-        if has_custom_tts:
-            try:
-                user_creds = service_account.Credentials.from_service_account_info(json.loads(custom_tts_json))
-                user_tts_client = texttospeech.TextToSpeechClient(credentials=user_creds)
-                print(f"  Using custom TTS credentials (15-min tier)")
-            except Exception as e:
-                print(f"  Custom TTS creds invalid, falling back to default: {e}")
-                user_tts_client = tts_client
-                if not is_admin:
-                    duration_minutes = 5
-        else:
-            user_tts_client = tts_client
+        # Default to 15 mins for admin, 5 mins for others
+        duration_minutes = 15 if is_admin else 5
         
         print(f"  Podcast tier: {duration_minutes}-minute generation")
             
@@ -205,9 +240,9 @@ def main():
             script = generate_podcast_script(news, lit, grants, duration_minutes=duration_minutes)
             print(f"Generated {len(script)} lines of dialogue.")
             
-            # Synthesize with Google Cloud TTS
-            print("Synthesizing audio with Google Cloud TTS Neural2 voices...")
-            files = generate_audio_segments(user_tts_client, script)
+            # Synthesize with Fish Audio
+            print("Synthesizing audio with Fish Audio (Hugging Face Gradio)...")
+            files = generate_audio_segments(script)
             
             # Merge
             master_mp3 = f"/tmp/master_{user.id}.mp3"

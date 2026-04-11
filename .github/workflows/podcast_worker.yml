@@ -1,8 +1,10 @@
-name: Daily AI Podcast & Scraper Worker
+name: Daily EvoScout Pipeline (Scrape + Podcast)
 
 on:
   schedule:
-    - cron: '0 8 * * *' # Runs every day at 8am UTC
+    - cron: '0 8 * * *' # Runs every day at 8am UTC (4am EDT)
+  repository_dispatch:
+    types: [manual-trigger]
   workflow_dispatch: # Allows manual trigger from Actions tab
 
 jobs:
@@ -11,6 +13,18 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v3
+
+    - name: Trigger Daily Scrape (Aggregator)
+      run: |
+        echo "Initiating daily data aggregation..."
+        curl -X POST \
+             -H "Content-Type: application/json" \
+             -s \
+             -o /dev/null \
+             -w "HTTP Status: %{http_code}\n" \
+             -d "{\"isAutomated\": true}" \
+             https://evoscout.vercel.app/api/aggregate
+        echo "Scrape complete."
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -27,11 +41,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r backend_worker/requirements.txt
 
-    - name: Run Backend Scraper & Audio Generation
+    - name: Run AI Podcast Generation
       env:
         FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        # Default Pexels token logic is in the script, or you can add it safely here:
-        PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
         python backend_worker/main.py

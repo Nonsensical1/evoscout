@@ -371,6 +371,35 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const liveData = await fetchLiveData(body.topics);
 
+    // If this is NOT an automated run, trigger the GitHub Action for the podcast
+    if (!body.isAutomated) {
+      const githubToken = process.env.GITHUB_TOKEN;
+      const repoOwner = "Nonsensical1";
+      const repoName = "evoscout";
+      
+      if (githubToken) {
+        console.log("Triggering GitHub Podcast Worker...");
+        try {
+          await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/dispatches`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${githubToken}`,
+              'Accept': 'application/vnd.github.v3+json',
+              'Content-Type': 'application/json',
+              'User-Agent': 'EvoScout-App'
+            },
+            body: JSON.stringify({
+              event_type: 'manual-trigger'
+            })
+          });
+        } catch (e) {
+          console.error("Failed to dispatch GitHub Action:", e);
+        }
+      } else {
+        console.warn("Missing GITHUB_TOKEN. Cannot trigger real-time podcast synthesis.");
+      }
+    }
+
     return NextResponse.json({
       success: true,
       liveData
