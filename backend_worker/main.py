@@ -73,6 +73,19 @@ def setup_firebase():
 def generate_podcast_script(news, lit, grants, duration_minutes=5):
     api_key = os.environ.get('GEMINI_API_KEY')
     
+    # DEBUG: Print available models to help resolve the 404
+    try:
+        models_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+        models_res = requests.get(models_url)
+        if models_res.ok:
+            available = [m.get('name') for m in models_res.json().get('models', [])]
+            print(f"--- AVAILABLE GEMINI MODELS: {', '.join(available)} ---")
+        else:
+            print(f"--- FAILED TO LIST MODELS: {models_res.text} ---")
+    except Exception as e:
+        print(f"--- FAILED TO LIST MODELS Exception: {e} ---")
+        
+
     safe_news = news[:4] if news else []
     safe_lit = lit[:3] if lit else []
     safe_grants = grants[:2] if grants else []
