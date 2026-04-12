@@ -11,6 +11,13 @@ from gradio_client import Client, handle_file
 from pydub import AudioSegment
 import re
 from urllib.parse import quote
+import soundfile as sf
+import numpy as np
+
+try:
+    from kokoro_onnx import Kokoro
+except ImportError:
+    pass # Managed by requirements.txt
 
 def parse_dialogue_fallback(raw_text):
     """
@@ -160,8 +167,8 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
             print(f"Failed regex fallback: {e2}")
             raise e
 
-def generate_audio_segments(script):
-    """Use Fish Audio S2 Pro via Hugging Face Gradio API (Higher Quality)."""
+def generate_fish_audio_segments(script):
+    """Use Fish Audio S2 Pro via Hugging Face Gradio API (Higher Quality, Strict Quotas)."""
     hf_token = os.getenv("HF_TOKEN")
     
     # Initialize client in a retry loop to give sleeping HF spaces time to start up
@@ -266,6 +273,45 @@ def generate_audio_segments(script):
     
     return files
 
+def generate_kokoro_audio_segments(script):
+    """Use Kokoro ONNX for local, rapid, free, unlimited TTS generation."""
+    files = []
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(base_dir, "kokoro-v0_19.onnx")
+    voices_path = os.path.join(base_dir, "voices.json")
+    
+    if not os.path.exists(model_path) or not os.path.exists(voices_path):
+        raise Exception(f"Kokoro model files not found locally in backend_worker. Ensure build step downloads them.")
+    
+    print("Loading Kokoro ONNX model locally into memory...")
+    kokoro = Kokoro(model_path, voices_path)
+    print("Kokoro loaded successfully.")
+    
+    for i, line in enumerate(script):
+        speaker = line.get('speaker', 'Alex')
+        text = line.get('text', '')
+        if not text.strip():
+            continue
+            
+        # Map Al and Matt to high-quality Kokoro broadcast presets
+        voice = "am_michael" if speaker == "Al" else "am_adam"
+        
+        print(f"  Synthesizing segment {i} with Kokoro ({speaker} -> {voice})...")
+        try:
+            # Create returns (audio_array, sample_rate)
+            audio, sr = kokoro.create(text, voice=voice, speed=1.0, lang="en-us")
+            
+            final_segment_path = f"/tmp/kokoro_segment_{i}.wav"
+            sf.write(final_segment_path, audio, sr)
+            files.append(final_segment_path)
+            
+            print(f"    Done: {len(text)} chars -> {final_segment_path}")
+        except Exception as e:
+            print(f"    Failed to synthesize segment {i} with Kokoro: {e}")
+            continue
+
+    return files
+
 def merge_audio(files, output_path):
     final_audio = AudioSegment.empty()
     # Add a tiny bit of silence between segments for a natural conversational pace
@@ -318,6 +364,18 @@ def main():
             print(f"Skipping {user.id} - Insufficient data for a podcast (Found {len(news)} news, {len(lit)} lit).")
             continue
             
+        # Parse User Profile & Settings
+        try:
+            settings_snap = db.collection('users').document(user.id).collection('settings').document('config').get()
+            if settings_snap.exists:
+                user_settings = settings_snap.to_dict()
+            else:
+                user_settings = {}
+        except Exception:
+            user_settings = {}
+            
+        tts_engine = user_settings.get('ttsEngine', 'kokoro')
+        
         try:
             # Look up user email via Firebase Auth
             user_record = auth.get_user(user.id)
@@ -328,19 +386,24 @@ def main():
         
         is_admin = (user_email == "elijahryal@gmail.com")
         
-        # Default to 15 mins for admin, 5 mins for others
-        duration_minutes = 15 if is_admin else 5
+        # Check explicit credentials for 15 min unlock from previous config
+        has_creds = bool(user_settings.get('googleCloudTtsCredentials'))
+        duration_minutes = 15 if (is_admin or has_creds) else 5
         
         print(f"  Podcast tier: {duration_minutes}-minute generation")
+        print(f"  TTS Engine: {tts_engine.upper()}")
             
         try:
             print("Generating podcast script from Gemini...")
             script = generate_podcast_script(news, lit, grants, duration_minutes=duration_minutes)
             print(f"Generated {len(script)} lines of dialogue.")
             
-            # Synthesize with Fish Audio
-            print("Synthesizing audio with Fish Audio (Hugging Face Gradio)...")
-            files = generate_audio_segments(script)
+            if tts_engine == 'fish':
+                print("Synthesizing audio with Fish Audio (Hugging Face Gradio)...")
+                files = generate_fish_audio_segments(script)
+            else:
+                print("Synthesizing audio with Kokoro (Local ONNX)...")
+                files = generate_kokoro_audio_segments(script)
             
             # Merge
             master_mp3 = f"/tmp/master_{user.id}.mp3"

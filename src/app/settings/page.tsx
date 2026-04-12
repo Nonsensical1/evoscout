@@ -21,6 +21,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [ttsCredentials, setTtsCredentials] = useState('');
+  const [ttsEngine, setTtsEngine] = useState('kokoro');
 
   useEffect(() => {
     async function loadSettings() {
@@ -45,6 +46,9 @@ export default function SettingsPage() {
           if (snap.data().googleCloudTtsCredentials) {
             setTtsCredentials(snap.data().googleCloudTtsCredentials);
           }
+          if (snap.data().ttsEngine) {
+            setTtsEngine(snap.data().ttsEngine);
+          }
         }
       } catch (e) {
         console.error("Error loading settings", e);
@@ -62,6 +66,7 @@ export default function SettingsPage() {
       await setDoc(doc(db, 'users', user.uid, 'settings', 'config'), {
         ...limits,
         topics,
+        ttsEngine,
         ...(ttsCredentials ? { googleCloudTtsCredentials: ttsCredentials } : {})
       }, { merge: true });
       setSuccessMsg("Configuration committed successfully.");
@@ -213,12 +218,48 @@ export default function SettingsPage() {
           <div className="mt-16 pt-10 border-t-2 border-editorial-border-dark">
             <div className="flex items-center gap-3 mb-2">
               <Cloud className="w-6 h-6 text-[#005587]" />
-              <h2 className="text-2xl font-bold uppercase tracking-widest inline-block pb-1">Podcast Generation Tier</h2>
+              <h2 className="text-2xl font-bold uppercase tracking-widest inline-block pb-1">AI Voice Engine</h2>
             </div>
             <p className="text-sm font-sans text-editorial-muted mt-2 mb-6">
-              By default, your AI Deep Dive podcast is generated at <strong>5 minutes</strong>. 
-              To unlock <strong>15-minute</strong> extended episodes, link your own Google Cloud Text-to-Speech service account below. 
-              The TTS usage will be billed to your own Google Cloud project.
+              Select the core technology used to synthesize your podcast hosts. 
+            </p>
+
+            <div className="space-y-4 mb-10">
+              <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 transition-colors">
+                <input 
+                  type="radio" 
+                  name="ttsEngine" 
+                  value="kokoro" 
+                  checked={ttsEngine === 'kokoro'} 
+                  onChange={(e) => setTtsEngine(e.target.value)}
+                  className="mt-1 accent-editorial-text w-4 h-4"
+                />
+                <div>
+                  <span className="block font-bold font-sans uppercase tracking-wider text-sm">Kokoro TTS (Default)</span>
+                  <span className="text-sm font-sans text-editorial-muted mt-1 block">100% Free, Unlimited duration. Uses ultra-realistic built-in studio broadcast voices (am_michael & am_adam).</span>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 transition-colors">
+                <input 
+                  type="radio" 
+                  name="ttsEngine" 
+                  value="fish" 
+                  checked={ttsEngine === 'fish'} 
+                  onChange={(e) => setTtsEngine(e.target.value)}
+                  className="mt-1 accent-editorial-text w-4 h-4"
+                />
+                <div>
+                  <span className="block font-bold font-sans uppercase tracking-wider text-sm">Fish Speech S2-Pro (ZeroGPU)</span>
+                  <span className="text-sm font-sans text-editorial-muted mt-1 block">Zero-Shot clones your exact custom Al.mp3 and Matt.mp3 files. Highly subject to API rate limits and duration caps.</span>
+                </div>
+              </label>
+            </div>
+
+            <h3 className="text-xl font-bold uppercase tracking-widest inline-block pb-1 mb-2">Podcast Generation Capacity</h3>
+            <p className="text-sm font-sans text-editorial-muted mt-2 mb-6">
+              By default, your AI Deep Dive podcast is generated as a short-form summary. 
+              To unlock <strong>15-minute</strong> extended episodes, link a billing account below. 
             </p>
 
             <div className="space-y-4">
