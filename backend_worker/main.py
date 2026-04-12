@@ -123,7 +123,8 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     max_retries = 3
     for attempt in range(max_retries):
         res = requests.post(url, json={
-            "contents": [{"parts": [{"text": prompt}]}]
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"}
         })
         
         if res.ok:
