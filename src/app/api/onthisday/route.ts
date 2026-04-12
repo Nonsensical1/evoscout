@@ -1,9 +1,53 @@
 import { NextResponse } from 'next/server';
+import { adminDb } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
+const FALLBACK_EVENTS = [
+  {
+    id: "HIST-1953-XYZ",
+    year: 1953,
+    text: "James Watson and Francis Crick publish their paper describing the double helix structure of DNA, revolutionizing molecular biology and genetics.",
+    pageUrl: "https://en.wikipedia.org/wiki/DNA"
+  },
+  {
+    id: "HIST-1996-XYZ",
+    year: 1996,
+    text: "Dolly the sheep becomes the first mammal cloned from an adult somatic cell, a monumental milestone in genetics and synthetic bio-potential.",
+    pageUrl: "https://en.wikipedia.org/wiki/Dolly_(sheep)"
+  },
+  {
+    id: "HIST-2001-XYZ",
+    year: 2001,
+    text: "The initial sequencing of the human genome is published simultaneously in Nature and Science, unlocking the modern era of genomics.",
+    pageUrl: "https://en.wikipedia.org/wiki/Human_Genome_Project"
+  },
+  {
+    id: "HIST-2012-XYZ",
+    year: 2012,
+    text: "Jennifer Doudna and Emmanuelle Charpentier publish their landmark paper on CRISPR-Cas9, proving it could be programmed for precision gene editing.",
+    pageUrl: "https://en.wikipedia.org/wiki/CRISPR"
+  }
+];
+
 export async function POST(req: Request) {
   try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const cacheRef = adminDb.collection('global_cache').doc('onthisday');
+    
+    // 1. Try Global Cache First! This prevents API rate limits (429) naturally by heavily centralizing usage.
+    try {
+       const snap = await cacheRef.get();
+       if (snap.exists) {
+           const data = snap.data();
+           if (data && data.date === todayStr && data.events && data.events.length > 0) {
+               return NextResponse.json({ success: true, events: data.events });
+           }
+       }
+    } catch (e) {
+       console.warn("Firestore cache read failed, evaluating directly", e);
+    }
+
     const body = await req.json().catch(() => ({}));
     const topicsMap = body.topics || {};
 
@@ -35,44 +79,73 @@ No markdown code block wrappers. Return purely the array.`;
        throw new Error("Missing GEMINI_API_KEY environment variable.");
     }
 
-    const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json" }
-      })
-    });
+    let finalEvents = [];
+    let success = false;
+    let attempts = 0;
 
-    if (!gRes.ok) {
-       const errTx = await gRes.text();
-       throw new Error(`Gemini API Error: ${gRes.status} - ${errTx}`);
+    // 2. Exponential Backoff API Wrapper (Prevents crashing if multiple uncached users hit simultaneously)
+    while (attempts < 3 && !success) {
+      const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      });
+
+      if (gRes.ok) {
+        const gData = await gRes.json();
+        const rawText = gData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+        
+        try {
+          let parsedEvents = [];
+          try {
+             parsedEvents = JSON.parse(rawText);
+          } catch (e) {
+             const cleaned = rawText.replace(/```(?:json)?\s*/g, '').replace(/```\s*$/g, '').trim();
+             parsedEvents = JSON.parse(cleaned);
+          }
+          
+          parsedEvents.sort((a: any, b: any) => Number(a.year) - Number(b.year));
+          finalEvents = parsedEvents.map((e: any, idx: number) => ({
+             id: `HIST-${e.year || 'UX'}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+             year: e.year || "Unknown",
+             text: e.text || "Historical record processed.",
+             pageUrl: e.pageUrl || null
+          }));
+          success = true;
+        } catch (e) {
+          console.warn("JSON Parse Error from Gemini response", e);
+        }
+      } else if (gRes.status === 429) {
+        console.log(`Rate limited (429). Attempt ${attempts + 1}/3. Waiting...`);
+        // Exponential backoff: 2s, 4s, 8s
+        await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempts)));
+      } else {
+        console.warn(`Gemini API Error: ${gRes.status}`);
+        break; // Other status errors (400, 500) will abort the loop
+      }
+      attempts++;
     }
 
-    const gData = await gRes.json();
-    const rawText = gData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-    
-    let events = [];
-    try {
-      events = JSON.parse(rawText);
-    } catch (e) {
-      const cleaned = rawText.replace(/```(?:json)?\s*/g, '').replace(/```\s*$/g, '').trim();
-      events = JSON.parse(cleaned);
+    // 3. Fallback check
+    if (!success || finalEvents.length === 0) {
+       console.warn("Gemini generation ultimately failed or exhausted retries. Providing generic curated pipeline events.");
+       finalEvents = FALLBACK_EVENTS;
+    } else {
+       // Only cache if we successfully generated a fresh, contextual set
+       try {
+         await cacheRef.set({ date: todayStr, events: finalEvents });
+       } catch (e) {
+         console.error("Failed to write to global cache", e);
+       }
     }
-
-    // Sort by chronological order
-    events.sort((a: any, b: any) => Number(a.year) - Number(b.year));
-
-    const finalEvents = events.map((e: any, idx: number) => ({
-       id: `HIST-${e.year || 'UX'}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
-       year: e.year || "Unknown",
-       text: e.text || "Historical record processed.",
-       pageUrl: e.pageUrl || null
-    }));
 
     return NextResponse.json({ success: true, events: finalEvents });
   } catch (error: any) {
     console.error("fetchOnThisDay pipeline error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    // Even in total disaster, serve fallback events rather than completely breaking UI layout
+    return NextResponse.json({ success: true, events: FALLBACK_EVENTS });
   }
 }
