@@ -184,11 +184,11 @@ def generate_audio_segments(script):
     # Paths to reference audio and transcriptions
     voice_refs = {
         "Al": {
-            "audio": os.path.join(voices_dir, "al.mp3"),
+            "audio": os.path.join(voices_dir, "Al.mp3"),
             "text": os.path.join(voices_dir, "al.txt")
         },
         "Matt": {
-            "audio": os.path.join(voices_dir, "matt.mp3"),
+            "audio": os.path.join(voices_dir, "Matt.mp3"),
             "text": os.path.join(voices_dir, "matt.txt")
         }
     }
