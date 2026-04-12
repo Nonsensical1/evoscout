@@ -118,8 +118,7 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     
     CRITICAL: Ensure every double quote inside a speaker's text is escaped with a backslash (e.g., Matt says, \\"Wow!\\").
     """
-    
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
     
     max_retries = 3
     for attempt in range(max_retries):
