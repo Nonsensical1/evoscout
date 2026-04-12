@@ -166,15 +166,15 @@ def generate_audio_segments(script):
     
     # Initialize client in a retry loop to give sleeping HF spaces time to start up
     client = None
-    for attempt in range(5):
+    for attempt in range(12):
         try:
             client = Client("fguilleme/fish-s2-pro-zero", hf_token=hf_token)
             break
         except Exception as e:
-            if attempt == 4:
-                raise Exception(f"Failed to connect to Hugging Face space after 5 attempts. It may be sleeping or down. Error: {e}")
-            print(f"Waiting for Hugging Face space to wake up (Attempt {attempt+1}/5)...")
-            time.sleep(20) # Wait 20 seconds before retrying
+            if attempt == 11:
+                raise Exception(f"Failed to connect to Hugging Face space after 12 attempts. It may be sleeping or down. Error: {e}")
+            print(f"Waiting for Hugging Face space to wake up (Attempt {attempt+1}/12)...")
+            time.sleep(30) # Wait 30 seconds before retrying
     files = []
     
     # Get the directory where this script is located
