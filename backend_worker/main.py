@@ -12,49 +12,52 @@ from pydub import AudioSegment
 import re
 from urllib.parse import quote
 
-def repair_json(json_str):
-    """Attempts to fix truncated JSON by closing arrays and objects."""
-    json_str = json_str.strip()
-    if not json_str:
-        return "[]"
+def parse_dialogue_fallback(raw_text):
+    """
+    Bulletproof string parser that relies on regex to find speakers and text.
+    Bypasses json.loads entirely to prevent crashes from hallucinated syntax 
+    (e.g. missing braces, unescaped quotes, trailing characters).
+    """
+    dialogue = []
     
-    # Check for truncated array
-    open_brackets = json_str.count('[') - json_str.count(']')
-    open_braces = json_str.count('{') - json_str.count('}')
-    
-    # If it ends with a comma or open quote, clean it up
-    json_str = re.sub(r',[\s]*$', '', json_str)
-    
-    # Close open quotes if odd number (naive)
-    if json_str.count('"') % 2 != 0:
-        json_str += '"'
+    # Split the raw string by the literal '"speaker":' to get processing chunks
+    chunks = raw_text.split('"speaker":')
+    for chunk in chunks[1:]:
+        # Extact speaker (find first quoted word)
+        speaker_match = re.search(r'^\s*"([^"]+)"', chunk)
+        if not speaker_match:
+            continue
+        speaker = speaker_match.group(1).strip()
         
-    # Close braces and brackets in right order
-    # (Simplified approach)
-    while open_braces > 0:
-        json_str += '}'
-        open_braces -= 1
-    while open_brackets > 0:
-        json_str += ']'
-        open_brackets -= 1
+        # Extract text block
+        text_block_match = re.search(r'"text"\s*:\s*"(.*)', chunk, re.DOTALL)
+        if not text_block_match:
+            continue
+            
+        remaining_text = text_block_match.group(1)
         
-    return json_str
-
-def extract_json(text):
-    """Extracts JSON content from text, handling markdown blocks and filler."""
-    # Find JSON blocks wrapped in backticks
-    pattern = r'```(?:json)?\s*([\s\S]*?)```'
-    matches = re.findall(pattern, text)
-    if matches:
-        return matches[0].strip()
+        # Trim whitespace
+        clean_text = remaining_text.strip()
         
-    # Fallback to finding the first '[' and last ']'
-    start = text.find('[')
-    end = text.rfind(']')
-    if start != -1 and end != -1:
-        return text[start:end+1].strip()
+        # Drop trailing structural characters that might be appended 
+        # (like commas, closing braces, or brackets)
+        while clean_text and clean_text[-1] in ('}', ']', ',', ' ', '\n', '\r', '\t'):
+            clean_text = clean_text[:-1]
+            
+        # Drop the final quote that enclosed the text value
+        if clean_text.endswith('"'):
+            clean_text = clean_text[:-1]
+            
+        # Clean up any leftover escaped quotes or newlines
+        clean_text = clean_text.replace('\\"', '"').replace('\\n', ' ').strip()
         
-    return text.strip()
+        if speaker and clean_text:
+            dialogue.append({"speaker": speaker, "text": clean_text})
+            
+    if not dialogue:
+        raise Exception("Regex fallback failed to find any dialogue.")
+        
+    return dialogue
 
 def setup_firebase():
     firebase_creds_json = os.environ.get('FIREBASE_SERVICE_ACCOUNT')
@@ -142,21 +145,19 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     data = res.json()
     raw_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
     
-    cleaned_json = extract_json(raw_text)
-    
     try:
-        return json.loads(cleaned_json)
+        # First attempt native json load (most robust if valid)
+        # Strip potential markdown blocks
+        clean = re.sub(r'```(?:json)?\s*', '', raw_text)
+        clean = re.sub(r'\s*```', '', clean).strip()
+        return json.loads(clean)
     except json.JSONDecodeError as e:
         print(f"Initial JSON parse failed: {e}")
-        print(f"Raw Snippet (First 100): {raw_text[:100]}...")
-        print(f"Raw Snippet (Last 100): {raw_text[-100:]}...")
-        
         try:
-            print("Attempting to repair JSON...")
-            repaired = repair_json(cleaned_json)
-            return json.loads(repaired)
+            print("Attempting bulletproof regex extraction...")
+            return parse_dialogue_fallback(raw_text)
         except Exception as e2:
-            print(f"Failed to repair JSON: {e2}")
+            print(f"Failed regex fallback: {e2}")
             raise e
 
 def generate_audio_segments(script):
