@@ -168,7 +168,7 @@ def generate_audio_segments(script):
     client = None
     for attempt in range(12):
         try:
-            client = Client("fguilleme/fish-s2-pro-zero", hf_token=hf_token)
+            client = Client("fguilleme/fish-s2-pro-zero", token=hf_token)
             break
         except Exception as e:
             if attempt == 11:
