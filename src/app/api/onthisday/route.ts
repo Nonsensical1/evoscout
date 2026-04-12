@@ -7,59 +7,68 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const topicsMap = body.topics || {};
 
-    const now = new Date();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
+    const defaultScienceKeywords = "CRISPR, gene editing, proteomics, synthetic biology, microbiology, biology, cancer research, pathology, genomics";
+    // topicsMap.news is safely truncated from page.tsx (1000 chars of actual titles)
+    const combinedTerms = topicsMap.news || defaultScienceKeywords;
 
-    // Default science keywords (curated for science milestones)
-    const defaultScienceKeywords = "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|pathology|zoology|biology|genetics|molecule|protein|enzyme|chromosome|evolution|physics|chemistry|astronomy|nobel|scientist|laboratory|university|institute";
+    const prompt = `You are a historical data assistant for an erudite synthetic biology and cellular news aggregation platform. 
+Your task is to generate 4 to 6 significant historical scientific milestones that are DIRECTLY related to the subjects currently being parsed in today's news.
 
-    // Use user settings topics if they exist, otherwise fallback to defaults
-    const combinedTerms = topicsMap.news
-      ? topicsMap.news.split(',').map((s: string) => s.trim()).filter(Boolean).join('|') + "|" + defaultScienceKeywords
-      : defaultScienceKeywords;
+Today's news headlines/topics are:
+"${combinedTerms}"
 
-    const keywordRegex = new RegExp(combinedTerms, 'i');
+Find major discoveries, institutional foundings, pivotal publications, or paradigm shifts that happened historically in these EXACT specific subject areas. 
+If possible, highlight events that happened in or around the current month, but prioritize absolute topical relevance above calendar dates. 
 
-    const res = await fetch(
-      `https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/${mm}/${dd}`,
-      {
-        headers: {
-          'Api-User-Agent': 'EvoScout/1.0 (https://github.com/Nonsensical1/evoscout; elijahryal@outlook.com)',
-          'Accept': 'application/json',
-        },
-        next: { revalidate: 3600 },
-      }
-    );
+Output ONLY a raw JSON array of objects with no markdown formatting. Each object should have the following structure:
+[
+  {
+    "year": 19XX, // integer year
+    "text": "A 2-3 sentence engaging description of the historical milestone and its conceptual link to similar modern research.",
+    "pageUrl": "https://en.wikipedia.org/wiki/..." // A relevant link for further reading
+  }
+]
+No markdown code block wrappers. Return purely the array.`;
 
-    if (!res.ok) {
-      throw new Error("Wikipedia API responded with status: " + res.status);
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+       throw new Error("Missing GEMINI_API_KEY environment variable.");
     }
 
-    const data = await res.json();
-    const events: any[] = data.events || [];
-
-    const filtered = events.filter((e: any) => {
-      // Check the primary text and the extract of the first page link for science relevance
-      const text = (e.text || '') + ' ' + (e.pages?.[0]?.extract || '');
-      return keywordRegex.test(text);
+    const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      })
     });
 
-    // Sort by year ascending so older milestones appearing at top represents "history"
-    filtered.sort((a: any, b: any) => (a.year || 0) - (b.year || 0));
+    if (!gRes.ok) {
+       const errTx = await gRes.text();
+       throw new Error(`Gemini API Error: ${gRes.status} - ${errTx}`);
+    }
 
-    const finalEvents = filtered.slice(0, 8).map((e: any) => {
-      const mainPage = e.pages && e.pages.length > 0 ? e.pages[0] : null;
-      return {
-        id: `HIST-${e.year}-${Math.random().toString(36).substr(2, 5)}`,
-        year: e.year,
-        text: e.text,
-        pageTitle: mainPage?.title?.replace(/_/g, ' ') || null,
-        pageUrl: mainPage?.content_urls?.desktop?.page || null,
-        extract: mainPage?.extract || null,
-        thumbnail: mainPage?.thumbnail?.source || null
-      };
-    });
+    const gData = await gRes.json();
+    const rawText = gData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+    
+    let events = [];
+    try {
+      events = JSON.parse(rawText);
+    } catch (e) {
+      const cleaned = rawText.replace(/```(?:json)?\s*/g, '').replace(/```\s*$/g, '').trim();
+      events = JSON.parse(cleaned);
+    }
+
+    // Sort by chronological order
+    events.sort((a: any, b: any) => Number(a.year) - Number(b.year));
+
+    const finalEvents = events.map((e: any, idx: number) => ({
+       id: `HIST-${e.year || 'UX'}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+       year: e.year || "Unknown",
+       text: e.text || "Historical record processed.",
+       pageUrl: e.pageUrl || null
+    }));
 
     return NextResponse.json({ success: true, events: finalEvents });
   } catch (error: any) {
