@@ -43,8 +43,8 @@ jobs:
 
     - name: Download Kokoro-ONNX Models
       run: |
-        wget -q https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/kokoro-v0_19.onnx -O backend_worker/kokoro-v0_19.onnx
-        wget -q https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files/voices.json -O backend_worker/voices.json
+        wget -q https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx -O backend_worker/kokoro-v1.0.onnx
+        wget -q https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin -O backend_worker/voices-v1.0.bin
 
     - name: Run AI Podcast Generation
       env:

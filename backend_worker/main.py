@@ -277,8 +277,8 @@ def generate_kokoro_audio_segments(script):
     """Use Kokoro ONNX for local, rapid, free, unlimited TTS generation."""
     files = []
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(base_dir, "kokoro-v0_19.onnx")
-    voices_path = os.path.join(base_dir, "voices.json")
+    model_path = os.path.join(base_dir, "kokoro-v1.0.onnx")
+    voices_path = os.path.join(base_dir, "voices-v1.0.bin")
     
     if not os.path.exists(model_path) or not os.path.exists(voices_path):
         raise Exception(f"Kokoro model files not found locally in backend_worker. Ensure build step downloads them.")
