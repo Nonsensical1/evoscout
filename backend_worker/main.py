@@ -9,7 +9,52 @@ import firebase_admin
 from firebase_admin import credentials, firestore, storage, auth
 from gradio_client import Client, handle_file
 from pydub import AudioSegment
+import re
 from urllib.parse import quote
+
+def repair_json(json_str):
+    """Attempts to fix truncated JSON by closing arrays and objects."""
+    json_str = json_str.strip()
+    if not json_str:
+        return "[]"
+    
+    # Check for truncated array
+    open_brackets = json_str.count('[') - json_str.count(']')
+    open_braces = json_str.count('{') - json_str.count('}')
+    
+    # If it ends with a comma or open quote, clean it up
+    json_str = re.sub(r',[\s]*$', '', json_str)
+    
+    # Close open quotes if odd number (naive)
+    if json_str.count('"') % 2 != 0:
+        json_str += '"'
+        
+    # Close braces and brackets in right order
+    # (Simplified approach)
+    while open_braces > 0:
+        json_str += '}'
+        open_braces -= 1
+    while open_brackets > 0:
+        json_str += ']'
+        open_brackets -= 1
+        
+    return json_str
+
+def extract_json(text):
+    """Extracts JSON content from text, handling markdown blocks and filler."""
+    # Find JSON blocks wrapped in backticks
+    pattern = r'```(?:json)?\s*([\s\S]*?)```'
+    matches = re.findall(pattern, text)
+    if matches:
+        return matches[0].strip()
+        
+    # Fallback to finding the first '[' and last ']'
+    start = text.find('[')
+    end = text.rfind(']')
+    if start != -1 and end != -1:
+        return text[start:end+1].strip()
+        
+    return text.strip()
 
 def setup_firebase():
     firebase_creds_json = os.environ.get('FIREBASE_SERVICE_ACCOUNT')
@@ -57,6 +102,8 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
       {{"speaker": "Al", "text": "[excited] Welcome back to the Deep Dive! [happy] Today we have some incredible news."}},
       {{"speaker": "Matt", "text": "[thoughtful] That's right, Al. [laughing] I couldn't believe it when I read the report on..."}}
     ]
+    
+    CRITICAL: Ensure every double quote inside a speaker's text is escaped with a backslash (e.g., Matt says, \\"Wow!\\").
     """
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
@@ -71,7 +118,22 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     data = res.json()
     raw_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
     
-    return json.loads(raw_text.strip())
+    cleaned_json = extract_json(raw_text)
+    
+    try:
+        return json.loads(cleaned_json)
+    except json.JSONDecodeError as e:
+        print(f"Initial JSON parse failed: {e}")
+        print(f"Raw Snippet (First 100): {raw_text[:100]}...")
+        print(f"Raw Snippet (Last 100): {raw_text[-100:]}...")
+        
+        try:
+            print("Attempting to repair JSON...")
+            repaired = repair_json(cleaned_json)
+            return json.loads(repaired)
+        except Exception as e2:
+            print(f"Failed to repair JSON: {e2}")
+            raise e
 
 def generate_audio_segments(script):
     """Use Fish Audio S2 Pro via Hugging Face Gradio API (Higher Quality)."""
