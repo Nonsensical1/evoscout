@@ -290,28 +290,6 @@ export default function Home() {
             {actionMessage && <p className="text-sm font-sans font-medium text-blue-600 mt-2">{actionMessage}</p>}
           </div>
           <div className="flex flex-col gap-4 w-full md:w-auto items-end">
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <span className="text-xs font-sans font-bold uppercase tracking-wider text-editorial-muted whitespace-nowrap">Jump To:</span>
-              <select 
-                className="font-sans text-sm border-2 border-editorial-border-dark bg-white py-1.5 px-3 uppercase tracking-wider font-bold text-editorial-text cursor-pointer outline-none focus:ring-0 max-w-full"
-                onChange={(e) => {
-                  const id = e.target.value;
-                  if (id) {
-                    const el = document.getElementById(id);
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }
-                  e.target.value = "";
-                }}
-              >
-                <option value="">Select Section</option>
-                <option value="section-news">Industry News</option>
-                <option value="section-literature">Literature</option>
-                <option value="section-history">History</option>
-                <option value="section-grants">Funding Specs</option>
-                <option value="section-open-grants">Active Postings</option>
-                <option value="section-positions">Classifieds</option>
-              </select>
-            </div>
             {user?.email?.toLowerCase() === "elijahryal@gmail.com" && (
               <button 
                 onClick={() => {
