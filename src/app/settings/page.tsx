@@ -20,7 +20,6 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
-  const [ttsCredentials, setTtsCredentials] = useState('');
   const [ttsEngine, setTtsEngine] = useState('kokoro');
 
   useEffect(() => {
@@ -43,9 +42,6 @@ export default function SettingsPage() {
             careerInstitutions: tops.careerInstitutions || "",
             careerTitles: tops.careerTitles || ""
           });
-          if (snap.data().googleCloudTtsCredentials) {
-            setTtsCredentials(snap.data().googleCloudTtsCredentials);
-          }
           if (snap.data().ttsEngine) {
             setTtsEngine(snap.data().ttsEngine);
           }
@@ -66,8 +62,7 @@ export default function SettingsPage() {
       await setDoc(doc(db, 'users', user.uid, 'settings', 'config'), {
         ...limits,
         topics,
-        ttsEngine,
-        ...(ttsCredentials ? { googleCloudTtsCredentials: ttsCredentials } : {})
+        ttsEngine
       }, { merge: true });
       setSuccessMsg("Configuration committed successfully.");
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -117,7 +112,6 @@ export default function SettingsPage() {
         <div className="absolute top-0 right-0 w-32 h-32 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-
           <div className="space-y-10">
             <div>
               <h2 className="text-2xl font-bold uppercase tracking-widest mb-2 border-b-2 border-editorial-border-dark inline-block pb-1">Aggregation Quotas</h2>
@@ -170,146 +164,109 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          </div>
+        
+          {/* RESTORED PAYLOAD METRICS */}
+          <div className="bg-[#fafafa] p-6 border border-editorial-border flex flex-col justify-center text-center items-center">
+            <div className="w-16 h-16 border-4 border-editorial-border rounded-full flex justify-center items-center mb-6">
+              <span className="font-sans font-black text-xl italic">{limits.newsLimit + limits.literatureLimit + limits.grantsLimit}</span>
+            </div>
+            <h3 className="font-serif font-bold text-xl mb-4">Daily Extraction Payload</h3>
+            <p className="text-sm font-sans text-editorial-muted">This represents the maximum theoretical throughput the parsing engine will inject into your daily briefing.</p>
+          </div>
+        </div>
+
+        {/* ALGORITHMIC SETTINGS */}
+        <div className="mt-16 pt-10 border-t-2 border-editorial-border-dark">
+            <h2 className="text-2xl font-bold uppercase tracking-widest mb-2 inline-block pb-1">Algorithmic Routing Parameters</h2>
+            <p className="text-sm font-sans text-editorial-muted mt-2 mb-8">Override the core scraping AI. Input comma-separated keywords or leave exactly blank to inherit default parameters.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="flex flex-col gap-2">
+                 <label className="font-bold font-sans uppercase tracking-wider text-sm">NSF / NIH Grants</label>
+                 <input name="grants" value={topics.grants} onChange={handleTopicChange} placeholder="e.g. genomics, pathology, epigenetics" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
+              </div>
+              <div className="flex flex-col gap-2">
+                 <label className="font-bold font-sans uppercase tracking-wider text-sm">GovGrants Open Pipeline</label>
+                 <input name="openGovGrants" value={topics.openGovGrants} onChange={handleTopicChange} placeholder="e.g. molecular biology, bioinformatics" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
+              </div>
+              <div className="flex flex-col gap-2">
+                 <label className="font-bold font-sans uppercase tracking-wider text-sm">Global Web News</label>
+                 <input name="news" value={topics.news} onChange={handleTopicChange} placeholder="e.g. CRISPR, Cas9, quantum computing" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
+              </div>
+              <div className="flex flex-col gap-2">
+                 <label className="font-bold font-sans uppercase tracking-wider text-sm">Pre-Print Literature</label>
+                 <input name="literature" value={topics.literature} onChange={handleTopicChange} placeholder="e.g. synthetic biology, oncology" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
+              </div>
+              <div className="flex flex-col gap-2">
+                 <label className="font-bold font-sans uppercase tracking-wider text-sm">Career Targets (Institutions)</label>
+                 <input name="careerInstitutions" value={topics.careerInstitutions} onChange={handleTopicChange} placeholder="e.g. NIH, Broad Institute, SpaceX" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
+              </div>
+              <div className="flex flex-col gap-2">
+                 <label className="font-bold font-sans uppercase tracking-wider text-sm">Career Targets (Job Titles)</label>
+                 <input name="careerTitles" value={topics.careerTitles} onChange={handleTopicChange} placeholder="e.g. Software Engineer, Lab Tech" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
+              </div>
+            </div>
         </div>
         
-        {/* RESTORED PAYLOAD METRICS */}
-        <div className="bg-[#fafafa] p-6 border border-editorial-border flex flex-col justify-center text-center items-center">
-          <div className="w-16 h-16 border-4 border-editorial-border rounded-full flex justify-center items-center mb-6">
-            <span className="font-sans font-black text-xl italic">{limits.newsLimit + limits.literatureLimit + limits.grantsLimit}</span>
+        {/* PODCAST TTS TIER */}
+        <div className="mt-16 pt-10 border-t-2 border-editorial-border-dark">
+          <div className="flex items-center gap-3 mb-2">
+            <Cloud className="w-6 h-6 text-[#005587]" />
+            <h2 className="text-2xl font-bold uppercase tracking-widest inline-block pb-1">AI Voice Engine</h2>
           </div>
-          <h3 className="font-serif font-bold text-xl mb-4">Daily Extraction Payload</h3>
-          <p className="text-sm font-sans text-editorial-muted">This represents the maximum theoretical throughput the parsing engine will inject into your daily briefing.</p>
-        </div>
-      </div>
+          <p className="text-sm font-sans text-editorial-muted mt-2 mb-6">
+            Select the core technology used to synthesize your podcast hosts. 
+          </p>
 
-      {/* ALGORITHMIC SETTINGS */}
-      <div className="mt-16 pt-10 border-t-2 border-editorial-border-dark">
-          <h2 className="text-2xl font-bold uppercase tracking-widest mb-2 inline-block pb-1">Algorithmic Routing Parameters</h2>
-          <p className="text-sm font-sans text-editorial-muted mt-2 mb-8">Override the core scraping AI. Input comma-separated keywords or leave exactly blank to inherit default parameters.</p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-            <div className="flex flex-col gap-2">
-               <label className="font-bold font-sans uppercase tracking-wider text-sm">NSF / NIH Grants</label>
-               <input name="grants" value={topics.grants} onChange={handleTopicChange} placeholder="e.g. genomics, pathology, epigenetics" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
-            </div>
-            <div className="flex flex-col gap-2">
-               <label className="font-bold font-sans uppercase tracking-wider text-sm">GovGrants Open Pipeline</label>
-               <input name="openGovGrants" value={topics.openGovGrants} onChange={handleTopicChange} placeholder="e.g. molecular biology, bioinformatics" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
-            </div>
-            <div className="flex flex-col gap-2">
-               <label className="font-bold font-sans uppercase tracking-wider text-sm">Global Web News</label>
-               <input name="news" value={topics.news} onChange={handleTopicChange} placeholder="e.g. CRISPR, Cas9, quantum computing" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
-            </div>
-            <div className="flex flex-col gap-2">
-               <label className="font-bold font-sans uppercase tracking-wider text-sm">Pre-Print Literature</label>
-               <input name="literature" value={topics.literature} onChange={handleTopicChange} placeholder="e.g. synthetic biology, oncology" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
-            </div>
-            <div className="flex flex-col gap-2">
-               <label className="font-bold font-sans uppercase tracking-wider text-sm">Career Targets (Institutions)</label>
-               <input name="careerInstitutions" value={topics.careerInstitutions} onChange={handleTopicChange} placeholder="e.g. NIH, Broad Institute, SpaceX" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
-            </div>
-            <div className="flex flex-col gap-2">
-               <label className="font-bold font-sans uppercase tracking-wider text-sm">Career Targets (Job Titles)</label>
-               <input name="careerTitles" value={topics.careerTitles} onChange={handleTopicChange} placeholder="e.g. Software Engineer, Lab Tech" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
-            </div>
-          </div>
-          
-          {/* PODCAST TTS TIER */}
-          <div className="mt-16 pt-10 border-t-2 border-editorial-border-dark">
-            <div className="flex items-center gap-3 mb-2">
-              <Cloud className="w-6 h-6 text-[#005587]" />
-              <h2 className="text-2xl font-bold uppercase tracking-widest inline-block pb-1">AI Voice Engine</h2>
-            </div>
-            <p className="text-sm font-sans text-editorial-muted mt-2 mb-6">
-              Select the core technology used to synthesize your podcast hosts. 
-            </p>
-
-            <div className="space-y-4 mb-10">
-              <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 transition-colors">
-                <input 
-                  type="radio" 
-                  name="ttsEngine" 
-                  value="kokoro" 
-                  checked={ttsEngine === 'kokoro'} 
-                  onChange={(e) => setTtsEngine(e.target.value)}
-                  className="mt-1 accent-editorial-text w-4 h-4"
-                />
-                <div>
-                  <span className="block font-bold font-sans uppercase tracking-wider text-sm">Kokoro TTS (Default)</span>
-                  <span className="text-sm font-sans text-editorial-muted mt-1 block">100% Free, Unlimited duration. Uses ultra-realistic built-in studio broadcast voices (am_michael & am_adam).</span>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 transition-colors">
-                <input 
-                  type="radio" 
-                  name="ttsEngine" 
-                  value="fish" 
-                  checked={ttsEngine === 'fish'} 
-                  onChange={(e) => setTtsEngine(e.target.value)}
-                  className="mt-1 accent-editorial-text w-4 h-4"
-                />
-                <div>
-                  <span className="block font-bold font-sans uppercase tracking-wider text-sm">Fish Speech S2-Pro (ZeroGPU)</span>
-                  <span className="text-sm font-sans text-editorial-muted mt-1 block">Zero-Shot clones your exact custom Al.mp3 and Matt.mp3 files. Highly subject to API rate limits and duration caps.</span>
-                </div>
-              </label>
-            </div>
-
-            <h3 className="text-xl font-bold uppercase tracking-widest inline-block pb-1 mb-2">Podcast Generation Capacity</h3>
-            <p className="text-sm font-sans text-editorial-muted mt-2 mb-6">
-              By default, your AI Deep Dive podcast is generated as a short-form summary. 
-              To unlock <strong>15-minute</strong> extended episodes, link a billing account below. 
-            </p>
-
-            <div className="space-y-4">
-              <div className="flex flex-col gap-2">
-                <label className="font-bold font-sans uppercase tracking-wider text-sm">Google Cloud Service Account JSON</label>
-                <textarea
-                  value={ttsCredentials}
-                  onChange={(e) => setTtsCredentials(e.target.value)}
-                  placeholder='Paste your full service account JSON here (e.g. {"type": "service_account", "project_id": "...", ...})'
-                  rows={4}
-                  className="p-3 border border-editorial-border font-mono text-xs focus:outline-editorial-text w-full resize-y bg-white"
-                />
-                <p className="text-xs font-sans text-editorial-muted">
-                  Generate at <a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" className="underline text-[#005587]">Google Cloud Console</a>. 
-                  Ensure <strong>Cloud Text-to-Speech API</strong> is enabled on your project.
-                </p>
+          <div className="space-y-4">
+            <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 transition-colors">
+              <input 
+                type="radio" 
+                name="ttsEngine" 
+                value="kokoro" 
+                checked={ttsEngine === 'kokoro'} 
+                onChange={(e) => setTtsEngine(e.target.value)}
+                className="mt-1 accent-editorial-text w-4 h-4"
+              />
+              <div>
+                <span className="block font-bold font-sans uppercase tracking-wider text-sm">Kokoro TTS (Default)</span>
+                <span className="text-sm font-sans text-editorial-muted mt-1 block">100% Free, Unlimited duration. Uses ultra-realistic built-in studio broadcast voices (am_michael & am_adam).</span>
               </div>
+            </label>
 
-              {ttsCredentials && (
-                <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 text-green-800 text-sm font-sans">
-                  <Cloud className="w-4 h-4" />
-                  <span>Custom credentials linked — your podcast will generate at the <strong>15-minute extended tier</strong>.</span>
-                </div>
-              )}
-
-              {!ttsCredentials && (
-                <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-200 text-gray-500 text-sm font-sans">
-                  <Cloud className="w-4 h-4" />
-                  <span>No custom credentials — podcast generates at the standard <strong>5-minute tier</strong>.</span>
-                </div>
-              )}
-            </div>
+            <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 transition-colors">
+              <input 
+                type="radio" 
+                name="ttsEngine" 
+                value="fish" 
+                checked={ttsEngine === 'fish'} 
+                onChange={(e) => setTtsEngine(e.target.value)}
+                className="mt-1 accent-editorial-text w-4 h-4"
+              />
+              <div>
+                <span className="block font-bold font-sans uppercase tracking-wider text-sm">Fish Speech S2-Pro (ZeroGPU)</span>
+                <span className="text-sm font-sans text-editorial-muted mt-1 block">Zero-Shot clones your exact custom Al.mp3 and Matt.mp3 files. Highly subject to API rate limits and duration caps.</span>
+              </div>
+            </label>
           </div>
+        </div>
 
-          {/* Submit Button Resituated */}
-          <div className="pt-6 border-t border-editorial-border">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-full bg-editorial-text hover:bg-black text-white py-4 flex justify-center items-center gap-3 font-sans font-bold uppercase tracking-widest transition-colors disabled:opacity-70"
-            >
-              {saving ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-              {saving ? 'Transmitting...' : 'Commit Configuration'}
-            </button>
-            {successMsg && (
-              <p className="text-center font-sans font-bold text-[#005587] text-sm mt-4 uppercase tracking-widest">
-                {successMsg}
-              </p>
-            )}
-          </div>
+        {/* Submit Button Resituated */}
+        <div className="pt-8 mt-12 border-t border-editorial-border">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full bg-editorial-text hover:bg-black text-white py-4 flex justify-center items-center gap-3 font-sans font-bold uppercase tracking-widest transition-colors disabled:opacity-70"
+          >
+            {saving ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            {saving ? 'Transmitting...' : 'Commit Configuration'}
+          </button>
+          {successMsg && (
+            <p className="text-center font-sans font-bold text-[#005587] text-sm mt-4 uppercase tracking-widest">
+              {successMsg}
+            </p>
+          )}
         </div>
       </div>
     </div>
