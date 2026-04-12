@@ -8,8 +8,7 @@ import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc, query,
 
 export default function Home() {
   const { user } = useAuth();
-  const [data, setData] = useState<any>({ grants: [], openGovGrants: [], news: [], literature: [], positions: [], podcastUrl: null, podcastScript: null });
-  const [historyEvents, setHistoryEvents] = useState<any[]>([]);
+  const [data, setData] = useState<any>({ grants: [], openGovGrants: [], news: [], literature: [], positions: [], podcastUrl: null, podcastScript: null, historyEvents: null });
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
   const [quotaNotice, setQuotaNotice] = useState<string | null>(null);
@@ -161,6 +160,7 @@ export default function Home() {
       if (addedCount > 0) {
         dailyFeed.podcastUrl = null;
         dailyFeed.podcastScript = null;
+        dailyFeed.historyEvents = null;
       }
 
       const batch = writeBatch(db);
@@ -207,7 +207,8 @@ export default function Home() {
           literature: feed.literature || [],
           positions: feed.positions || [],
           podcastUrl: feed.podcastUrl || null,
-          podcastScript: feed.podcastScript || null
+          podcastScript: feed.podcastScript || null,
+          historyEvents: feed.historyEvents || null
         });
         setLoading(false);
 
@@ -257,7 +258,8 @@ export default function Home() {
   }, [user, handleRunScraper, SCRAPE_COOLDOWN_MS]);
 
   useEffect(() => {
-    if (data.news && data.news.length > 0 && historyEvents.length === 0) {
+    if (!user) return;
+    if (data.news && data.news.length > 0 && !data.historyEvents) {
       const terms = data.news.map((n: any) => n.title).join(' ');
       const safeTerms = terms.substring(0, 1000); 
       fetch('/api/onthisday', {
@@ -266,12 +268,14 @@ export default function Home() {
         body: JSON.stringify({ topics: { news: safeTerms } })
       })
       .then(res => res.json())
-      .then(resData => {
-         if (resData.success) setHistoryEvents(resData.events);
+      .then(async resData => {
+         if (resData.success) {
+           await setDoc(doc(db, 'users', user.uid, 'daily', 'feed'), { historyEvents: resData.events }, { merge: true });
+         }
       })
       .catch(err => console.error("History fetch error:", err));
     }
-  }, [data.news]);
+  }, [data.news, data.historyEvents, user]);
 
 
   if (loading) return <div className="min-h-[50vh] flex items-center justify-center font-serif text-xl italic text-editorial-muted">Synchronizing encrypted database...</div>;
@@ -470,7 +474,7 @@ export default function Home() {
             <div className="mb-5 border-b border-editorial-border pb-2 text-center">
               <h3 className="font-serif font-black text-sm uppercase tracking-widest text-[#005587]">This Day in History</h3>
             </div>
-            {historyEvents.length === 0 ? (
+            {!data.historyEvents ? (
                <div className="flex justify-center items-center py-4">
                  <div className="flex gap-1">
                    <div className="w-1.5 h-1.5 bg-[#005587] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
@@ -480,7 +484,7 @@ export default function Home() {
                </div>
             ) : (
              <ul className="flex flex-col gap-6">
-              {historyEvents.map((ev: any) => (
+              {data.historyEvents.map((ev: any) => (
                 <li key={ev.id} className="group border-b border-gray-200 pb-5 last:border-0 last:pb-0 block">
                   <a href={ev.pageUrl || "#"} target="_blank" className="flex flex-col outline-none">
                      <span className="text-xl font-serif font-bold text-center mb-2 group-hover:text-[#005587] transition-colors">{ev.year}</span>

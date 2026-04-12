@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,22 +31,6 @@ const FALLBACK_EVENTS = [
 
 export async function POST(req: Request) {
   try {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const cacheRef = adminDb.collection('global_cache').doc('onthisday');
-    
-    // 1. Try Global Cache First! This prevents API rate limits (429) naturally by heavily centralizing usage.
-    try {
-       const snap = await cacheRef.get();
-       if (snap.exists) {
-           const data = snap.data();
-           if (data && data.date === todayStr && data.events && data.events.length > 0) {
-               return NextResponse.json({ success: true, events: data.events });
-           }
-       }
-    } catch (e) {
-       console.warn("Firestore cache read failed, evaluating directly", e);
-    }
-
     const body = await req.json().catch(() => ({}));
     const topicsMap = body.topics || {};
 
@@ -83,7 +66,7 @@ No markdown code block wrappers. Return purely the array.`;
     let success = false;
     let attempts = 0;
 
-    // 2. Exponential Backoff API Wrapper (Prevents crashing if multiple uncached users hit simultaneously)
+    // Exponential Backoff API Wrapper (Prevents crashing if multiple users hit simultaneously)
     while (attempts < 3 && !success) {
       const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
         method: 'POST',
@@ -129,17 +112,10 @@ No markdown code block wrappers. Return purely the array.`;
       attempts++;
     }
 
-    // 3. Fallback check
+    // Fallback check
     if (!success || finalEvents.length === 0) {
-       console.warn("Gemini generation ultimately failed or exhausted retries. Providing generic curated pipeline events.");
+       console.warn("Gemini generation ultimately failed. Providing generic curated pipeline events.");
        finalEvents = FALLBACK_EVENTS;
-    } else {
-       // Only cache if we successfully generated a fresh, contextual set
-       try {
-         await cacheRef.set({ date: todayStr, events: finalEvents });
-       } catch (e) {
-         console.error("Failed to write to global cache", e);
-       }
     }
 
     return NextResponse.json({ success: true, events: finalEvents });
