@@ -162,9 +162,19 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
 
 def generate_audio_segments(script):
     """Use Fish Audio S2 Pro via Hugging Face Gradio API (Higher Quality)."""
-    # Use HF_TOKEN from environment if available to bypass ZeroGPU limits
     hf_token = os.getenv("HF_TOKEN")
-    client = Client("fguilleme/fish-s2-pro-zero", hf_token=hf_token)
+    
+    # Initialize client in a retry loop to give sleeping HF spaces time to start up
+    client = None
+    for attempt in range(5):
+        try:
+            client = Client("fguilleme/fish-s2-pro-zero", hf_token=hf_token)
+            break
+        except Exception as e:
+            if attempt == 4:
+                raise Exception(f"Failed to connect to Hugging Face space after 5 attempts. It may be sleeping or down. Error: {e}")
+            print(f"Waiting for Hugging Face space to wake up (Attempt {attempt+1}/5)...")
+            time.sleep(20) # Wait 20 seconds before retrying
     files = []
     
     # Get the directory where this script is located
