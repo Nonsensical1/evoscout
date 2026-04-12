@@ -107,13 +107,25 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     """
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-    res = requests.post(url, json={
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"responseMimeType": "application/json"}
-    })
     
-    if not res.ok:
-        raise Exception(f"Gemini REST API Error: {res.status_code} {res.text}")
+    max_retries = 3
+    for attempt in range(max_retries):
+        res = requests.post(url, json={
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"}
+        })
+        
+        if res.ok:
+            break
+            
+        if res.status_code == 429:
+            wait_time = (attempt + 1) * 35 # Wait 35s, then 70s, as free tier restricts RPM strictly
+            print(f"Gemini Rate Limited (429). Attempt {attempt + 1}/{max_retries}. Waiting {wait_time}s...")
+            time.sleep(wait_time)
+        else:
+            raise Exception(f"Gemini REST API Error: {res.status_code} {res.text}")
+    else:
+        raise Exception(f"Gemini REST API Error: Failed after {max_retries} retries due to 429 Quota Exhaustion. Response: {res.text}")
     
     data = res.json()
     raw_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
@@ -139,7 +151,7 @@ def generate_audio_segments(script):
     """Use Fish Audio S2 Pro via Hugging Face Gradio API (Higher Quality)."""
     # Use HF_TOKEN from environment if available to bypass ZeroGPU limits
     hf_token = os.getenv("HF_TOKEN")
-    client = Client("fguilleme/fish-s2-pro-zero", token=hf_token)
+    client = Client("fguilleme/fish-s2-pro-zero", hf_token=hf_token)
     files = []
     
     # Get the directory where this script is located
