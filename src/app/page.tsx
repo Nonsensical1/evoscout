@@ -27,7 +27,7 @@ export default function Home() {
 
   const SCRAPE_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
-  const handleRunScraper = useCallback(async () => {
+  const handleRunScraper = useCallback(async (isAdminOverride = false) => {
     if (!user || scrapeInProgress.current) return;
     scrapeInProgress.current = true;
     setQuotaNotice(null);
@@ -156,8 +156,8 @@ export default function Home() {
       dailyFeed.lastScrapeTimestamp = new Date().toISOString();
       dailyFeed.quotaFilled = quotaFilled;
 
-      // If we added new news or literature, clear the old podcast to trigger a fresh synthesis
-      if (addedCount > 0) {
+      // If we added new news or literature, OR an admin explicitly commands a force run, clear caches to trigger a fresh synthesis
+      if (addedCount > 0 || isAdminOverride) {
         dailyFeed.podcastUrl = null;
         dailyFeed.podcastScript = null;
         dailyFeed.historyEvents = null;
@@ -298,7 +298,7 @@ export default function Home() {
               <button 
                 onClick={() => {
                   scrapeInProgress.current = false;
-                  handleRunScraper();
+                  handleRunScraper(true);
                 }}
                 className="bg-red-900 hover:bg-red-800 text-white font-sans text-xs uppercase tracking-wider font-bold py-2 px-4 shadow-sm transition-colors w-full md:w-auto"
               >
