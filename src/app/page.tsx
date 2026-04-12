@@ -9,6 +9,7 @@ import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc, query,
 export default function Home() {
   const { user } = useAuth();
   const [data, setData] = useState<any>({ grants: [], openGovGrants: [], news: [], literature: [], positions: [], podcastUrl: null, podcastScript: null });
+  const [historyEvents, setHistoryEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
   const [quotaNotice, setQuotaNotice] = useState<string | null>(null);
@@ -255,6 +256,23 @@ export default function Home() {
     return () => unsub();
   }, [user, handleRunScraper, SCRAPE_COOLDOWN_MS]);
 
+  useEffect(() => {
+    if (data.news && data.news.length > 0 && historyEvents.length === 0) {
+      const terms = data.news.map((n: any) => n.title).join(' ');
+      const safeTerms = terms.substring(0, 1000); 
+      fetch('/api/onthisday', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topics: { news: safeTerms } })
+      })
+      .then(res => res.json())
+      .then(resData => {
+         if (resData.success) setHistoryEvents(resData.events);
+      })
+      .catch(err => console.error("History fetch error:", err));
+    }
+  }, [data.news]);
+
 
   if (loading) return <div className="min-h-[50vh] flex items-center justify-center font-serif text-xl italic text-editorial-muted">Synchronizing encrypted database...</div>;
 
@@ -264,21 +282,43 @@ export default function Home() {
       {/* Top Banner / Controls */}
       <section className="mb-10 border-b-2 border-editorial-border-dark pb-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          <div className="space-y-2">
+          <div className="space-y-4 w-full md:w-auto">
             <h2 className="text-3xl font-serif font-bold text-editorial-text">Daily Scouting Briefing</h2>
             <p className="font-sans text-editorial-muted max-w-2xl text-base">
               Automated global aggregation of Microbiology, Cellular Sciences, and Synthetic Biology releases.
             </p>
             {actionMessage && <p className="text-sm font-sans font-medium text-blue-600 mt-2">{actionMessage}</p>}
           </div>
-          <div className="flex gap-4">
-            {user?.email === "elijahryal@gmail.com" && (
+          <div className="flex flex-col gap-4 w-full md:w-auto items-end">
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <span className="text-xs font-sans font-bold uppercase tracking-wider text-editorial-muted whitespace-nowrap">Jump To:</span>
+              <select 
+                className="font-sans text-sm border-2 border-editorial-border-dark bg-white py-1.5 px-3 uppercase tracking-wider font-bold text-editorial-text cursor-pointer outline-none focus:ring-0 max-w-full"
+                onChange={(e) => {
+                  const id = e.target.value;
+                  if (id) {
+                    const el = document.getElementById(id);
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }
+                  e.target.value = "";
+                }}
+              >
+                <option value="">Select Section</option>
+                <option value="section-news">Industry News</option>
+                <option value="section-literature">Literature</option>
+                <option value="section-history">History</option>
+                <option value="section-grants">Funding Specs</option>
+                <option value="section-open-grants">Active Postings</option>
+                <option value="section-positions">Classifieds</option>
+              </select>
+            </div>
+            {user?.email?.toLowerCase() === "elijahryal@gmail.com" && (
               <button 
                 onClick={() => {
                   scrapeInProgress.current = false;
                   handleRunScraper();
                 }}
-                className="bg-red-900 hover:bg-red-800 text-white font-sans text-xs uppercase tracking-wider font-bold py-2 px-4 shadow-sm transition-colors"
+                className="bg-red-900 hover:bg-red-800 text-white font-sans text-xs uppercase tracking-wider font-bold py-2 px-4 shadow-sm transition-colors w-full md:w-auto"
               >
                 Force Aggregate
               </button>
@@ -366,7 +406,7 @@ export default function Home() {
         <div className="lg:col-span-8 flex flex-col gap-10">
           
           {/* Breaking News Section */}
-          <section>
+          <section id="section-news">
             <div className="flex items-baseline justify-between mb-6 border-b border-editorial-border pb-2">
               <h3 className="text-2xl font-serif font-black uppercase tracking-tight">Industry & Scientific News</h3>
               <span className="text-xs font-sans font-bold text-editorial-muted uppercase tracking-wider">
@@ -409,7 +449,7 @@ export default function Home() {
           <hr className="border-t-4 border-editorial-border-dark" />
 
           {/* Key Literature */}
-          <section>
+          <section id="section-literature">
             <div className="flex items-baseline justify-between mb-6 border-b border-editorial-border pb-2">
               <h3 className="text-2xl font-serif font-black uppercase tracking-tight">Latest Pre-Prints & Literature</h3>
                <span className="text-xs font-sans font-bold text-editorial-muted uppercase tracking-wider">
@@ -447,8 +487,35 @@ export default function Home() {
         {/* Right Column: Grants & Positions */}
         <div className="lg:col-span-4 flex flex-col gap-10 pl-0 lg:pl-6">
           
+          {/* History Section */}
+          <section id="section-history" className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-[#fafafa] border border-editorial-border p-6 shadow-[4px_4px_0px_#e5e5e5]">
+            <div className="mb-5 border-b border-editorial-border pb-2 text-center">
+              <h3 className="font-serif font-black text-sm uppercase tracking-widest text-[#005587]">This Day in History</h3>
+            </div>
+            {historyEvents.length === 0 ? (
+               <div className="flex justify-center items-center py-4">
+                 <div className="flex gap-1">
+                   <div className="w-1.5 h-1.5 bg-[#005587] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                   <div className="w-1.5 h-1.5 bg-[#005587] rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                   <div className="w-1.5 h-1.5 bg-[#005587] rounded-full animate-bounce"></div>
+                 </div>
+               </div>
+            ) : (
+             <ul className="flex flex-col gap-6">
+              {historyEvents.map((ev: any) => (
+                <li key={ev.id} className="group border-b border-gray-200 pb-5 last:border-0 last:pb-0 block">
+                  <a href={ev.pageUrl || "#"} target="_blank" className="flex flex-col outline-none">
+                     <span className="text-xl font-serif font-bold text-center mb-2 group-hover:text-[#005587] transition-colors">{ev.year}</span>
+                     <p className="text-xs font-serif text-editorial-text leading-relaxed text-center" dangerouslySetInnerHTML={{ __html: ev.text }} />
+                  </a>
+                </li>
+              ))}
+             </ul>
+            )}
+          </section>
+
           {/* Grants Section */}
-          <section>
+          <section id="section-grants">
              <div className="mb-6 border-b-2 border-editorial-border-dark pb-2 text-center">
               <h3 className="font-serif font-black text-lg uppercase tracking-widest">Funding Specs</h3>
             </div>
@@ -477,7 +544,7 @@ export default function Home() {
           </section>
 
           {/* Active GovGrants Section */}
-          <section>
+          <section id="section-open-grants">
              <div className="mb-6 border-b-2 border-editorial-border-dark pb-2 text-center mt-8">
               <h3 className="font-serif font-black text-lg uppercase tracking-widest text-editorial-text">Active Postings</h3>
             </div>
@@ -506,7 +573,7 @@ export default function Home() {
           </section>
 
           {/* Open Positions */}
-          <section className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-[#fafafa] border border-editorial-border p-6 shadow-[4px_4px_0px_#e5e5e5]">
+          <section id="section-positions" className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-[#fafafa] border border-editorial-border p-6 shadow-[4px_4px_0px_#e5e5e5]">
             <div className="mb-5 border-b border-editorial-border pb-2 text-center">
               <h3 className="font-serif font-black text-sm uppercase tracking-widest">Open Classifieds</h3>
             </div>

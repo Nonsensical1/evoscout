@@ -384,7 +384,7 @@ def main():
         except Exception:
             user_email = ""
         
-        is_admin = (user_email == "elijahryal@gmail.com")
+        is_admin = (user_email.lower() == "elijahryal@gmail.com")
         
         # Check explicit credentials for 15 min unlock from previous config
         has_creds = bool(user_settings.get('googleCloudTtsCredentials'))
