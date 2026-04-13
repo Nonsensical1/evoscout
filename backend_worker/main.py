@@ -168,118 +168,80 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
             raise e
 
 def generate_fish_audio_segments(script):
-    """Use Fish Audio S2 Pro natively deployed on private Modal GPUs ($30 free tier)."""
+    """Use Fish Audio S2 Pro via native Modal FastAPI endpoint (no Gradio dependency)."""
+    import requests
+    import base64
+
     modal_url = os.getenv("MODAL_APP_URL")
     if not modal_url:
-        raise Exception("MODAL_APP_URL secret is completely missing from your environment. You must deploy 'modal_fish_tts.py' to obtain your personalized zero-queue inference URL and inject it into your GitHub Repository secrets.")
-        
-    print(f"Dialing direct secure pipeline to Modal infrastructure ({modal_url})...")
-    client = None
-    import requests
-    for attempt in range(15):
-        try:
-            # Wake up the endpoint and allow model weights to download on the Modal GPU
-            res = requests.get(modal_url, timeout=30)
-            if res.status_code == 200:
-                print("Modal Gradio UI is fully awake! Establishing Client binding...")
-                client = Client(modal_url)
-                break
-            else:
-                raise Exception(f"Non-200 OK Status: {res.status_code}")
-        except Exception as e:
-            if attempt == 14:
-                raise Exception(f"Modal server timed out cold-booting. Check modal dashboard: {e}")
-            print(f"Waiting for Modal Cold-Boot allocation and weight injection on A10G (Attempt {attempt+1}/15)...")
-            time.sleep(20) # Keep holding until VM spins up (Total ~5 mins)
-    files = []
-    
-    # Get the directory where this script is located
+        raise Exception("MODAL_APP_URL secret is missing. Deploy modal_fish_tts.py and add the URL to GitHub Secrets.")
+
+    # The new endpoint is a POST endpoint at /synthesize
+    synthesize_url = modal_url.rstrip("/") + "/synthesize"
+    print(f"Dialing native Modal S2-Pro endpoint: {synthesize_url}...")
+
     base_dir = os.path.dirname(os.path.abspath(__file__))
     voices_dir = os.path.join(base_dir, "voices")
-    
-    # Paths to reference audio and transcriptions
+
     voice_refs = {
-        "Al": {
-            "audio": os.path.join(voices_dir, "Al.mp3"),
-            "text": os.path.join(voices_dir, "al.txt")
-        },
-        "Matt": {
-            "audio": os.path.join(voices_dir, "Matt.mp3"),
-            "text": os.path.join(voices_dir, "matt.txt")
-        }
+        "Al":   {"audio": os.path.join(voices_dir, "Al.mp3"),   "text": os.path.join(voices_dir, "al.txt")},
+        "Matt": {"audio": os.path.join(voices_dir, "Matt.mp3"), "text": os.path.join(voices_dir, "matt.txt")},
     }
-    
-    # Pre-load reference texts
+
     ref_texts = {}
+    ref_audio_b64 = {}
     for speaker, paths in voice_refs.items():
         if os.path.exists(paths["text"]):
             with open(paths["text"], "r", encoding="utf-8") as f:
                 ref_texts[speaker] = f.read().strip()
         else:
-            print(f"Warning: Reference text for {speaker} not found at {paths['text']}")
             ref_texts[speaker] = ""
+        if os.path.exists(paths["audio"]):
+            with open(paths["audio"], "rb") as f:
+                ref_audio_b64[speaker] = base64.b64encode(f.read()).decode()
+        else:
+            ref_audio_b64[speaker] = ""
 
+    files = []
     for i, line in enumerate(script):
-        speaker = line.get('speaker', 'Alex')
-        text = line.get('text', '')
+        speaker = line.get("speaker", "Al")
+        text = line.get("text", "")
         if not text.strip():
             continue
-        
-        ref = voice_refs.get(speaker, voice_refs["Al"])
-        ref_text = ref_texts.get(speaker, "")
-        
-        print(f"  Synthesizing segment {i} with Fish Audio ({speaker})...")
-        
-        # Implement retry logic with exponential backoff for rate limits
+
+        print(f"  Synthesizing segment {i} ({speaker}): {text[:60]}...")
+
+        payload = {
+            "text": text,
+            "ref_audio_b64": ref_audio_b64.get(speaker, ""),
+            "ref_text": ref_texts.get(speaker, ""),
+        }
+
         max_retries = 3
         success = False
         for attempt in range(max_retries):
             try:
-                # S2 Pro endpoint expects 8 parameters
-                result = client.predict(
-                    text=text,
-                    ref_audio=handle_file(ref["audio"]) if os.path.exists(ref["audio"]) else None,
-                    ref_text=ref_text if ref_text else " ", # Required by S2 Pro
-                    max_new_tokens=1024,
-                    chunk_length=200,
-                    top_p=0.7,
-                    repetition_penalty=1.1, # Lowered for more natural flow
-                    temperature=0.35,       # Lowered for higher stability
-                    api_name="/tts_inference"
-                )
-                
-                # S2 Pro returns a string path or a FileData dict
-                if isinstance(result, dict):
-                    temp_file = result.get('value', result.get('path'))
+                # Long timeout — cold boot can take ~60s even with baked weights
+                res = requests.post(synthesize_url, json=payload, timeout=300)
+                if res.status_code == 200:
+                    out_path = f"/tmp/segment_{i}.wav"
+                    with open(out_path, "wb") as f:
+                        f.write(res.content)
+                    files.append(out_path)
+                    print(f"    Done: {len(text)} chars -> {out_path}")
+                    success = True
+                    break
                 else:
-                    temp_file = result
-                
-                if not temp_file:
-                    raise Exception("Model returned empty result")
-                
-                final_segment_path = f"/tmp/segment_{i}.mp3"
-                shutil.copy(temp_file, final_segment_path)
-                files.append(final_segment_path)
-                print(f"    Done: {len(text)} chars -> {final_segment_path}")
-                success = True
-                break
-                
+                    raise Exception(f"Modal returned HTTP {res.status_code}: {res.text[:200]}")
             except Exception as e:
-                err_str = str(e)
-                if "429" in err_str or "Too Many Requests" in err_str:
-                    wait_time = (2 ** attempt) * 5
-                    print(f"    Rate limited (429). Attempt {attempt + 1}/{max_retries}. Waiting {wait_time}s...")
-                    time.sleep(wait_time)
-                else:
-                    print(f"    Error synthesizing segment {i} on attempt {attempt + 1}: {e}")
-                    if attempt == max_retries - 1:
-                        break
-                    time.sleep(2)
-        
+                print(f"    Attempt {attempt+1}/{max_retries} failed: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(10)
+
         if not success:
-            print(f"    Failed to synthesize segment {i} after {max_retries} attempts.")
+            print(f"    Skipping segment {i} after {max_retries} failed attempts.")
             continue
-    
+
     return files
 
 def generate_kokoro_audio_segments(script):
