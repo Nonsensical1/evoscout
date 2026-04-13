@@ -176,8 +176,8 @@ def generate_fish_audio_segments(script):
     if not modal_url:
         raise Exception("MODAL_APP_URL secret is missing. Deploy modal_fish_tts.py and add the URL to GitHub Secrets.")
 
-    # The new endpoint is a POST endpoint at /synthesize
-    synthesize_url = modal_url.rstrip("/") + "/synthesize"
+    # With @modal.fastapi_endpoint the label URL IS the endpoint (POST to root)
+    synthesize_url = modal_url.rstrip("/")
     print(f"Dialing native Modal S2-Pro endpoint: {synthesize_url}...")
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
