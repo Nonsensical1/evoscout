@@ -12,7 +12,7 @@ app = modal.App("evoscout-fish-speech")
 
 image = (
     modal.Image.debian_slim(python_version="3.10")
-    .apt_install("git", "ffmpeg", "libsm6", "libxext6")
+    .apt_install("git", "ffmpeg", "libsm6", "libxext6", "libsndfile1")
     .run_commands(
         "git clone https://github.com/fishaudio/fish-speech.git /fish-speech",
     )
@@ -23,7 +23,7 @@ image = (
         "pip install transformers==4.44.2",
         "pip install einops natsort loguru hydra-core omegaconf",
         "pip install vector-quantize-pytorch encodec",
-        "pip install loralib pyrootutils huggingface_hub",
+        "pip install loralib pyrootutils huggingface_hub soundfile",
         "pip install fastapi uvicorn python-multipart",
     )
     .run_commands(
