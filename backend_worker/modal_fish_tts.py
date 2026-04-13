@@ -24,6 +24,8 @@ image = (
         "pip install einops natsort loguru hydra-core omegaconf",
         "pip install vector-quantize-pytorch encodec",
         "pip install loralib pyrootutils huggingface_hub soundfile",
+        "pip install lightning librosa tiktoken safetensors",
+        "pip install descript-audio-codec descript-audiotools",
         "pip install fastapi uvicorn python-multipart",
     )
     .run_commands(
