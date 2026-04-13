@@ -7,7 +7,7 @@ app = modal.App("evoscout-fish-speech")
 # Recreate the HuggingFace Spaces Environment in Modal
 image = (
     modal.Image.debian_slim(python_version="3.10")
-    .apt_install("git", "ffmpeg", "libsm6", "libxext6")
+    .apt_install("git", "ffmpeg", "libsm6", "libxext6", "portaudio19-dev", "python3-pyaudio")
     .run_commands(
         # We clone the exact S2-Pro Hugging Face UI space that was rate binding us
         "git clone https://huggingface.co/spaces/fguilleme/fish-s2-pro-zero /app"
