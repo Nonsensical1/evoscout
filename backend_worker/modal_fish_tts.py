@@ -19,7 +19,7 @@ image = (
     )
     .run_commands(
         "cd /app && pip install -r requirements.txt",
-        "pip install pydantic==2.8.2 fastapi==0.112.0" # Stabilize gradio deps
+        "pip install pydantic==2.8.2 fastapi==0.112.0 gradio spaces" # Stabilize gradio deps
     )
     .run_commands(
         # Pre-bake the massive model checkpoints directly into the image to eliminate download delays on cold boot
