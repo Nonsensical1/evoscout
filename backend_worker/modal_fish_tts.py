@@ -10,7 +10,7 @@ image = (
     .apt_install("git", "ffmpeg", "libsm6", "libxext6")
     .run_commands(
         # We clone the exact S2-Pro Hugging Face UI space that was rate binding us
-        "git clone https://huggingface.co/spaces/fishaudio/fish-speech-1 /app"
+        "git clone https://huggingface.co/spaces/fguilleme/fish-s2-pro-zero /app"
     )
     .run_commands(
         # We inject CUDA PyTorch before installing requirements
@@ -24,8 +24,7 @@ image = (
     .run_commands(
         # Pre-bake the massive model checkpoints directly into the image to eliminate download delays on cold boot
         "pip install huggingface_hub",
-        "hf download fishaudio/fish-speech-1.5 --local-dir /app/checkpoints/fish-speech-1.5",
-        "hf download fishaudio/s1-mini --local-dir /app/checkpoints/openaudio-s1-mini"
+        "hf download fishaudio/s2-pro"
     )
 )
 
