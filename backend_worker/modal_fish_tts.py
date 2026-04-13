@@ -26,7 +26,7 @@ image = (
 @app.function(
     image=image, 
     gpu="A10G", # Allocate a dedicated A10G chunk from Modal's free tier
-    container_idle_timeout=120, # Shuts down compute if idle for 2 mins (Saves massive tier limits)
+    scaledown_window=120, # Shuts down compute if idle for 2 mins (Saves massive tier limits)
     allow_concurrent_inputs=5
 )
 @modal.web_server(port=7860)
