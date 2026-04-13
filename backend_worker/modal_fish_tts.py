@@ -92,8 +92,7 @@ def web_app():
     async def synthesize(request: Request):
         import base64
         import tempfile
-        import io
-        import torchaudio
+        import subprocess
         from fish_speech.utils.schema import ServeTTSRequest
 
         body = await request.json()
@@ -104,14 +103,18 @@ def web_app():
         refs = []
         if ref_audio_b64:
             raw = base64.b64decode(ref_audio_b64)
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            # Write source audio (could be MP3/WAV/etc)
+            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
                 f.write(raw)
-                ref_path = f.name
-            waveform, sr = torchaudio.load(ref_path)
-            buf = io.BytesIO()
-            torchaudio.save(buf, waveform, sr, format="wav")
-            buf.seek(0)
-            refs = [{"audio": buf.read(), "text": ref_text}]
+                src_path = f.name
+            # Convert to WAV with ffmpeg (already installed, handles any format)
+            wav_path = src_path + ".wav"
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", src_path, "-ar", "44100", "-ac", "1", wav_path],
+                capture_output=True, check=True
+            )
+            with open(wav_path, "rb") as f:
+                refs = [{"audio": f.read(), "text": ref_text}]
 
         tts_request = ServeTTSRequest(
             text=text,
