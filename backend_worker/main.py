@@ -345,7 +345,7 @@ def main():
         except Exception:
             user_settings = {}
             
-        tts_engine = user_settings.get('ttsEngine', 'kokoro')
+        tts_engine = user_settings.get('ttsEngine', 'kokoro').lower()  # normalize FISH/Fish/fish -> fish
         
         try:
             # Look up user email via Firebase Auth
