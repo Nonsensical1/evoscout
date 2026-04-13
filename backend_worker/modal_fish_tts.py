@@ -40,7 +40,7 @@ image = (
     scaledown_window=300,  # Stay warm for 5 min after last request
     timeout=600,
 )
-@modal.web_endpoint(method="POST", label="fish-tts-synthesize")
+@modal.fastapi_endpoint(method="POST", label="fish-tts-synthesize")
 def synthesize(item: dict):
     """
     Native S2-Pro inference endpoint.
