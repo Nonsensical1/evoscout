@@ -175,15 +175,22 @@ def generate_fish_audio_segments(script):
         
     print(f"Dialing direct secure pipeline to Modal infrastructure ({modal_url})...")
     client = None
-    for attempt in range(6):
+    import requests
+    for attempt in range(15):
         try:
-            client = Client(modal_url)
-            break
+            # Wake up the endpoint and allow model weights to download on the Modal GPU
+            res = requests.get(modal_url, timeout=30)
+            if res.status_code == 200:
+                print("Modal Gradio UI is fully awake! Establishing Client binding...")
+                client = Client(modal_url)
+                break
+            else:
+                raise Exception(f"Non-200 OK Status: {res.status_code}")
         except Exception as e:
-            if attempt == 5:
-                raise Exception(f"Modal server is unresponsive. Check modal dashboard: {e}")
-            print(f"Waiting for Modal Cold-Boot initialization on A10G (Attempt {attempt+1}/6)...")
-            time.sleep(10) # Wait 10 seconds for VM spin up
+            if attempt == 14:
+                raise Exception(f"Modal server timed out cold-booting. Check modal dashboard: {e}")
+            print(f"Waiting for Modal Cold-Boot allocation and weight injection on A10G (Attempt {attempt+1}/15)...")
+            time.sleep(20) # Keep holding until VM spins up (Total ~5 mins)
     files = []
     
     # Get the directory where this script is located
