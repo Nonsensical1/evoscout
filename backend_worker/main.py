@@ -168,20 +168,22 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
             raise e
 
 def generate_fish_audio_segments(script):
-    """Use Fish Audio S2 Pro via Hugging Face Gradio API (Higher Quality, Strict Quotas)."""
-    hf_token = os.getenv("HF_TOKEN")
-    
-    # Initialize client in a retry loop to give sleeping HF spaces time to start up
+    """Use Fish Audio S2 Pro natively deployed on private Modal GPUs ($30 free tier)."""
+    modal_url = os.getenv("MODAL_APP_URL")
+    if not modal_url:
+        raise Exception("MODAL_APP_URL secret is completely missing from your environment. You must deploy 'modal_fish_tts.py' to obtain your personalized zero-queue inference URL and inject it into your GitHub Repository secrets.")
+        
+    print(f"Dialing direct secure pipeline to Modal infrastructure ({modal_url})...")
     client = None
-    for attempt in range(12):
+    for attempt in range(6):
         try:
-            client = Client("fguilleme/fish-s2-pro-zero", token=hf_token)
+            client = Client(modal_url)
             break
         except Exception as e:
-            if attempt == 11:
-                raise Exception(f"Failed to connect to Hugging Face space after 12 attempts. It may be sleeping or down. Error: {e}")
-            print(f"Waiting for Hugging Face space to wake up (Attempt {attempt+1}/12)...")
-            time.sleep(30) # Wait 30 seconds before retrying
+            if attempt == 5:
+                raise Exception(f"Modal server is unresponsive. Check modal dashboard: {e}")
+            print(f"Waiting for Modal Cold-Boot initialization on A10G (Attempt {attempt+1}/6)...")
+            time.sleep(10) # Wait 10 seconds for VM spin up
     files = []
     
     # Get the directory where this script is located
