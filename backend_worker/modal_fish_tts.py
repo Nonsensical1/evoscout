@@ -23,7 +23,7 @@ image = (
     )
     .run_commands(
         # Pre-bake the massive model checkpoints directly into the image to eliminate download delays on cold boot
-        "pip install huggingface_hub",
+        "pip install huggingface_hub<0.27.0",
         "hf download fishaudio/s2-pro"
     )
 )
