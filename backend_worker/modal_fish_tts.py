@@ -21,14 +21,20 @@ image = (
         "cd /app && pip install -r requirements.txt",
         "pip install pydantic==2.8.2 fastapi==0.112.0" # Stabilize gradio deps
     )
+    .run_commands(
+        # Pre-bake the massive model checkpoints directly into the image to eliminate download delays on cold boot
+        "pip install huggingface_hub",
+        "huggingface-cli download fishaudio/fish-speech-1.5 --local-dir /app/checkpoints/fish-speech-1.5",
+        "huggingface-cli download fishaudio/s1-mini --local-dir /app/checkpoints/openaudio-s1-mini"
+    )
 )
 
 @app.function(
     image=image, 
     gpu="A10G", # Allocate a dedicated A10G chunk from Modal's free tier
-    scaledown_window=120 # Shuts down compute if idle for 2 mins (Saves massive tier limits)
+    scaledown_window=300 # Keeps VM awake for 5 mins after generation ends
 )
-@modal.web_server(port=7860)
+@modal.web_server(port=7860, startup_timeout=600) # Give 10 mins for PyTorch cold compile
 def fish_tts_ui():
     """
     Deploys the Fish Audio S2-Pro Gradio UI natively into Modal cloud's infrastructure.
