@@ -24,8 +24,8 @@ image = (
     .run_commands(
         # Pre-bake the massive model checkpoints directly into the image to eliminate download delays on cold boot
         "pip install huggingface_hub",
-        "huggingface-cli download fishaudio/fish-speech-1.5 --local-dir /app/checkpoints/fish-speech-1.5",
-        "huggingface-cli download fishaudio/s1-mini --local-dir /app/checkpoints/openaudio-s1-mini"
+        "hf download fishaudio/fish-speech-1.5 --local-dir /app/checkpoints/fish-speech-1.5",
+        "hf download fishaudio/s1-mini --local-dir /app/checkpoints/openaudio-s1-mini"
     )
 )
 
