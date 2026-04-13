@@ -11,24 +11,26 @@ app = modal.App("evoscout-fish-speech")
 
 image = (
     modal.Image.debian_slim(python_version="3.10")
-    .apt_install("git", "ffmpeg", "libsm6", "libxext6", "portaudio19-dev")
+    .apt_install("git", "ffmpeg", "libsm6", "libxext6")
     .run_commands(
-        # Clone the fish-speech source code (not the Gradio space — just the engine)
+        # Clone fish-speech source only — do NOT pip install -e . (dep resolution explodes)
         "git clone https://github.com/fishaudio/fish-speech.git /fish-speech",
-        "cd /fish-speech && pip install -e .",
     )
     .run_commands(
-        # Install CUDA-enabled PyTorch (must come after fish-speech deps)
-        "pip uninstall -y torch torchaudio torchvision",
+        # CUDA PyTorch first — must pin exact versions to avoid conflicts with fish-speech internals
         "pip install torch==2.3.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu121",
     )
     .run_commands(
-        # FastAPI/uvicorn for our native endpoint (no Gradio needed)
+        # Install only what fish_speech modules actually import at runtime
+        # (avoids the sentry-sdk/werkzeug circular dep hell from pip install -e .)
+        "pip install transformers==4.44.2",
+        "pip install einops natsort loguru hydra-core omegaconf",
+        "pip install vector-quantize-pytorch encodec",
+        "pip install loralib pyrootutils huggingface_hub",
         "pip install fastapi uvicorn python-multipart",
     )
     .run_commands(
-        # Pre-bake model weights into the image (eliminates cold-boot download)
-        "pip install huggingface_hub",
+        # Pre-bake S2-Pro weights into the image layer (zero cold-boot download)
         "python -c \"from huggingface_hub import snapshot_download; snapshot_download(repo_id='fishaudio/s2-pro', local_dir='/checkpoints/s2-pro')\"",
     )
 )
@@ -37,7 +39,7 @@ image = (
 @app.function(
     image=image,
     gpu="A10G",
-    scaledown_window=300,  # Stay warm for 5 min after last request
+    scaledown_window=300,
     timeout=600,
 )
 @modal.fastapi_endpoint(method="POST", label="fish-tts-synthesize")
@@ -56,6 +58,7 @@ def synthesize(item: dict):
     import torchaudio
     from fastapi.responses import Response
 
+    # Add fish-speech to path without installing it as a package
     sys.path.insert(0, "/fish-speech")
 
     from fish_speech.models.text2semantic.inference import launch_thread_safe_queue
@@ -67,7 +70,6 @@ def synthesize(item: dict):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     precision = torch.bfloat16
 
-    # Load models (cached in container memory across warm requests)
     print(f"Loading S2-Pro models from {checkpoint_dir} on {device}...")
     llama_queue = launch_thread_safe_queue(
         checkpoint_path=checkpoint_dir,
@@ -91,7 +93,6 @@ def synthesize(item: dict):
     ref_audio_b64 = item.get("ref_audio_b64", "")
     ref_text = item.get("ref_text", "")
 
-    # Decode reference audio from base64
     refs = []
     if ref_audio_b64:
         raw = base64.b64decode(ref_audio_b64)
@@ -99,14 +100,12 @@ def synthesize(item: dict):
             f.write(raw)
             ref_path = f.name
 
-        # Re-encode to the format fish_speech expects
         waveform, sr = torchaudio.load(ref_path)
         buf = io.BytesIO()
         torchaudio.save(buf, waveform, sr, format="wav")
         buf.seek(0)
         refs = [{"audio": buf.read(), "text": ref_text}]
 
-    # Run inference
     request = ServeTTSRequest(
         text=text,
         references=refs,
@@ -120,7 +119,5 @@ def synthesize(item: dict):
     )
 
     audio_chunks = list(engine.inference(request))
-
-    # Concatenate all chunks
     combined = b"".join(audio_chunks)
     return Response(content=combined, media_type="audio/wav")
