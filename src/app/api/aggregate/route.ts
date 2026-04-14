@@ -163,14 +163,20 @@ async function fetchLiveData(topicsMap: any = {}) {
     let allNews: any[] = [];
     const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|pathology|zoology";
     const biologicalTerms = new RegExp(newsTermsSafe, 'i');
-    const twentyFourHoursAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    let newsLookbackHours = 24; // Strict 24 hours for current day isolation
+    const dayOfWeek = new Date().getDay(); // 0 is Sunday, 1 is Monday ... 6 is Saturday
+    // Expand window ONLY for weekends when the daily wire is naturally dormant
+    if (dayOfWeek === 1) newsLookbackHours = 72;      // Monday (looks back over Sat/Sun)
+    else if (dayOfWeek === 0) newsLookbackHours = 48; // Sunday (looks back over Sat)
+    
+    const timeWindowLimit = Date.now() - newsLookbackHours * 60 * 60 * 1000;
 
     for (const feedConfig of rssFeeds) {
       try {
         const feed = await parser.parseURL(feedConfig.url);
         const filteredNews = feed.items.filter((item: any) => {
           const isBioMatch = biologicalTerms.test(item.title || '') || biologicalTerms.test(item.contentSnippet || '');
-          const isRecent = item.isoDate ? (new Date(item.isoDate).getTime() > twentyFourHoursAgo) : true;
+          const isRecent = item.isoDate ? (new Date(item.isoDate).getTime() > timeWindowLimit) : true;
           return isBioMatch && isRecent;
         });
 

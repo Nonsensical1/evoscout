@@ -108,10 +108,10 @@ export default function Home() {
       // We always refresh positions entirely.
       dailyFeed.positions = liveData.positions ? liveData.positions.slice(0, settings.positionsLimit || 12) : [];
 
-      // Backfill missing items from the previous feed to prevent slow-weekend empty states
+      // Backfill missing items from the previous feed ONLY if completely empty (prevent slow-weekend 0 states)
+      // Do NOT backfill just to reach the quota limit. We must enforce strict current-day sorting.
       const needsBackfill = ['news', 'literature', 'grants', 'openGovGrants'].some(cat => {
-         const limit = settings[`${cat}Limit`] || 12;
-         return (!dailyFeed[cat] || dailyFeed[cat].length < limit);
+         return (!dailyFeed[cat] || dailyFeed[cat].length === 0);
       });
 
       if (needsBackfill) {
@@ -128,7 +128,7 @@ export default function Home() {
 
          ['news', 'literature', 'grants', 'openGovGrants'].forEach(cat => {
             const limit = settings[`${cat}Limit`] || 12;
-            if (!dailyFeed[cat] || dailyFeed[cat].length < limit) {
+            if (!dailyFeed[cat] || dailyFeed[cat].length === 0) { // ONLY backfill if completely empty
                for (const historicFeed of historicFeeds) {
                   if (!historicFeed[cat] || historicFeed[cat].length === 0) continue;
                   
