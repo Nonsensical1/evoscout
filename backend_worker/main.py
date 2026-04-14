@@ -128,7 +128,7 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     
     CRITICAL: Ensure every double quote inside a speaker's text is escaped with a backslash (e.g., Matt says, \\"Wow!\\").
     """
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
     
     max_retries = 3
     for attempt in range(max_retries):
@@ -141,9 +141,10 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
             break
             
         if res.status_code == 429:
-            wait_time = (attempt + 1) * 35 # Wait 35s, then 70s, as free tier restricts RPM strictly
+            wait_time = (attempt + 1) * 15  # 15s, 30s, 45s — 2.0-flash is more lenient
             print(f"Gemini Rate Limited (429). Attempt {attempt + 1}/{max_retries}. Waiting {wait_time}s...")
             time.sleep(wait_time)
+
         else:
             raise Exception(f"Gemini REST API Error: {res.status_code} {res.text}")
     else:
