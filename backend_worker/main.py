@@ -129,13 +129,14 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     CRITICAL: Ensure every double quote inside a speaker's text is escaped with a backslash (e.g., Matt says, \\"Wow!\\").
     """
     # Model fallback chain — ordered by free-tier daily quota headroom.
-    # On 429 (quota exhausted), we try the next model automatically.
-    # Non-429 errors raise immediately (they'd fail on all models anyway).
+    # 429 = quota/rate limit, 503/529 = server overload — all get retried then fallback.
+    # Hard errors (400, 401, etc.) raise immediately — they won't fix on another model.
     GEMINI_MODELS = [
         "gemini-2.0-flash",       # 1,500 RPD free — primary
         "gemini-2.5-flash",       # 500 RPD free  — first fallback
         "gemini-2.5-flash-lite",  # 20 RPD free   — last resort
     ]
+    RETRYABLE_CODES = {429, 503, 529}  # quota, overloaded, overloaded
 
     res = None
     last_error = None
@@ -154,22 +155,22 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
                 print(f"[Gemini] Success with {model}")
                 break
 
-            if res.status_code == 429:
-                wait_time = (attempt + 1) * 15  # 15s, 30s, 45s
-                print(f"[Gemini] {model} rate limited (429). Attempt {attempt + 1}/3. Waiting {wait_time}s...")
+            if res.status_code in RETRYABLE_CODES:
+                wait_time = (attempt + 1) * 20  # 20s, 40s, 60s
+                print(f"[Gemini] {model} error {res.status_code}. Attempt {attempt + 1}/3. Waiting {wait_time}s...")
                 time.sleep(wait_time)
             else:
+                # Hard error (400, 401, 404…) — not retryable on any model
                 raise Exception(f"Gemini API Error ({model}): {res.status_code} {res.text}")
         else:
-            # All 3 retries on this model hit 429 → try next model
+            # All 3 retries exhausted → try next model
             last_error = res.text
-            print(f"[Gemini] {model} quota exhausted, falling back to next model...")
+            print(f"[Gemini] {model} exhausted (code {res.status_code}), trying next model...")
             continue
 
         break  # Success — stop trying models
     else:
-        raise Exception(f"Gemini Error: All models quota exhausted. Last response: {last_error}")
-
+        raise Exception(f"Gemini Error: All models failed. Last response: {last_error}")
 
     
     data = res.json()
