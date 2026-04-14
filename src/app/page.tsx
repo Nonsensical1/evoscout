@@ -138,11 +138,12 @@ export default function Home() {
       dailyFeed.lastScrapeTimestamp = new Date().toISOString();
       dailyFeed.quotaFilled = quotaFilled;
 
-      // If we added new news or literature, OR an admin explicitly commands a force run, clear caches to trigger a fresh synthesis
+      // If we added new news or literature, OR an admin explicitly commands a force run, clear podcast caches to trigger a fresh synthesis.
+      // NOTE: historyEvents are NOT cleared here. They only regenerate on new-day transitions
+      // to avoid exhausting the Gemini rate limit immediately after the aggregation batch.
       if (addedCount > 0 || isAdminOverride) {
         dailyFeed.podcastUrl = null;
         dailyFeed.podcastScript = null;
-        dailyFeed.historyEvents = null;
       }
 
       const batch = writeBatch(db);
@@ -242,20 +243,25 @@ export default function Home() {
   useEffect(() => {
     if (!user) return;
     if (data.news && data.news.length > 0 && !data.historyEvents) {
-      const terms = data.news.map((n: any) => n.title).join(' ');
-      const safeTerms = terms.substring(0, 1000); 
-      fetch('/api/onthisday', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topics: { news: safeTerms } })
-      })
-      .then(res => res.json())
-      .then(async resData => {
-         if (resData.success) {
-           await setDoc(doc(db, 'users', user.uid, 'daily', 'feed'), { historyEvents: resData.events }, { merge: true });
-         }
-      })
-      .catch(err => console.error("History fetch error:", err));
+      // Delay the history API call by 15 seconds to let the Gemini rate-limit window
+      // from the aggregation batch summarization cool down before we fire another request.
+      const timer = setTimeout(() => {
+        const terms = data.news.map((n: any) => n.title).join(' ');
+        const safeTerms = terms.substring(0, 1000); 
+        fetch('/api/onthisday', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topics: { news: safeTerms } })
+        })
+        .then(res => res.json())
+        .then(async resData => {
+           if (resData.success) {
+             await setDoc(doc(db, 'users', user.uid, 'daily', 'feed'), { historyEvents: resData.events }, { merge: true });
+           }
+        })
+        .catch(err => console.error("History fetch error:", err));
+      }, 15000);
+      return () => clearTimeout(timer);
     }
   }, [data.news, data.historyEvents, user]);
 

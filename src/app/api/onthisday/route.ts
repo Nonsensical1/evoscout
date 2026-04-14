@@ -80,7 +80,7 @@ Output ONLY a raw JSON array of objects. Do not include conversational filler li
 
     // Exponential Backoff API Wrapper
     while (attempts < 3 && !success) {
-      const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+      const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -133,7 +133,7 @@ Output ONLY a raw JSON array of objects. Do not include conversational filler li
         }
       } else if (gRes.status === 429) {
         lastErrorMsg = "Rate limited (429)";
-        await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempts)));
+        await new Promise(r => setTimeout(r, 5000 * Math.pow(2, attempts)));
       } else {
         lastErrorMsg = `Gemini HTTP Error ${gRes.status}: ` + await gRes.text().catch(()=>"");
         break; // Other status errors (400, 500) will abort the loop
@@ -141,17 +141,10 @@ Output ONLY a raw JSON array of objects. Do not include conversational filler li
       attempts++;
     }
 
-    // Fallback check - Now injects diagnostic errors instead of generic filler
+    // Fallback to curated events if Gemini generation ultimately failed
     if (!success || finalEvents.length === 0) {
-       return NextResponse.json({ 
-           success: true, 
-           events: [{
-               id: "DEBUG-FAIL",
-               year: 2026,
-               text: `DEBUG FAILURE: StateCode=${lastStatus} | Err=${lastErrorMsg} | TextSnip=${lastRawText.substring(0, 80)}`,
-               pageUrl: null
-           }]
-       });
+       console.warn(`OnThisDay generation failed after ${attempts} attempts. LastStatus=${lastStatus}, Err=${lastErrorMsg}. Using fallback events.`);
+       finalEvents = FALLBACK_EVENTS;
     }
 
     return NextResponse.json({ success: true, events: finalEvents });
