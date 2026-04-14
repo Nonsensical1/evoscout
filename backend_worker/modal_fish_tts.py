@@ -255,7 +255,11 @@ def web_app():
             # ── (waveform, sample_rate) tuple from DAC decoder ─────────────────
             elif isinstance(audio, (tuple, list)) and len(audio) == 2:
                 first, second = audio[0], audio[1]
-                if isinstance(second, (int, float)):
+                # Fish-speech actually returns (sample_rate, waveform)
+                if isinstance(first, (int, float)):
+                    sample_rate = int(first)
+                    audio = second
+                elif isinstance(second, (int, float)):
                     sample_rate = int(second)
                     audio = first
                 else:
