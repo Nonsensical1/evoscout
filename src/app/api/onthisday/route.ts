@@ -69,7 +69,7 @@ Output ONLY a raw JSON array of objects. Do not include conversational filler li
        throw new Error("Missing GEMINI_API_KEY environment variable.");
     }
 
-    let finalEvents = [];
+    let finalEvents: any[] = [];
     let success = false;
     let attempts = 0;
 
@@ -95,7 +95,7 @@ Output ONLY a raw JSON array of objects. Do not include conversational filler li
         const rawText = gData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
         
         try {
-          let parsedEvents = [];
+          let parsedEvents: any[] = [];
           const cleanedText = rawText.replace(/```(?:json)?\s*/gi, '').replace(/```\s*$/g, '').trim();
           const startIndex = cleanedText.indexOf('[');
           const endIndex = cleanedText.lastIndexOf(']');
