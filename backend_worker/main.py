@@ -128,27 +128,49 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     
     CRITICAL: Ensure every double quote inside a speaker's text is escaped with a backslash (e.g., Matt says, \\"Wow!\\").
     """
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-    
-    max_retries = 3
-    for attempt in range(max_retries):
-        res = requests.post(url, json={
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json"}
-        })
-        
-        if res.ok:
-            break
-            
-        if res.status_code == 429:
-            wait_time = (attempt + 1) * 15  # 15s, 30s, 45s — 2.0-flash is more lenient
-            print(f"Gemini Rate Limited (429). Attempt {attempt + 1}/{max_retries}. Waiting {wait_time}s...")
-            time.sleep(wait_time)
+    # Model fallback chain — ordered by free-tier daily quota headroom.
+    # On 429 (quota exhausted), we try the next model automatically.
+    # Non-429 errors raise immediately (they'd fail on all models anyway).
+    GEMINI_MODELS = [
+        "gemini-2.0-flash",       # 1,500 RPD free — primary
+        "gemini-2.5-flash",       # 500 RPD free  — first fallback
+        "gemini-2.5-flash-lite",  # 20 RPD free   — last resort
+    ]
 
+    res = None
+    last_error = None
+
+    for model in GEMINI_MODELS:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        print(f"[Gemini] Trying model: {model}")
+
+        for attempt in range(3):
+            res = requests.post(url, json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"responseMimeType": "application/json"}
+            })
+
+            if res.ok:
+                print(f"[Gemini] Success with {model}")
+                break
+
+            if res.status_code == 429:
+                wait_time = (attempt + 1) * 15  # 15s, 30s, 45s
+                print(f"[Gemini] {model} rate limited (429). Attempt {attempt + 1}/3. Waiting {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                raise Exception(f"Gemini API Error ({model}): {res.status_code} {res.text}")
         else:
-            raise Exception(f"Gemini REST API Error: {res.status_code} {res.text}")
+            # All 3 retries on this model hit 429 → try next model
+            last_error = res.text
+            print(f"[Gemini] {model} quota exhausted, falling back to next model...")
+            continue
+
+        break  # Success — stop trying models
     else:
-        raise Exception(f"Gemini REST API Error: Failed after {max_retries} retries due to 429 Quota Exhaustion. Response: {res.text}")
+        raise Exception(f"Gemini Error: All models quota exhausted. Last response: {last_error}")
+
+
     
     data = res.json()
     raw_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
