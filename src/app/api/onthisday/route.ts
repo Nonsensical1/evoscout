@@ -80,7 +80,13 @@ Output ONLY a raw JSON array of objects. Do not include conversational filler li
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json" }
+          generationConfig: { responseMimeType: "application/json" },
+          safetySettings: [
+             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+             { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+             { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
+          ]
         })
       });
 
@@ -100,8 +106,8 @@ Output ONLY a raw JSON array of objects. Do not include conversational filler li
              parsedEvents = JSON.parse(cleanedText);
           }
           
-          // Must have at least something to be considered successfully generated
           if (!Array.isArray(parsedEvents) || parsedEvents.length === 0) {
+             console.error("Gemini Failure Data:", JSON.stringify(gData));
              throw new Error("Gemini returned an empty array or invalid structure.");
           }
 
@@ -113,8 +119,8 @@ Output ONLY a raw JSON array of objects. Do not include conversational filler li
              pageUrl: e.pageUrl || null
           }));
           success = true;
-        } catch (e) {
-          console.warn("JSON Parse Error from Gemini response", e);
+        } catch (e: any) {
+          console.warn("JSON Parse Error from Gemini response:", e.message);
         }
       } else if (gRes.status === 429) {
         console.log(`Rate limited (429). Attempt ${attempts + 1}/3. Waiting...`);
