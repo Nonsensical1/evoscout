@@ -165,9 +165,8 @@ async function fetchLiveData(topicsMap: any = {}) {
     const biologicalTerms = new RegExp(newsTermsSafe, 'i');
     let newsLookbackHours = 24; // Strict 24 hours for current day isolation
     const dayOfWeek = new Date().getDay(); // 0 is Sunday, 1 is Monday ... 6 is Saturday
-    // Expand window ONLY for weekends when the daily wire is naturally dormant
-    if (dayOfWeek === 1) newsLookbackHours = 72;      // Monday (looks back over Sat/Sun)
-    else if (dayOfWeek === 0) newsLookbackHours = 48; // Sunday (looks back over Sat)
+    // Expand window ONLY on Sundays when the primary wire is offline
+    if (dayOfWeek === 0) newsLookbackHours = 48; // Sunday (looks back over Sat)
     
     const timeWindowLimit = Date.now() - newsLookbackHours * 60 * 60 * 1000;
 
