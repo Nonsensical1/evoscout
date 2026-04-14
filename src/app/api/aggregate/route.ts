@@ -335,17 +335,25 @@ async function fetchLiveData(topicsMap: any = {}) {
     const batches = chunkArray(summarizedItems, 20);
     const masterSummaryDict: any = {};
 
-    const batchPromises = batches.map(async (batch) => {
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
       try {
         const prompt = `Summarize the following scientific articles into a 2-3 sentence AI summary. Return ONLY a strict JSON object mapping the article 'id' to the 'summary' string. Do not use markdown wrappers. Articles: ${JSON.stringify(batch)}`;
         const geminiKey = process.env.GEMINI_API_KEY;
         if (!geminiKey) throw new Error("Missing GEMINI_API_KEY env var");
+        
         const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
+            generationConfig: { responseMimeType: "application/json" },
+            safetySettings: [
+               { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+               { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+               { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+               { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
+            ]
           })
         });
         
@@ -354,12 +362,16 @@ async function fetchLiveData(topicsMap: any = {}) {
         const rawText = gData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
         const parsed = JSON.parse(rawText);
         Object.assign(masterSummaryDict, parsed);
+
+        // Gently throttle seq calls to protect Free Tier
+        if (i < batches.length - 1) {
+            await new Promise(res => setTimeout(res, 1500));
+        }
+
       } catch (e) {
         console.error("Gemini batch failure:", e);
       }
-    });
-    
-    await Promise.all(batchPromises);
+    }
 
     results.news = results.news.map((n: any) => ({
       ...n,
