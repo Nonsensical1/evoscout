@@ -139,11 +139,14 @@ export default function Home() {
       dailyFeed.quotaFilled = quotaFilled;
 
       // If we added new news or literature, OR an admin explicitly commands a force run, clear podcast caches to trigger a fresh synthesis.
-      // NOTE: historyEvents are NOT cleared here. They only regenerate on new-day transitions
+      // historyEvents only clears on admin force compile — never on normal hourly quota scrapes —
       // to avoid exhausting the Gemini rate limit immediately after the aggregation batch.
       if (addedCount > 0 || isAdminOverride) {
         dailyFeed.podcastUrl = null;
         dailyFeed.podcastScript = null;
+      }
+      if (isAdminOverride) {
+        dailyFeed.historyEvents = null;
       }
 
       const batch = writeBatch(db);
