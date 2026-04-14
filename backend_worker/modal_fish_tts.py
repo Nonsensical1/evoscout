@@ -170,8 +170,8 @@ def web_app():
             max_new_tokens=1024,
             chunk_length=200,
             top_p=0.7,
-            repetition_penalty=1.1,
-            temperature=0.35,
+            repetition_penalty=1.2, # Fish default for better flow
+            temperature=0.7,        # Bumping from 0.35: crucial for high-quality expression
             format="wav",
         )
 
