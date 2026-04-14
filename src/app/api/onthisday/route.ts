@@ -72,6 +72,11 @@ Output ONLY a raw JSON array of objects. Do not include conversational filler li
     let finalEvents: any[] = [];
     let success = false;
     let attempts = 0;
+    
+    // Diagnostic state trackers
+    let lastStatus = 0;
+    let lastErrorMsg = "Initial state";
+    let lastRawText = "";
 
     // Exponential Backoff API Wrapper
     while (attempts < 3 && !success) {
@@ -89,10 +94,13 @@ Output ONLY a raw JSON array of objects. Do not include conversational filler li
           ]
         })
       });
+      
+      lastStatus = gRes.status;
 
       if (gRes.ok) {
         const gData = await gRes.json();
         const rawText = gData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
+        lastRawText = rawText;
         
         try {
           let parsedEvents: any[] = [];
@@ -107,8 +115,8 @@ Output ONLY a raw JSON array of objects. Do not include conversational filler li
           }
           
           if (!Array.isArray(parsedEvents) || parsedEvents.length === 0) {
-             console.error("Gemini Failure Data:", JSON.stringify(gData));
-             throw new Error("Gemini returned an empty array or invalid structure.");
+             lastErrorMsg = "Parsed struct was not an array or was empty";
+             throw new Error(lastErrorMsg);
           }
 
           parsedEvents.sort((a: any, b: any) => Number(a.year) - Number(b.year));
@@ -120,23 +128,30 @@ Output ONLY a raw JSON array of objects. Do not include conversational filler li
           }));
           success = true;
         } catch (e: any) {
+          lastErrorMsg = "JSON Parse Error: " + e.message;
           console.warn("JSON Parse Error from Gemini response:", e.message);
         }
       } else if (gRes.status === 429) {
-        console.log(`Rate limited (429). Attempt ${attempts + 1}/3. Waiting...`);
-        // Exponential backoff: 2s, 4s, 8s
+        lastErrorMsg = "Rate limited (429)";
         await new Promise(r => setTimeout(r, 2000 * Math.pow(2, attempts)));
       } else {
-        console.warn(`Gemini API Error: ${gRes.status}`);
+        lastErrorMsg = `Gemini HTTP Error ${gRes.status}: ` + await gRes.text().catch(()=>"");
         break; // Other status errors (400, 500) will abort the loop
       }
       attempts++;
     }
 
-    // Fallback check
+    // Fallback check - Now injects diagnostic errors instead of generic filler
     if (!success || finalEvents.length === 0) {
-       console.warn("Gemini generation ultimately failed. Providing generic curated pipeline events.");
-       finalEvents = FALLBACK_EVENTS;
+       return NextResponse.json({ 
+           success: true, 
+           events: [{
+               id: "DEBUG-FAIL",
+               year: 2026,
+               text: `DEBUG FAILURE: StateCode=${lastStatus} | Err=${lastErrorMsg} | TextSnip=${lastRawText.substring(0, 80)}`,
+               pageUrl: null
+           }]
+       });
     }
 
     return NextResponse.json({ success: true, events: finalEvents });
