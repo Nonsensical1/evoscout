@@ -79,21 +79,33 @@ export default function Home() {
       let skippedCount = 0;
 
       const processCategory = (categoryItems: any[], categoryName: string, limit: number) => {
-        let currentLen = dailyFeed[categoryName]?.length || 0;
         if (!dailyFeed[categoryName]) dailyFeed[categoryName] = [];
+        const existingIds = new Set(dailyFeed[categoryName].map((i: any) => i.id));
+        
+        let combined = [...dailyFeed[categoryName]];
         
         for (const item of categoryItems) {
-          if (!history.has(item.id)) {
-            if (currentLen < limit) {
-              dailyFeed[categoryName].push({ ...item, date: new Date().toISOString() });
-              historyArr.push(item.id);
-              history.add(item.id);
-              addedCount++;
-              currentLen++;
-            } else { skippedCount++; }
-          } else { skippedCount++; }
-          if (currentLen >= limit) break;
+           if (!existingIds.has(item.id)) {
+              // Add to visual feed
+              combined.push({ ...item, date: new Date().toISOString() });
+              // Only count as 'added' and new to history if it actually is brand new
+              if (!history.has(item.id)) {
+                  historyArr.push(item.id);
+                  history.add(item.id);
+                  addedCount++;
+              }
+           }
         }
+        
+        // Sort chronologically (newest first)
+        combined.sort((a, b) => {
+           const timeA = new Date(a.isoDate || a.date).getTime();
+           const timeB = new Date(b.isoDate || b.date).getTime();
+           return timeB - timeA;
+        });
+        
+        // Push older padded articles out seamlessly by slicing to limit
+        dailyFeed[categoryName] = combined.slice(0, limit);
       };
 
       const newsLimit = settings.newsLimit || 12;
@@ -108,49 +120,17 @@ export default function Home() {
       // We always refresh positions entirely.
       dailyFeed.positions = liveData.positions ? liveData.positions.slice(0, settings.positionsLimit || 12) : [];
 
-      // ONLY allow quota backfilling on Sundays (date.getDay() === 0) when the wire is quiet.
-      // On all other days, rely on the vast data sources to meet quotas naturally.
-      const isSunday = new Date().getDay() === 0;
-      const needsBackfill = isSunday && ['news', 'literature', 'grants', 'openGovGrants'].some(cat => {
-         const limit = settings[`${cat}Limit`] || 12;
-         return (!dailyFeed[cat] || dailyFeed[cat].length < limit);
-      });
+      // Compute quota-filled flags strictly measuring <24h True Fresh volume.
+      // Any items that are 24-48h old act as visual padding to hit the limit 
+      // but do NOT halt the hourly cooldown sequence.
+      const isFresh = (item: any) => {
+         const t = new Date(item.isoDate || item.date).getTime();
+         return (Date.now() - t) < 24 * 60 * 60 * 1000;
+      };
 
-      if (needsBackfill) {
-         let historicFeeds: any[] = [];
-         if (oldFeed) historicFeeds.push(oldFeed);
-         // If oldFeed isn't enough (e.g. yesterday was also an empty weekend), dip into the ledger
-         try {
-            const ledgerQuery = query(collection(db, 'users', user.uid, 'ledger'), orderBy('date', 'desc'), firestoreLimit(7));
-            const ledgerSnaps = await getDocs(ledgerQuery);
-            historicFeeds = [...historicFeeds, ...ledgerSnaps.docs.map(d => d.data())];
-         } catch (e) {
-            console.error("Ledger historic fallback failed", e);
-         }
-
-         ['news', 'literature', 'grants', 'openGovGrants'].forEach(cat => {
-            const limit = settings[`${cat}Limit`] || 12;
-            if (!dailyFeed[cat] || dailyFeed[cat].length < limit) {
-               for (const historicFeed of historicFeeds) {
-                  if (!historicFeed[cat] || historicFeed[cat].length === 0) continue;
-                  
-                  const needed = limit - (dailyFeed[cat]?.length || 0);
-                  if (needed <= 0) break;
-
-                  const existingIds = new Set((dailyFeed[cat] || []).map((i: any) => i.id));
-                  const candidates = historicFeed[cat].filter((i: any) => !existingIds.has(i.id));
-                  
-                  if (!dailyFeed[cat]) dailyFeed[cat] = [];
-                  dailyFeed[cat] = [...dailyFeed[cat], ...candidates.slice(0, needed)];
-               }
-            }
-         });
-      }
-
-      // Compute quota-filled flags for the three participating categories
       const quotaFilled = {
-        news: (dailyFeed.news?.length || 0) >= newsLimit,
-        literature: (dailyFeed.literature?.length || 0) >= litLimit,
+        news: (dailyFeed.news?.filter(isFresh).length || 0) >= newsLimit,
+        literature: (dailyFeed.literature?.filter(isFresh).length || 0) >= litLimit,
         grants: (dailyFeed.grants?.length || 0) >= grantsLimit,
       };
 
@@ -225,11 +205,29 @@ export default function Home() {
           return;
         }
 
-        // Removed archaic hourly cooldown cycles. Once the daily feed is generated, 
-        // the pipeline rests for 24 hours. The dashboard elegantly displays whatever 
-        // organic pipeline volume was gathered for the day without panicking.
-        setQuotaNotice(null);
-        return;
+        // CASE 2: Same day — check if quota-filling cycle should trigger
+        const qf = feed.quotaFilled || { news: false, literature: false, grants: false };
+        const allFilled = qf.news && qf.literature && qf.grants;
+
+        if (allFilled) {
+          // All fresh <24h quotas met — done for the day
+          setQuotaNotice(null);
+          return;
+        }
+
+        // Quotas not filled by <24h papers — check hourly cooldown
+        const lastScrape = feed.lastScrapeTimestamp ? new Date(feed.lastScrapeTimestamp).getTime() : 0;
+        const elapsed = Date.now() - lastScrape;
+
+        if (elapsed >= SCRAPE_COOLDOWN_MS) {
+          // Cooldown expired — re-scrape to try filling quota
+          setActionMessage("Timeline quota unfulfilled. Pinging global matrices...");
+          handleRunScraper();
+        } else {
+          // Cooldown active — show notice
+          const minutesLeft = Math.ceil((SCRAPE_COOLDOWN_MS - elapsed) / 60000);
+          setQuotaNotice(`The timeline is populating. EvoScout will attempt to append more newly published reports if you check back in ~${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.`);
+        }
 
       } else {
         // Document does not exist yet (first sign-in)

@@ -219,14 +219,15 @@ async function fetchLiveData(topicsMap: any = {}) {
             source: feedConfig.source,
             url: item.link || "",
             image: image,
-            rawSnippet: item.contentSnippet
+            rawSnippet: item.contentSnippet,
+            isoDate: item.isoDate || new Date().toISOString()
           };
         }));
         allNews = allNews.concat(mapped);
       } catch (e) { console.error(`News Fetch Error for ${feedConfig.source}:`, e); }
     }
 
-    results.news = shuffleArray(allNews);
+    results.news = allNews.sort((a, b) => new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime());
   } catch (e) { console.error("Top-level News Fetch Error:", e); }
 
   try {
@@ -254,14 +255,17 @@ async function fetchLiveData(topicsMap: any = {}) {
       if (filtered.length < 5) filtered = papers;
 
       const uniquePapers = Array.from(new Map(filtered.map((p: any) => [p.doi, p])).values()) as any[];
-      results.literature = shuffleArray(uniquePapers).map((p: any) => ({
-        id: `LIT-${p.doi}`,
-        title: p.title,
-        authors: p.authors || "Various Authors",
-        journal: "bioRxiv",
-        doi: p.doi,
-        rawAbstract: p.abstract
-      }));
+      results.literature = uniquePapers
+        .map((p: any) => ({
+          id: `LIT-${p.doi}`,
+          title: p.title,
+          authors: p.authors || "Various Authors",
+          journal: "bioRxiv",
+          doi: p.doi,
+          rawAbstract: p.abstract,
+          isoDate: p.date ? new Date(p.date).toISOString() : new Date().toISOString()
+        }))
+        .sort((a, b) => new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime());
     }
   } catch (e) { console.error("Lit Fetch Error:", e); }
 
