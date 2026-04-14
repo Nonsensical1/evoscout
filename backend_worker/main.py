@@ -100,96 +100,124 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     safe_lit = lit[:3] if lit else []
     safe_grants = grants[:2] if grants else []
     
-    # Scale word count to match target duration (~150 words per minute of speech)
-    target_words = duration_minutes * 150
+    # Divide generation into 5-minute segments to avoid AI output token limits and 503 timeouts
+    import math
+    segment_duration = 5
+    num_parts = math.ceil(duration_minutes / segment_duration) if duration_minutes > 5 else 1
+    target_words_part = (duration_minutes * 150) // num_parts
     
-    prompt = f"""
-    You are writing a ~{duration_minutes}-minute dynamic podcast script based on today's biological advancements.
-    The podcast features two hosts: 'Al' (male) and 'Matt' (male).
-    They are energetic, natural, banter a lot, and deeply analyze the science.
+    full_script = []
+    previous_context = ""
     
-    STRICT TTS FORMATTING (MANDATORY):
-    - You MUST include emotion tags at the start of almost every line or when the tone shifts.
-    - Supported tags: [excited], [thoughtful], [laughing], [serious], [surprised], [whispering], [happy], [sad], [loud], [low voice], [sigh].
-    - Use conversational fillers like 'hmm', 'right', 'exactly', and 'you know'.
-    - Use ellipses (...) for natural pauses.
-    
-    Make the script thorough (around {target_words} words total across all lines).
-    Use the following news, literature, and grants for material:
-    NEWS: {json.dumps(safe_news)}
-    LIT: {json.dumps(safe_lit)}
-    GRANTS: {json.dumps(safe_grants)}
-    
-    Return EXACTLY a pure JSON array containing the dialogue, with NO markdown formatting, like this:
-    [
-      {{"speaker": "Al", "text": "[excited] Welcome back to the Deep Dive! [happy] Today we have some incredible news."}},
-      {{"speaker": "Matt", "text": "[thoughtful] That's right, Al. [laughing] I couldn't believe it when I read the report on..."}}
-    ]
-    
-    CRITICAL: Ensure every double quote inside a speaker's text is escaped with a backslash (e.g., Matt says, \\"Wow!\\").
-    """
-    # Model fallback chain — ordered by free-tier daily quota headroom.
-    # 429 = quota/rate limit, 503/529 = server overload — all get retried then fallback.
-    # Hard errors (400, 401, etc.) raise immediately — they won't fix on another model.
-    GEMINI_MODELS = [
-        "gemini-2.0-flash",       # 1,500 RPD free — primary
-        "gemini-2.5-flash",       # 500 RPD free  — first fallback
-        "gemini-2.5-flash-lite",  # 20 RPD free   — last resort
-    ]
-    RETRYABLE_CODES = {429, 503, 529}  # quota, overloaded, overloaded
+    for part in range(1, num_parts + 1):
+        print(f"Generating podcast script part {part}/{num_parts}...")
+        
+        prompt = f"""
+        You are writing Part {part} of {num_parts} for a ~{duration_minutes}-minute dynamic podcast script based on today's biological advancements.
+        The podcast features two hosts: 'Al' (male) and 'Matt' (male).
+        They are energetic, natural, banter a lot, and deeply analyze the science.
+        
+        STRICT TTS FORMATTING (MANDATORY):
+        - You MUST include emotion tags at the start of almost every line or when the tone shifts.
+        - Supported tags: [excited], [thoughtful], [laughing], [serious], [surprised], [whispering], [happy], [sad], [loud], [low voice], [sigh].
+        - Use conversational fillers like 'hmm', 'right', 'exactly', and 'you know'.
+        - Use ellipses (...) for natural pauses.
+        
+        Make this specific part thorough (around {target_words_part} words total across all lines).
+        """
+        
+        if part == 1 and num_parts > 1:
+            prompt += "As Part 1, start with a welcoming introduction to the podcast, then dive into the first topics.\n"
+        elif part == num_parts and num_parts > 1:
+            prompt += "As the final part, cover the remaining topics and provide a concluding wrap-up for the podcast.\n"
+        elif num_parts > 1:
+            prompt += "As a middle part, smoothly continue the conversation without a formal introduction.\n"
 
-    res = None
-    last_error = None
+        if previous_context:
+            prompt += f"\nFor context, here are the last few lines of the previous segment so you can continue the flow naturally:\n{previous_context}\n"
 
-    for model in GEMINI_MODELS:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        print(f"[Gemini] Trying model: {model}")
+        prompt += f"""
+        Use the following news, literature, and grants for material. Progress through different items across the parts:
+        NEWS: {json.dumps(safe_news)}
+        LIT: {json.dumps(safe_lit)}
+        GRANTS: {json.dumps(safe_grants)}
+        
+        Return EXACTLY a pure JSON array containing the dialogue for THIS PART ONLY, with NO markdown formatting, like this:
+        [
+          {{"speaker": "Al", "text": "[excited] Welcome back! [happy] Today we have some incredible news."}},
+          {{"speaker": "Matt", "text": "[thoughtful] That's right, Al. [laughing] I couldn't believe it..."}}
+        ]
+        
+        CRITICAL: Ensure every double quote inside a speaker's text is escaped with a backslash.
+        """
+        
+        # Model fallback chain — ordered by free-tier daily quota headroom.
+        GEMINI_MODELS = [
+            "gemini-2.0-flash",       # 1,500 RPD free — primary
+            "gemini-2.5-flash",       # 500 RPD free  — first fallback
+            "gemini-2.5-flash-lite",  # 20 RPD free   — last resort
+        ]
+        RETRYABLE_CODES = {429, 503, 529}  # quota, overloaded, overloaded
 
-        for attempt in range(3):
-            res = requests.post(url, json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"responseMimeType": "application/json"}
-            })
+        res = None
+        last_error = None
 
-            if res.ok:
-                print(f"[Gemini] Success with {model}")
-                break
+        for model in GEMINI_MODELS:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            print(f"  [Gemini Part {part}] Trying model: {model}")
 
-            if res.status_code in RETRYABLE_CODES:
-                wait_time = (attempt + 1) * 20  # 20s, 40s, 60s
-                print(f"[Gemini] {model} error {res.status_code}. Attempt {attempt + 1}/3. Waiting {wait_time}s...")
-                time.sleep(wait_time)
+            for attempt in range(3):
+                res = requests.post(url, json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"responseMimeType": "application/json"}
+                })
+
+                if res.ok:
+                    print(f"  [Gemini Part {part}] Success with {model}")
+                    break
+
+                if res.status_code in RETRYABLE_CODES:
+                    wait_time = (attempt + 1) * 20  # 20s, 40s, 60s
+                    print(f"  [Gemini Part {part}] {model} error {res.status_code}. Attempt {attempt + 1}/3. Waiting {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    # Hard error (400, 401, 404…) — not retryable on any model
+                    raise Exception(f"Gemini API Error ({model}): {res.status_code} {res.text}")
             else:
-                # Hard error (400, 401, 404…) — not retryable on any model
-                raise Exception(f"Gemini API Error ({model}): {res.status_code} {res.text}")
+                # All 3 retries exhausted → try next model
+                last_error = res.text
+                print(f"  [Gemini Part {part}] {model} exhausted (code {res.status_code}), trying next model...")
+                continue
+
+            break  # Success — stop trying models
         else:
-            # All 3 retries exhausted → try next model
-            last_error = res.text
-            print(f"[Gemini] {model} exhausted (code {res.status_code}), trying next model...")
-            continue
+            raise Exception(f"Gemini Error for Part {part}: All models failed. Last response: {last_error}")
 
-        break  # Success — stop trying models
-    else:
-        raise Exception(f"Gemini Error: All models failed. Last response: {last_error}")
-
-    
-    data = res.json()
-    raw_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
-    
-    try:
-        # First attempt native json load (most robust if valid)
-        # Strip potential markdown blocks
-        clean = re.sub(r'```(?:json)?\s*', '', raw_text)
-        clean = re.sub(r'\s*```', '', clean).strip()
-        return json.loads(clean)
-    except json.JSONDecodeError as e:
-        print(f"Initial JSON parse failed: {e}")
+        data = res.json()
+        raw_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
+        
         try:
-            print("Attempting bulletproof regex extraction...")
-            return parse_dialogue_fallback(raw_text)
-        except Exception as e2:
-            print(f"Failed regex fallback: {e2}")
-            raise e
+            clean = re.sub(r'```(?:json)?\s*', '', raw_text)
+            clean = re.sub(r'\s*```', '', clean).strip()
+            part_script = json.loads(clean)
+        except json.JSONDecodeError as e:
+            print(f"Initial JSON parse failed for part {part}: {e}")
+            try:
+                print("Attempting bulletproof regex extraction...")
+                part_script = parse_dialogue_fallback(raw_text)
+            except Exception as e2:
+                print(f"Failed regex fallback for part {part}: {e2}")
+                raise e
+        
+        full_script.extend(part_script)
+        
+        if len(part_script) >= 3:
+            previous_context = json.dumps(part_script[-3:], indent=2)
+        elif part_script:
+            previous_context = json.dumps(part_script, indent=2)
+
+    return full_script
+
 
 def generate_fish_audio_segments(script):
     """Use Fish Audio S2 Pro via native Modal FastAPI endpoint (no Gradio dependency)."""
