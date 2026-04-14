@@ -163,10 +163,10 @@ async function fetchLiveData(topicsMap: any = {}) {
     let allNews: any[] = [];
     const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|pathology|zoology";
     const biologicalTerms = new RegExp(newsTermsSafe, 'i');
-    let newsLookbackHours = 24; // Strict 24 hours for current day isolation
+    let newsLookbackHours = 48; // Rolling 48-hour window (captures everything published 'yesterday' and 'today' globally)
     const dayOfWeek = new Date().getDay(); // 0 is Sunday, 1 is Monday ... 6 is Saturday
     // Expand window ONLY on Sundays when the primary wire is offline
-    if (dayOfWeek === 0) newsLookbackHours = 48; // Sunday (looks back over Sat)
+    if (dayOfWeek === 0) newsLookbackHours = 72; // Sunday (looks back over Fri/Sat)
     
     const timeWindowLimit = Date.now() - newsLookbackHours * 60 * 60 * 1000;
 

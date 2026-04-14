@@ -225,29 +225,11 @@ export default function Home() {
           return;
         }
 
-        // CASE 2: Same day — check if quota-filling cycle should trigger
-        const qf = feed.quotaFilled || { news: false, literature: false, grants: false };
-        const allFilled = qf.news && qf.literature && qf.grants;
-
-        if (allFilled) {
-          // All quotas met — done for the day
-          setQuotaNotice(null);
-          return;
-        }
-
-        // Quotas not filled — check cooldown
-        const lastScrape = feed.lastScrapeTimestamp ? new Date(feed.lastScrapeTimestamp).getTime() : 0;
-        const elapsed = Date.now() - lastScrape;
-
-        if (elapsed >= SCRAPE_COOLDOWN_MS) {
-          // Cooldown expired — re-scrape to try filling quota
-          setActionMessage("Quota not yet met. Re-scanning feeds...");
-          handleRunScraper();
-        } else {
-          // Cooldown active — show notice
-          const minutesLeft = Math.ceil((SCRAPE_COOLDOWN_MS - elapsed) / 60000);
-          setQuotaNotice(`It's still early — some feeds haven't fully populated yet. EvoScout will attempt to gather more content if you check back in ~${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.`);
-        }
+        // Removed archaic hourly cooldown cycles. Once the daily feed is generated, 
+        // the pipeline rests for 24 hours. The dashboard elegantly displays whatever 
+        // organic pipeline volume was gathered for the day without panicking.
+        setQuotaNotice(null);
+        return;
 
       } else {
         // Document does not exist yet (first sign-in)
