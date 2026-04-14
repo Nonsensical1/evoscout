@@ -409,9 +409,9 @@ def main():
         
         is_admin = (user_email.lower() == "elijahryal@gmail.com")
         
-        # Check explicit credentials for 15 min unlock from previous config
+        # Check explicit credentials for premium unlock from previous config (now 8 min max to save Fish compute)
         has_creds = bool(user_settings.get('googleCloudTtsCredentials'))
-        duration_minutes = 15 if (is_admin or has_creds) else 5
+        duration_minutes = 8 if (is_admin or has_creds) else 5
         
         print(f"  Podcast tier: {duration_minutes}-minute generation")
         print(f"  TTS Engine: {tts_engine.upper()}")
