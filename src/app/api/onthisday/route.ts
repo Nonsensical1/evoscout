@@ -50,20 +50,19 @@ Today's news headlines/topics are:
 "${combinedTerms}"
 
 CRITICAL RULES:
-1. THEMATIC RELEVANCE: Find major discoveries, institutional foundings, pivotal publications, or paradigm shifts that happened historically in these EXACT specific subject areas.
-2. AVOID REPETITION: Do NOT output the same famous milestones repeatedly (e.g., Dolly the Sheep, Watson & Crick DNA structure, initial CRISPR papers). Dig deep into niche, lesser-known, but highly impactful scientific progression.
-3. CALENDAR PRIORITY: Prioritize events that happened in ${month}, or even better, exactly on ${month} ${day}. If none exist for these specific niche topics, you may select other dates, but state the month they occurred.
-4. DIVERSITY: Ensure events span different decades or centuries (e.g., 1800s, 1900s, 2000s) to show the progression of the field.
+1. THEMATIC RELEVANCE: Attempt to find discoveries, institutional foundings, or paradigm shifts in these specific subjects. If you cannot find obscure events for these exact subjects, drift into broader molecular biology, virology, or modern genetics.
+2. AVOID REPETITION: Do NOT output the same famous milestones repeatedly (e.g., Dolly the Sheep, Watson & Crick, initial CRISPR papers). Dig deep into niche, lesser-known scientific progression.
+3. CALENDAR PRIORITY: Prioritize events that happened exactly on ${month} ${day}, or in the month of ${month}. If necessary, pick other dates but state when they occurred.
+4. DIVERSITY: Ensure events span different decades to show the progression of the field.
 
-Output ONLY a raw JSON array of objects with no markdown formatting. Each object should have the following structure:
+Output ONLY a raw JSON array of objects. Do not include conversational filler like "Here are the events".
 [
   {
-    "year": 19XX, // integer year
+    "year": 19XX,
     "text": "A 2-3 sentence engaging description of the historical milestone and its conceptual link to similar modern research.",
-    "pageUrl": "https://en.wikipedia.org/wiki/..." // A relevant link for further reading
+    "pageUrl": "https://en.wikipedia.org/wiki/..."
   }
-]
-No markdown code block wrappers. Return purely the array.`;
+]`;
 
     const geminiKey = process.env.GEMINI_API_KEY;
     if (!geminiKey) {
@@ -74,7 +73,7 @@ No markdown code block wrappers. Return purely the array.`;
     let success = false;
     let attempts = 0;
 
-    // Exponential Backoff API Wrapper (Prevents crashing if multiple users hit simultaneously)
+    // Exponential Backoff API Wrapper
     while (attempts < 3 && !success) {
       const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
         method: 'POST',
@@ -91,13 +90,21 @@ No markdown code block wrappers. Return purely the array.`;
         
         try {
           let parsedEvents = [];
-          try {
-             parsedEvents = JSON.parse(rawText);
-          } catch (e) {
-             const cleaned = rawText.replace(/```(?:json)?\s*/g, '').replace(/```\s*$/g, '').trim();
-             parsedEvents = JSON.parse(cleaned);
+          const cleanedText = rawText.replace(/```(?:json)?\s*/gi, '').replace(/```\s*$/g, '').trim();
+          const startIndex = cleanedText.indexOf('[');
+          const endIndex = cleanedText.lastIndexOf(']');
+          
+          if (startIndex !== -1 && endIndex !== -1) {
+             parsedEvents = JSON.parse(cleanedText.substring(startIndex, endIndex + 1));
+          } else {
+             parsedEvents = JSON.parse(cleanedText);
           }
           
+          // Must have at least something to be considered successfully generated
+          if (!Array.isArray(parsedEvents) || parsedEvents.length === 0) {
+             throw new Error("Gemini returned an empty array or invalid structure.");
+          }
+
           parsedEvents.sort((a: any, b: any) => Number(a.year) - Number(b.year));
           finalEvents = parsedEvents.map((e: any, idx: number) => ({
              id: `HIST-${e.year || 'UX'}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
