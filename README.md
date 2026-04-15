@@ -75,7 +75,7 @@ The masthead displays the live date (`CurrentDate` component) and the edition su
 | 📄 **Literature Feed** | Latest bioRxiv preprints filtered by topic, deduplicated by DOI, enriched with AI summaries |
 | 💰 **Grants Feed** | Active funding from NSF, NIH RePORTER & Grants.gov with an expanding time-window fallback |
 | 💼 **Careers Portal** | 18 curated evergreen career pages from top research institutions, shuffled daily |
-| 🏛️ **This Day in History** | AI-generated science milestones contextualised to today's news headlines |
+| 🏛️ **This Day in History** | AI-parsed science milestones contextualised to today's news headlines |
 | 📚 **Historical Ledger** | Full archive of every past daily edition, stored in Firestore and browseable at `/history` |
 | 🎙️ **AI Podcast** | A personalised daily deep-dive podcast hosted by AI characters Al & Matt |
 | ⚙️ **User Settings** | Per-user TTS engine, per-feed quotas, topic keyword overrides, and institution filters |
