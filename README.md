@@ -14,7 +14,7 @@
 
 ---
 
-*EvoScout automatically aggregates daily research news, academic literature, and grant opportunities — then synthesises everything into a personalised AI-hosted podcast, so you never miss a breakthrough.*
+*EvoScout automatically aggregates daily research news, academic literature, and grant opportunities, then synthesises everything into a personalised AI-hosted podcast, so you never miss a breakthrough.*
 
 </div>
 
