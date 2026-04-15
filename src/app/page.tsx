@@ -120,6 +120,11 @@ export default function Home() {
       // We always refresh positions entirely.
       dailyFeed.positions = liveData.positions ? liveData.positions.slice(0, settings.positionsLimit || 12) : [];
 
+      // History events come from the aggregate pipeline directly (no separate API call)
+      if (liveData.historyEvents && liveData.historyEvents.length > 0) {
+        dailyFeed.historyEvents = liveData.historyEvents;
+      }
+
       // Compute quota-filled flags strictly measuring <24h True Fresh volume.
       // Any items that are 24-48h old act as visual padding to hit the limit 
       // but do NOT halt the hourly cooldown sequence.
@@ -145,10 +150,6 @@ export default function Home() {
         dailyFeed.podcastUrl = null;
         dailyFeed.podcastScript = null;
       }
-      if (isAdminOverride) {
-        dailyFeed.historyEvents = null;
-      }
-
       const batch = writeBatch(db);
       batch.set(doc(db, 'users', user.uid, 'daily', 'feed'), dailyFeed);
       batch.set(doc(db, 'users', user.uid, 'scouted', 'history'), { hashes: historyArr });
@@ -243,30 +244,8 @@ export default function Home() {
     return () => unsub();
   }, [user, handleRunScraper, SCRAPE_COOLDOWN_MS]);
 
-  useEffect(() => {
-    if (!user) return;
-    if (data.news && data.news.length > 0 && !data.historyEvents) {
-      // Delay the history API call by 15 seconds to let the Gemini rate-limit window
-      // from the aggregation batch summarization cool down before we fire another request.
-      const timer = setTimeout(() => {
-        const terms = data.news.map((n: any) => n.title).join(' ');
-        const safeTerms = terms.substring(0, 1000); 
-        fetch('/api/onthisday', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topics: { news: safeTerms } })
-        })
-        .then(res => res.json())
-        .then(async resData => {
-           if (resData.success) {
-             await setDoc(doc(db, 'users', user.uid, 'daily', 'feed'), { historyEvents: resData.events }, { merge: true });
-           }
-        })
-        .catch(err => console.error("History fetch error:", err));
-      }, 15000);
-      return () => clearTimeout(timer);
-    }
-  }, [data.news, data.historyEvents, user]);
+  // History events are now generated inline by the aggregate pipeline.
+  // No separate /api/onthisday call needed.
 
 
   if (loading) return <div className="min-h-[50vh] flex items-center justify-center font-serif text-xl italic text-editorial-muted">Synchronizing encrypted database...</div>;

@@ -384,6 +384,70 @@ async function fetchLiveData(topicsMap: any = {}) {
     }));
   } catch(e) { console.error("Gemini pipeline error:", e); }
 
+  // === THIS DAY IN HISTORY — runs as the final Gemini call in the sequential pipeline ===
+  try {
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      // Cooldown to let the rate limit window breathe after summarization batches
+      await new Promise(r => setTimeout(r, 2000));
+
+      const today = new Date();
+      const month = today.toLocaleString('default', { month: 'long' });
+      const day = today.getDate();
+      const newsTerms = results.news.map((n: any) => n.title).join(', ').substring(0, 500);
+
+      const histPrompt = `You are a historical data assistant for an erudite synthetic biology and cellular news aggregation platform.
+Today is ${month} ${day}.
+Generate 4 to 6 significant historical scientific milestones related to today's news topics:
+"${newsTerms || 'synthetic biology, CRISPR, genomics, cancer research'}"
+
+RULES:
+1. Find discoveries, foundings, or paradigm shifts in these subjects. If too niche, drift into broader molecular biology or genetics.
+2. Do NOT use overused milestones (Dolly the Sheep, Watson & Crick DNA, initial CRISPR papers, Human Genome Project completion). Find lesser-known but impactful events.
+3. Prioritize events on ${month} ${day} or in ${month}. Otherwise pick other dates.
+4. Span different decades (1800s through 2020s).
+
+Return ONLY a JSON array:
+[{"year": 1985, "text": "Description of the milestone.", "pageUrl": "https://en.wikipedia.org/wiki/..."}]`;
+
+      const hRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: histPrompt }] }],
+          safetySettings: [
+             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+             { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+             { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
+          ]
+        })
+      });
+
+      if (hRes.ok) {
+        const hData = await hRes.json();
+        const rawText = hData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const cleaned = rawText.replace(/```(?:json)?\s*/gi, '').replace(/```\s*$/g, '').trim();
+        const startBracket = cleaned.indexOf('[');
+        const endBracket = cleaned.lastIndexOf(']');
+        if (startBracket !== -1 && endBracket !== -1) {
+          const parsed = JSON.parse(cleaned.substring(startBracket, endBracket + 1));
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            parsed.sort((a: any, b: any) => Number(a.year) - Number(b.year));
+            results.historyEvents = parsed.map((e: any, idx: number) => ({
+              id: `HIST-${e.year || 'UX'}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+              year: e.year || "Unknown",
+              text: e.text || "Historical record.",
+              pageUrl: e.pageUrl || null
+            }));
+          }
+        }
+      } else {
+        console.warn(`History Gemini call failed: ${hRes.status}`);
+      }
+    }
+  } catch (e) { console.error("History generation error:", e); }
+
   return results;
 }
 
