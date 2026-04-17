@@ -299,9 +299,14 @@ def generate_fish_audio_segments(script, user_modal_url=None):
                     success = True
                     break
                 else:
+                    err_msg = str(res.text[:200]).lower()
+                    if "credit" in err_msg or "balance" in err_msg or "quota" in err_msg or res.status_code in [402, 429]:
+                        raise Exception(f"MODAL_QUOTA_EXCEEDED: HTTP {res.status_code}: {res.text[:200]}")
                     raise Exception(f"Modal returned HTTP {res.status_code}: {res.text[:200]}")
             except Exception as e:
                 print(f"    Attempt {attempt+1}/{max_retries} failed: {e}")
+                if "MODAL_QUOTA_EXCEEDED" in str(e):
+                    raise e
                 if attempt < max_retries - 1:
                     time.sleep(10)
 
@@ -454,7 +459,20 @@ def main():
             
             if tts_engine == 'fish':
                 print("Synthesizing audio with Fish Audio (Modal)...")
-                files = generate_fish_audio_segments(script, user_modal_url=user_modal_url if user_modal_url else None)
+                try:
+                    files = generate_fish_audio_segments(script, user_modal_url=user_modal_url if user_modal_url else None)
+                except Exception as e:
+                    if "MODAL_QUOTA_EXCEEDED" in str(e):
+                        print("  [MODAL QUOTA] Credits exhausted! Downgrading to Kokoro and locking user config.")
+                        try:
+                            db.collection('users').document(user.id).collection('settings').document('config').set(
+                                {'modalQuotaExceededMonth': datetime.utcnow().month, 'ttsEngine': 'kokoro'}, merge=True
+                            )
+                        except Exception as e2:
+                            print(f"  Warning: failed to flag modalQuotaExceededMonth: {e2}")
+                        files = generate_kokoro_audio_segments(script)
+                    else:
+                        raise e
             else:
                 print("Synthesizing audio with Kokoro (Local ONNX)...")
                 files = generate_kokoro_audio_segments(script)

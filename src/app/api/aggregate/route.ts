@@ -447,7 +447,7 @@ async function fetchLiveData(topicsMap: any = {}) {
     }));
   } catch(e) { console.error("Gemini pipeline error:", e); }
 
-  // === THIS DAY IN HISTORY — NYT Article Search API (no Gemini quota consumed) ===
+  // === THIS DAY IN HISTORY — NYT Article Search API ===
   try {
     const NYT_API_KEY = process.env.NYT_API_KEY || 'Zg3680b2RjPZAhZMb4LX0b8QYc4iF8XcXwGG5Dg3exNRiTJT';
 
@@ -457,21 +457,24 @@ async function fetchLiveData(topicsMap: any = {}) {
     const monthDay = `${mm}${dd}`;
     const currentYear = today.getFullYear();
 
-    // Build a concise search query from user's news topics or defaults
-    const defaultQuery = 'CRISPR gene editing synthetic biology cancer research genomics proteomics';
-    const scienceQuery = topicsMap.news
-      ? topicsMap.news.split(',').map((s: string) => s.trim()).filter(Boolean).slice(0, 6).join(' OR ')
-      : defaultQuery;
+    // The topics parsed for are those that are currently being parsed for by the daily news
+    const defaultNewsTopics = "CRISPR, Cas9, Cas12, gene, cell, RNA, proteomics, synthetic biology, epigenetic, microbiome, cancer, pathology, zoology";
+    const userTopicsStr = topicsMap.news || defaultNewsTopics;
+    const scienceQuery = userTopicsStr
+      .split(',')
+      .map((s: string) => `"${s.trim()}"`)
+      .slice(0, 10)
+      .join(' OR ');
 
-    // Sample 6 historical years on this exact calendar date (min 1980 for reliable coverage)
-    const targetYears = [
-      currentYear - 1,
-      currentYear - 5,
-      currentYear - 10,
-      currentYear - 20,
-      currentYear - 30,
-      currentYear - 40,
-    ].filter(y => y >= 1980);
+    // Sample 5 random historical years (min 1920) to stay within NYT 5 req/min free tier maximums
+    const targetYears: number[] = [];
+    const minYear = 1920;
+    let attempts = 0;
+    while (targetYears.length < 5 && attempts < 20) {
+      const year = Math.floor(Math.random() * (currentYear - minYear)) + minYear;
+      if (!targetYears.includes(year)) targetYears.push(year);
+      attempts++;
+    }
 
     const fetchNYTYear = async (year: number): Promise<any[]> => {
       const dateStr = `${year}${monthDay}`;
@@ -494,32 +497,30 @@ async function fetchLiveData(topicsMap: any = {}) {
       } catch { return []; }
     };
 
-    // All years in parallel — NYT free tier allows 10 req/min
-    const yearResults = await Promise.allSettled(targetYears.map(fetchNYTYear));
-
+    // Process sequentially with a delay to avoid rate limit spikes
     const histEvents: any[] = [];
-    yearResults.forEach((result, i) => {
-      if (result.status !== 'fulfilled') return;
-      const best = result.value.find(
-        (d: any) => d.headline?.main && d.abstract && d.abstract.length > 30
-      );
-      if (!best) return;
-      const pubYear = new Date(best.pub_date).getFullYear();
-      const headline = best.headline.main as string;
-      const abstract = (best.abstract as string).replace(/\s+/g, ' ').trim();
-      const text = abstract.length > 20 ? `${headline}. ${abstract}` : headline;
-      histEvents.push({
-        id: `HIST-${pubYear}-${i}-${Math.random().toString(36).substr(2, 5)}`,
-        year: pubYear,
-        text: text.substring(0, 400),
-        pageUrl: best.web_url || null,
-      });
-    });
+    for (const year of targetYears) {
+      const docs = await fetchNYTYear(year);
+      const best = docs.find((d: any) => d.headline?.main && d.abstract && d.abstract.length > 20);
+      if (best) {
+        const pubYear = new Date(best.pub_date).getFullYear();
+        const headline = best.headline.main as string;
+        const abstract = (best.abstract as string).replace(/\s+/g, ' ').trim();
+        const text = abstract.length > 20 ? `${headline}. ${abstract}` : headline;
+        histEvents.push({
+          id: `HIST-${pubYear}-${Math.random().toString(36).substr(2, 5)}`,
+          year: pubYear,
+          text: text.substring(0, 400),
+          pageUrl: best.web_url || null,
+        });
+      }
+      await new Promise(res => setTimeout(res, 300));
+    }
 
     histEvents.sort((a, b) => Number(a.year) - Number(b.year));
     console.log(`[OnThisDay] Got ${histEvents.length} NYT events for ${mm}/${dd}.`);
 
-    results.historyEvents = histEvents.length >= 2 ? histEvents : FALLBACK_EVENTS;
+    results.historyEvents = histEvents.length >= 1 ? histEvents : FALLBACK_EVENTS;
   } catch (e) {
     console.error('History (NYT) pipeline error:', e);
     results.historyEvents = FALLBACK_EVENTS;

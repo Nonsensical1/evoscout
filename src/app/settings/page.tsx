@@ -22,6 +22,7 @@ export default function SettingsPage() {
   const [successMsg, setSuccessMsg] = useState('');
   const [ttsEngine, setTtsEngine] = useState('kokoro');
   const [customModalUrl, setCustomModalUrl] = useState('');
+  const [modalQuotaExceededMonth, setModalQuotaExceededMonth] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadSettings() {
@@ -48,6 +49,9 @@ export default function SettingsPage() {
           }
           if (snap.data().customModalUrl) {
             setCustomModalUrl(snap.data().customModalUrl);
+          }
+          if (snap.data().modalQuotaExceededMonth !== undefined) {
+            setModalQuotaExceededMonth(snap.data().modalQuotaExceededMonth);
           }
         }
       } catch (e) {
@@ -98,6 +102,9 @@ export default function SettingsPage() {
       </div>
     );
   }
+
+  const currentMonth = new Date().getMonth() + 1;
+  const isModalLocked = modalQuotaExceededMonth === currentMonth;
 
   return (
     <div className="max-w-4xl mx-auto font-serif">
@@ -240,19 +247,25 @@ export default function SettingsPage() {
               </div>
             </label>
 
-            <div className="border border-editorial-border">
-              <label className="flex items-start gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors">
+            <div className={`border border-editorial-border ${isModalLocked ? 'opacity-60 select-none bg-gray-50' : ''}`}>
+              <label className={`flex items-start gap-3 p-4 transition-colors ${isModalLocked ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}>
                 <input 
                   type="radio" 
                   name="ttsEngine" 
                   value="fish" 
                   checked={ttsEngine === 'fish'} 
                   onChange={(e) => setTtsEngine(e.target.value)}
-                  className="mt-1 accent-editorial-text w-4 h-4"
+                  disabled={isModalLocked}
+                  className="mt-1 accent-editorial-text w-4 h-4 disabled:bg-gray-300"
                 />
                 <div>
                   <span className="block font-bold font-sans uppercase tracking-wider text-sm">Fish Speech S2-Pro (Modal)</span>
                   <span className="text-sm font-sans text-editorial-muted mt-1 block">Zero-Shot clones your exact custom Al.mp3 and Matt.mp3 files. Requires linking your own Modal free-tier deployment.</span>
+                  {isModalLocked && (
+                    <span className="block mt-3 text-[10px] sm:text-xs font-sans font-bold text-red-600 uppercase tracking-widest border border-red-200 bg-white p-2 text-center rounded-sm">
+                      🔒 Locked: Modal Free Credits Exhausted Until Next Month
+                    </span>
+                  )}
                 </div>
               </label>
 
