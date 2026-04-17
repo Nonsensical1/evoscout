@@ -21,6 +21,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [ttsEngine, setTtsEngine] = useState('kokoro');
+  const [customModalUrl, setCustomModalUrl] = useState('');
 
   useEffect(() => {
     async function loadSettings() {
@@ -45,6 +46,9 @@ export default function SettingsPage() {
           if (snap.data().ttsEngine) {
             setTtsEngine(snap.data().ttsEngine);
           }
+          if (snap.data().customModalUrl) {
+            setCustomModalUrl(snap.data().customModalUrl);
+          }
         }
       } catch (e) {
         console.error("Error loading settings", e);
@@ -62,7 +66,8 @@ export default function SettingsPage() {
       await setDoc(doc(db, 'users', user.uid, 'settings', 'config'), {
         ...limits,
         topics,
-        ttsEngine
+        ttsEngine,
+        customModalUrl
       }, { merge: true });
       setSuccessMsg("Configuration committed successfully.");
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -235,20 +240,38 @@ export default function SettingsPage() {
               </div>
             </label>
 
-            <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 transition-colors">
-              <input 
-                type="radio" 
-                name="ttsEngine" 
-                value="fish" 
-                checked={ttsEngine === 'fish'} 
-                onChange={(e) => setTtsEngine(e.target.value)}
-                className="mt-1 accent-editorial-text w-4 h-4"
-              />
-              <div>
-                <span className="block font-bold font-sans uppercase tracking-wider text-sm">Fish Speech S2-Pro (ZeroGPU)</span>
-                <span className="text-sm font-sans text-editorial-muted mt-1 block">Zero-Shot clones your exact custom Al.mp3 and Matt.mp3 files. Highly subject to API rate limits and duration caps.</span>
-              </div>
-            </label>
+            <div className="border border-editorial-border">
+              <label className="flex items-start gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors">
+                <input 
+                  type="radio" 
+                  name="ttsEngine" 
+                  value="fish" 
+                  checked={ttsEngine === 'fish'} 
+                  onChange={(e) => setTtsEngine(e.target.value)}
+                  className="mt-1 accent-editorial-text w-4 h-4"
+                />
+                <div>
+                  <span className="block font-bold font-sans uppercase tracking-wider text-sm">Fish Speech S2-Pro (Modal)</span>
+                  <span className="text-sm font-sans text-editorial-muted mt-1 block">Zero-Shot clones your exact custom Al.mp3 and Matt.mp3 files. Requires linking your own Modal free-tier deployment.</span>
+                </div>
+              </label>
+
+              {ttsEngine === 'fish' && (
+                <div className="p-4 bg-gray-50 border-t border-editorial-border">
+                  <label className="block font-bold font-sans uppercase tracking-wider text-xs mb-2">Modal Web Endpoint URL</label>
+                  <input
+                    type="text"
+                    value={customModalUrl}
+                    onChange={(e) => setCustomModalUrl(e.target.value)}
+                    placeholder="https://your-workspace--fish-speech-app.modal.run"
+                    className="w-full p-2 border border-editorial-border font-sans text-sm focus:outline-editorial-text"
+                  />
+                  <p className="text-xs font-sans text-editorial-muted mt-2">
+                    Must route directly to your deployed <code>@modal.asgi_app()</code>. Example format above.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

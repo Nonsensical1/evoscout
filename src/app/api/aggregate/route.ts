@@ -6,6 +6,61 @@ function shuffleArray(array: any[]) {
   return array.sort(() => 0.5 - Math.random());
 }
 
+const FALLBACK_EVENTS = [
+  {
+    id: "HIST-1953-XYZ",
+    year: 1953,
+    text: "James Watson and Francis Crick publish their paper describing the double helix structure of DNA, revolutionizing molecular biology and genetics.",
+    pageUrl: "https://en.wikipedia.org/wiki/DNA"
+  },
+  {
+    id: "HIST-1996-XYZ",
+    year: 1996,
+    text: "Dolly the sheep becomes the first mammal cloned from an adult somatic cell, a monumental milestone in genetics and synthetic bio-potential.",
+    pageUrl: "https://en.wikipedia.org/wiki/Dolly_(sheep)"
+  },
+  {
+    id: "HIST-2001-XYZ",
+    year: 2001,
+    text: "The initial sequencing of the human genome is published simultaneously in Nature and Science, unlocking the modern era of genomics.",
+    pageUrl: "https://en.wikipedia.org/wiki/Human_Genome_Project"
+  },
+  {
+    id: "HIST-2012-XYZ",
+    year: 2012,
+    text: "Jennifer Doudna and Emmanuelle Charpentier publish their landmark paper on CRISPR-Cas9, proving it could be programmed for precision gene editing.",
+    pageUrl: "https://en.wikipedia.org/wiki/CRISPR"
+  }
+];
+
+// Top-40 university keywords for prestige-tier preprint sorting.
+// Matched case-insensitively against the corresponding author's institution string.
+const TOP_40_UNIVERSITY_KEYWORDS = [
+  'harvard', 'mit', 'massachusetts institute of technology',
+  'stanford', 'caltech', 'california institute of technology',
+  'cambridge', 'oxford', 'imperial college',
+  'yale', 'princeton', 'columbia', 'penn', 'upenn', 'university of pennsylvania',
+  'johns hopkins', 'duke', 'cornell', 'dartmouth',
+  'chicago', 'university of chicago',
+  'northwestern', 'vanderbilt', 'notre dame',
+  'ucla', 'uc san diego', 'ucsd', 'ucsf', 'uc san francisco',
+  'michigan', 'university of michigan',
+  'washington university', 'washington university in st',
+  'university of washington',
+  'carnegie mellon', 'rice', 'emory', 'tufts', 'georgetown',
+  'toronto', 'mcgill', 'edinburgh', 'ucl', 'university college london',
+  'eth zurich', 'epfl', 'karolinska', 'heidelberg',
+  'tokyo', 'kyoto', 'national university of singapore', 'nus',
+  'broad institute', 'sanger', 'cold spring harbor', 'hhmi', 'scripps',
+  'rockefeller', 'sloan kettering', 'dana-farber', 'md anderson'
+];
+
+function isTopInstitution(institution: string): boolean {
+  if (!institution) return false;
+  const lower = institution.toLowerCase();
+  return TOP_40_UNIVERSITY_KEYWORDS.some(kw => lower.includes(kw));
+}
+
 async function fetchLiveData(topicsMap: any = {}) {
   const parseTopics = (str: string | undefined, fallback: string[]) => str ? str.split(',').map((s: string) => s.trim()).filter(Boolean) : fallback;
   const parser = new Parser({ customFields: { item: [['media:thumbnail', 'mediaThumbnail']] } });
@@ -260,12 +315,20 @@ async function fetchLiveData(topicsMap: any = {}) {
           id: `LIT-${p.doi}`,
           title: p.title,
           authors: p.authors || "Various Authors",
+          institution: p.author_corresponding_institution || "",
           journal: "bioRxiv",
           doi: p.doi,
           rawAbstract: p.abstract,
           isoDate: p.date ? new Date(p.date).toISOString() : new Date().toISOString()
         }))
-        .sort((a, b) => new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime());
+        .sort((a, b) => {
+          // Tier 1: top-40 institution papers come first
+          const aTop = isTopInstitution(a.institution) ? 0 : 1;
+          const bTop = isTopInstitution(b.institution) ? 0 : 1;
+          if (aTop !== bTop) return aTop - bTop;
+          // Tier 2: within the same prestige group, sort by most recent
+          return new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime();
+        });
     }
   } catch (e) { console.error("Lit Fetch Error:", e); }
 
@@ -384,69 +447,83 @@ async function fetchLiveData(topicsMap: any = {}) {
     }));
   } catch(e) { console.error("Gemini pipeline error:", e); }
 
-  // === THIS DAY IN HISTORY — runs as the final Gemini call in the sequential pipeline ===
+  // === THIS DAY IN HISTORY — NYT Article Search API (no Gemini quota consumed) ===
   try {
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-      // Cooldown to let the rate limit window breathe after summarization batches
-      await new Promise(r => setTimeout(r, 2000));
+    const NYT_API_KEY = process.env.NYT_API_KEY || 'Zg3680b2RjPZAhZMb4LX0b8QYc4iF8XcXwGG5Dg3exNRiTJT';
 
-      const today = new Date();
-      const month = today.toLocaleString('default', { month: 'long' });
-      const day = today.getDate();
-      const newsTerms = results.news.map((n: any) => n.title).join(', ').substring(0, 500);
+    const today = new Date();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const monthDay = `${mm}${dd}`;
+    const currentYear = today.getFullYear();
 
-      const histPrompt = `You are a historical data assistant for an erudite synthetic biology and cellular news aggregation platform.
-Today is ${month} ${day}.
-Generate 4 to 6 significant historical scientific milestones related to today's news topics:
-"${newsTerms || 'synthetic biology, CRISPR, genomics, cancer research'}"
+    // Build a concise search query from user's news topics or defaults
+    const defaultQuery = 'CRISPR gene editing synthetic biology cancer research genomics proteomics';
+    const scienceQuery = topicsMap.news
+      ? topicsMap.news.split(',').map((s: string) => s.trim()).filter(Boolean).slice(0, 6).join(' OR ')
+      : defaultQuery;
 
-RULES:
-1. Find discoveries, foundings, or paradigm shifts in these subjects. If too niche, drift into broader molecular biology or genetics.
-2. Do NOT use overused milestones (Dolly the Sheep, Watson & Crick DNA, initial CRISPR papers, Human Genome Project completion). Find lesser-known but impactful events.
-3. Prioritize events on ${month} ${day} or in ${month}. Otherwise pick other dates.
-4. Span different decades (1800s through 2020s).
+    // Sample 6 historical years on this exact calendar date (min 1980 for reliable coverage)
+    const targetYears = [
+      currentYear - 1,
+      currentYear - 5,
+      currentYear - 10,
+      currentYear - 20,
+      currentYear - 30,
+      currentYear - 40,
+    ].filter(y => y >= 1980);
 
-Return ONLY a JSON array:
-[{"year": 1985, "text": "Description of the milestone.", "pageUrl": "https://en.wikipedia.org/wiki/..."}]`;
-
-      const hRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: histPrompt }] }],
-          safetySettings: [
-             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-             { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-             { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
-          ]
-        })
+    const fetchNYTYear = async (year: number): Promise<any[]> => {
+      const dateStr = `${year}${monthDay}`;
+      const params = new URLSearchParams({
+        q: scienceQuery,
+        'api-key': NYT_API_KEY,
+        begin_date: dateStr,
+        end_date: dateStr,
+        sort: 'relevance',
+        fl: 'headline,abstract,pub_date,web_url',
       });
+      try {
+        const res = await fetch(
+          `https://api.nytimes.com/svc/search/v2/articlesearch.json?${params}`,
+          { headers: { Accept: 'application/json' } }
+        );
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (data.response?.docs as any[]) || [];
+      } catch { return []; }
+    };
 
-      if (hRes.ok) {
-        const hData = await hRes.json();
-        const rawText = hData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        const cleaned = rawText.replace(/```(?:json)?\s*/gi, '').replace(/```\s*$/g, '').trim();
-        const startBracket = cleaned.indexOf('[');
-        const endBracket = cleaned.lastIndexOf(']');
-        if (startBracket !== -1 && endBracket !== -1) {
-          const parsed = JSON.parse(cleaned.substring(startBracket, endBracket + 1));
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            parsed.sort((a: any, b: any) => Number(a.year) - Number(b.year));
-            results.historyEvents = parsed.map((e: any, idx: number) => ({
-              id: `HIST-${e.year || 'UX'}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
-              year: e.year || "Unknown",
-              text: e.text || "Historical record.",
-              pageUrl: e.pageUrl || null
-            }));
-          }
-        }
-      } else {
-        console.warn(`History Gemini call failed: ${hRes.status}`);
-      }
-    }
-  } catch (e) { console.error("History generation error:", e); }
+    // All years in parallel — NYT free tier allows 10 req/min
+    const yearResults = await Promise.allSettled(targetYears.map(fetchNYTYear));
+
+    const histEvents: any[] = [];
+    yearResults.forEach((result, i) => {
+      if (result.status !== 'fulfilled') return;
+      const best = result.value.find(
+        (d: any) => d.headline?.main && d.abstract && d.abstract.length > 30
+      );
+      if (!best) return;
+      const pubYear = new Date(best.pub_date).getFullYear();
+      const headline = best.headline.main as string;
+      const abstract = (best.abstract as string).replace(/\s+/g, ' ').trim();
+      const text = abstract.length > 20 ? `${headline}. ${abstract}` : headline;
+      histEvents.push({
+        id: `HIST-${pubYear}-${i}-${Math.random().toString(36).substr(2, 5)}`,
+        year: pubYear,
+        text: text.substring(0, 400),
+        pageUrl: best.web_url || null,
+      });
+    });
+
+    histEvents.sort((a, b) => Number(a.year) - Number(b.year));
+    console.log(`[OnThisDay] Got ${histEvents.length} NYT events for ${mm}/${dd}.`);
+
+    results.historyEvents = histEvents.length >= 2 ? histEvents : FALLBACK_EVENTS;
+  } catch (e) {
+    console.error('History (NYT) pipeline error:', e);
+    results.historyEvents = FALLBACK_EVENTS;
+  }
 
   return results;
 }

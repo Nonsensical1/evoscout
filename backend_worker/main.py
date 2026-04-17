@@ -80,7 +80,7 @@ def setup_firebase():
     
     return firestore.client(), storage.bucket()
 
-def generate_podcast_script(news, lit, grants, duration_minutes=5):
+def generate_podcast_script(news, lit, grants, duration_minutes=5, use_emotion_tags=False):
     api_key = os.environ.get('GEMINI_API_KEY')
     
     # DEBUG: Print available models to help resolve the 404
@@ -112,17 +112,28 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     for part in range(1, num_parts + 1):
         print(f"Generating podcast script part {part}/{num_parts}...")
         
-        prompt = f"""
-        You are writing Part {part} of {num_parts} for a ~{duration_minutes}-minute dynamic podcast script based on today's biological advancements.
-        The podcast features two hosts: 'Al' (male) and 'Matt' (male).
-        They are energetic, natural, banter a lot, and deeply analyze the science.
-        
+        if use_emotion_tags:
+            tts_format_block = """
         STRICT TTS FORMATTING (MANDATORY):
         - You MUST include emotion tags at the start of almost every line or when the tone shifts.
         - Supported tags: [excited], [thoughtful], [laughing], [serious], [surprised], [whispering], [happy], [sad], [loud], [low voice], [sigh].
         - Use conversational fillers like 'hmm', 'right', 'exactly', and 'you know'.
         - Use ellipses (...) for natural pauses.
-        
+        """
+        else:
+            tts_format_block = """
+        FORMATTING (MANDATORY):
+        - Do NOT include any bracketed emotion tags (e.g. [excited], [laughing]) — write clean, natural prose only.
+        - Use conversational fillers like 'hmm', 'right', 'exactly', and 'you know'.
+        - Use ellipses (...) for natural pauses.
+        - Vary sentence rhythm naturally to convey emotion through word choice alone.
+        """
+
+        prompt = f"""
+        You are writing Part {part} of {num_parts} for a ~{duration_minutes}-minute dynamic podcast script based on today's biological advancements.
+        The podcast features two hosts: 'Al' (male) and 'Matt' (male).
+        They are energetic, natural, banter a lot, and deeply analyze the science.
+        {tts_format_block}
         Make this specific part thorough (around {target_words_part} words total across all lines).
         """
         
@@ -219,14 +230,14 @@ def generate_podcast_script(news, lit, grants, duration_minutes=5):
     return full_script
 
 
-def generate_fish_audio_segments(script):
-    """Use Fish Audio S2 Pro via native Modal FastAPI endpoint (no Gradio dependency)."""
+def generate_fish_audio_segments(script, user_modal_url=None):
+    """Use Fish Audio S2 Pro via native Modal FastAPI endpoint."""
     import requests
     import base64
 
-    modal_url = os.getenv("MODAL_APP_URL")
+    modal_url = user_modal_url or os.getenv("MODAL_APP_URL")
     if not modal_url:
-        raise Exception("MODAL_APP_URL secret is missing. Deploy modal_fish_tts.py and add the URL to GitHub Secrets.")
+        raise Exception("No Modal URL configured. User must link their custom endpoint in Settings or MODAL_APP_URL must be set globally.")
 
     # asgi_app exposes explicit FastAPI routes — our handler is at POST /synthesize
     synthesize_url = modal_url.rstrip("/") + "/synthesize"
@@ -409,6 +420,22 @@ def main():
         
         is_admin = (user_email.lower() == "elijahryal@gmail.com")
         
+        # Enforce 1-time free Fish S2-Pro rule for non-admins using the default global Modal
+        user_modal_url = user_settings.get('customModalUrl', '').strip()
+        if tts_engine == 'fish' and not user_modal_url and not is_admin:
+            fish_free_uses = user_settings.get('fishFreeUses', 0)
+            if fish_free_uses >= 1:
+                print("  [LIMIT] User has exhausted their 1 free Fish S2-Pro use. Downgrading to Kokoro TTS.")
+                tts_engine = 'kokoro'
+            else:
+                print("  [LIMIT] Consuming 1 free Fish S2-Pro use. Updating Firestore.")
+                try:
+                    db.collection('users').document(user.id).collection('settings').document('config').set(
+                        {'fishFreeUses': firestore.Increment(1)}, merge=True
+                    )
+                except Exception as e:
+                    print(f"  Warning: failed to increment fishFreeUses: {e}")
+        
         # Check explicit credentials for premium unlock from previous config (now 8 min max to save Fish compute)
         has_creds = bool(user_settings.get('googleCloudTtsCredentials'))
         duration_minutes = 8 if (is_admin or has_creds) else 5
@@ -418,12 +445,12 @@ def main():
             
         try:
             print("Generating podcast script from Gemini...")
-            script = generate_podcast_script(news, lit, grants, duration_minutes=duration_minutes)
+            script = generate_podcast_script(news, lit, grants, duration_minutes=duration_minutes, use_emotion_tags=(tts_engine == 'fish'))
             print(f"Generated {len(script)} lines of dialogue.")
             
             if tts_engine == 'fish':
-                print("Synthesizing audio with Fish Audio (Hugging Face Gradio)...")
-                files = generate_fish_audio_segments(script)
+                print("Synthesizing audio with Fish Audio (Modal)...")
+                files = generate_fish_audio_segments(script, user_modal_url=user_modal_url if user_modal_url else None)
             else:
                 print("Synthesizing audio with Kokoro (Local ONNX)...")
                 files = generate_kokoro_audio_segments(script)

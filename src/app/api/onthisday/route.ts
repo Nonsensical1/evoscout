@@ -1,160 +1,147 @@
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
+// Allow Vercel Pro functions up to 300 s — ~104 years × ~900 ms/request ≈ 94 s
+export const maxDuration = 300;
+
+// NYT Developer API key — add NYT_API_KEY to Vercel env vars to override
+const NYT_API_KEY = process.env.NYT_API_KEY || 'Zg3680b2RjPZAhZMb4LX0b8QYc4iF8XcXwGG5Dg3exNRiTJT';
 
 const FALLBACK_EVENTS = [
   {
-    id: "HIST-1953-XYZ",
+    id: 'HIST-1953-XYZ',
     year: 1953,
-    text: "James Watson and Francis Crick publish their paper describing the double helix structure of DNA, revolutionizing molecular biology and genetics.",
-    pageUrl: "https://en.wikipedia.org/wiki/DNA"
+    text: 'Watson and Crick publish the double helix structure of DNA, revolutionizing molecular biology and ushering in the modern age of genetics.',
+    pageUrl: 'https://en.wikipedia.org/wiki/DNA',
   },
   {
-    id: "HIST-1996-XYZ",
-    year: 1996,
-    text: "Dolly the sheep becomes the first mammal cloned from an adult somatic cell, a monumental milestone in genetics and synthetic bio-potential.",
-    pageUrl: "https://en.wikipedia.org/wiki/Dolly_(sheep)"
+    id: 'HIST-1983-XYZ',
+    year: 1983,
+    text: 'Kary Mullis conceives the polymerase chain reaction (PCR), enabling rapid amplification of DNA sequences and becoming a bedrock of modern molecular biology.',
+    pageUrl: 'https://en.wikipedia.org/wiki/Polymerase_chain_reaction',
   },
   {
-    id: "HIST-2001-XYZ",
+    id: 'HIST-2001-XYZ',
     year: 2001,
-    text: "The initial sequencing of the human genome is published simultaneously in Nature and Science, unlocking the modern era of genomics.",
-    pageUrl: "https://en.wikipedia.org/wiki/Human_Genome_Project"
+    text: 'The draft sequence of the human genome is simultaneously published in Nature and Science, unlocking the modern era of genomics and personalised medicine.',
+    pageUrl: 'https://en.wikipedia.org/wiki/Human_Genome_Project',
   },
   {
-    id: "HIST-2012-XYZ",
+    id: 'HIST-2012-XYZ',
     year: 2012,
-    text: "Jennifer Doudna and Emmanuelle Charpentier publish their landmark paper on CRISPR-Cas9, proving it could be programmed for precision gene editing.",
-    pageUrl: "https://en.wikipedia.org/wiki/CRISPR"
-  }
+    text: 'Jennifer Doudna and Emmanuelle Charpentier demonstrate that CRISPR-Cas9 can be programmed for precision gene editing in a landmark Science paper.',
+    pageUrl: 'https://en.wikipedia.org/wiki/CRISPR',
+  },
 ];
+
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
     const topicsMap = body.topics || {};
 
-    const defaultScienceKeywords = "CRISPR, gene editing, proteomics, synthetic biology, microbiology, biology, cancer research, pathology, genomics";
-    // topicsMap.news is safely truncated from page.tsx (1000 chars of actual titles)
-    const combinedTerms = topicsMap.news || defaultScienceKeywords;
+    // Build a concise OR-joined query from user's news topics, or fall back to defaults
+    const defaultQuery =
+      'CRISPR gene editing synthetic biology cancer research genomics proteomics';
+    const scienceQuery = topicsMap.news
+      ? topicsMap.news
+          .split(',')
+          .map((s: string) => s.trim())
+          .filter(Boolean)
+          .slice(0, 6)
+          .join(' OR ')
+      : defaultQuery;
 
+    // Target: this calendar month+day across every year from 1980 to last year
     const today = new Date();
-    const month = today.toLocaleString('default', { month: 'long' });
-    const day = today.getDate();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const monthDay = `${mm}${dd}`;
+    const currentYear = today.getFullYear();
 
-    const prompt = `You are a historical data assistant for an erudite synthetic biology and cellular news aggregation platform. 
-Today is ${month} ${day}.
-Your task is to generate 4 to 6 significant historical scientific milestones that are DIRECTLY related to the subjects currently being parsed in today's news.
+    // Start from 1921 — modern biology coverage begins reliably in this era
+    const allYears: number[] = [];
+    for (let y = 1921; y < currentYear; y++) allYears.push(y);
 
-Today's news headlines/topics are:
-"${combinedTerms}"
+    console.log(
+      `[OnThisDay] Full sweep: ${allYears.length} years (1921–${currentYear - 1}) for ${mm}/${dd}`
+    );
 
-CRITICAL RULES:
-1. THEMATIC RELEVANCE: Attempt to find discoveries, institutional foundings, or paradigm shifts in these specific subjects. If you cannot find obscure events for these exact subjects, drift into broader molecular biology, virology, or modern genetics.
-2. AVOID REPETITION: Do NOT output the same famous milestones repeatedly (e.g., Dolly the Sheep, Watson & Crick, initial CRISPR papers). Dig deep into niche, lesser-known scientific progression.
-3. CALENDAR PRIORITY: Prioritize events that happened exactly on ${month} ${day}, or in the month of ${month}. If necessary, pick other dates but state when they occurred.
-4. DIVERSITY: Ensure events span different decades to show the progression of the field.
+    const events: any[] = [];
 
-Output ONLY a raw JSON array of objects. Do not include conversational filler like "Here are the events".
-[
-  {
-    "year": 19XX,
-    "text": "A 2-3 sentence engaging description of the historical milestone and its conceptual link to similar modern research.",
-    "pageUrl": "https://en.wikipedia.org/wiki/..."
-  }
-]`;
+    // Sequential requests with a 700 ms inter-request delay.
+    // ~104 years × (avg ~200 ms response + 700 ms sleep) ≈ 94 seconds — within 300 s maxDuration.
+    // Early decades (1920s–1940s) may return sparse science results but resolve quickly.
+    // If we hit a 429, we back off 12 s and retry once before giving up on that year.
+    for (let i = 0; i < allYears.length; i++) {
+      const year = allYears[i];
 
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (!geminiKey) {
-       throw new Error("Missing GEMINI_API_KEY environment variable.");
-    }
+      // Pause before every request except the very first
+      if (i > 0) await sleep(700);
 
-    let finalEvents: any[] = [];
-    let success = false;
-    let attempts = 0;
-    
-    // Diagnostic state trackers
-    let lastStatus = 0;
-    let lastErrorMsg = "Initial state";
-    let lastRawText = "";
-
-    // Exponential Backoff API Wrapper
-    while (attempts < 3 && !success) {
-      const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json" },
-          safetySettings: [
-             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-             { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-             { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-             { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }
-          ]
-        })
+      const dateStr = `${year}${monthDay}`;
+      const params = new URLSearchParams({
+        q: scienceQuery,
+        'api-key': NYT_API_KEY,
+        begin_date: dateStr,
+        end_date: dateStr,
+        sort: 'relevance',
+        fl: 'headline,abstract,pub_date,web_url',
       });
-      
-      lastStatus = gRes.status;
+      const url = `https://api.nytimes.com/svc/search/v2/articlesearch.json?${params}`;
 
-      if (gRes.ok) {
-        const gData = await gRes.json();
-        const rawText = gData.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
-        lastRawText = rawText;
-        
-        try {
-          let parsedEvents: any[] = [];
-          const cleanedText = rawText.replace(/```(?:json)?\s*/gi, '').replace(/```\s*$/g, '').trim();
-          const startIndex = cleanedText.indexOf('[');
-          const endIndex = cleanedText.lastIndexOf(']');
-          
-          if (startIndex !== -1 && endIndex !== -1) {
-             parsedEvents = JSON.parse(cleanedText.substring(startIndex, endIndex + 1));
-          } else {
-             parsedEvents = JSON.parse(cleanedText);
-          }
-          
-          if (!Array.isArray(parsedEvents) || parsedEvents.length === 0) {
-             lastErrorMsg = "Parsed struct was not an array or was empty";
-             throw new Error(lastErrorMsg);
-          }
+      let docs: any[] = [];
+      try {
+        let res = await fetch(url, { headers: { Accept: 'application/json' } });
 
-          parsedEvents.sort((a: any, b: any) => Number(a.year) - Number(b.year));
-          finalEvents = parsedEvents.map((e: any, idx: number) => ({
-             id: `HIST-${e.year || 'UX'}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
-             year: e.year || "Unknown",
-             text: e.text || "Historical record processed.",
-             pageUrl: e.pageUrl || null
-          }));
-          success = true;
-        } catch (e: any) {
-          lastErrorMsg = "JSON Parse Error: " + e.message;
-          console.warn("JSON Parse Error from Gemini response:", e.message);
+        // If rate-limited, back off once and retry
+        if (res.status === 429) {
+          console.warn(`[OnThisDay] 429 at year ${year} — backing off 12 s…`);
+          await sleep(12000);
+          res = await fetch(url, { headers: { Accept: 'application/json' } });
         }
-      } else if (gRes.status === 429) {
-        lastErrorMsg = "Rate limited (429)";
-        await new Promise(r => setTimeout(r, 5000 * Math.pow(2, attempts)));
-      } else {
-        lastErrorMsg = `Gemini HTTP Error ${gRes.status}: ` + await gRes.text().catch(()=>"");
-        break; // Other status errors (400, 500) will abort the loop
+
+        // If still failing, skip this year but don't abort the whole sweep
+        if (!res.ok) {
+          console.warn(`[OnThisDay] HTTP ${res.status} for year ${year}, skipping.`);
+          continue;
+        }
+
+        const data = await res.json();
+        docs = (data.response?.docs as any[]) || [];
+      } catch (fetchErr) {
+        console.error(`[OnThisDay] Network error for year ${year}:`, fetchErr);
+        continue;
       }
-      attempts++;
+
+      // Pick the best article: must have a headline and a non-trivial abstract
+      const best = docs.find(
+        (d: any) => d.headline?.main && d.abstract && d.abstract.length > 30
+      );
+      if (!best) continue;
+
+      const pubYear = new Date(best.pub_date).getFullYear();
+      const headline = best.headline.main as string;
+      const abstract = (best.abstract as string).replace(/\s+/g, ' ').trim();
+      const text = abstract.length > 20 ? `${headline}. ${abstract}` : headline;
+
+      events.push({
+        id: `HIST-${pubYear}-${i}-${Math.random().toString(36).substr(2, 5)}`,
+        year: pubYear,
+        text: text.substring(0, 400),
+        pageUrl: best.web_url || null,
+      });
     }
 
-    // Fallback to curated events if Gemini generation ultimately failed
-    if (!success || finalEvents.length === 0) {
-       console.warn(`OnThisDay generation failed after ${attempts} attempts. LastStatus=${lastStatus}, Err=${lastErrorMsg}. Using fallback events.`);
-       finalEvents = FALLBACK_EVENTS;
-    }
+    // Sort chronologically so the sidebar reads oldest → newest
+    events.sort((a, b) => Number(a.year) - Number(b.year));
+    console.log(`[OnThisDay] Sweep complete — ${events.length} events collected.`);
 
+    const finalEvents = events.length >= 2 ? events : FALLBACK_EVENTS;
     return NextResponse.json({ success: true, events: finalEvents });
-
   } catch (error: any) {
-    console.error("fetchOnThisDay pipeline error:", error);
-    // Generic fallback if Gemini is unreachable
-    return NextResponse.json({ 
-        success: true, 
-        events: FALLBACK_EVENTS
-    });
+    console.error('[OnThisDay] Pipeline error:', error);
+    return NextResponse.json({ success: true, events: FALLBACK_EVENTS });
   }
 }
