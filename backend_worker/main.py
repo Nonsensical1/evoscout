@@ -278,6 +278,10 @@ def generate_fish_audio_segments(script, user_modal_url=None):
             "text": text,
             "ref_audio_b64": ref_audio_b64.get(speaker, ""),
             "ref_text": ref_texts.get(speaker, ""),
+            # Push the autoregressive transformer into highly-expressive territory
+            "temperature": 0.85, 
+            "top_p": 0.95,
+            "repetition_penalty": 1.2
         }
 
         max_retries = 3
