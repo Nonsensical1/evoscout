@@ -43,13 +43,13 @@ export async function POST(req: Request) {
 
     // Build a concise OR-joined query from user's news topics, or fall back to defaults
     const defaultQuery =
-      'CRISPR gene editing synthetic biology cancer research genomics proteomics';
+      'biology OR genetics OR CRISPR OR cancer OR genomics OR proteomics OR science';
     const scienceQuery = topicsMap.news
       ? topicsMap.news
           .split(',')
           .map((s: string) => s.trim())
           .filter(Boolean)
-          .slice(0, 6)
+          .slice(0, 5)
           .join(' OR ')
       : defaultQuery;
 
@@ -61,8 +61,11 @@ export async function POST(req: Request) {
     const currentYear = today.getFullYear();
 
     // Start from 1921 — modern biology coverage begins reliably in this era
-    const allYears: number[] = [];
+    let allYears: number[] = [];
     for (let y = 1921; y < currentYear; y++) allYears.push(y);
+    
+    // Pick exactly 5 random years to avoid blowing through NYT 5 Req/Minute rate limit
+    allYears = allYears.sort(() => 0.5 - Math.random()).slice(0, 5);
 
     console.log(
       `[OnThisDay] Full sweep: ${allYears.length} years (1921–${currentYear - 1}) for ${mm}/${dd}`
@@ -70,10 +73,7 @@ export async function POST(req: Request) {
 
     const events: any[] = [];
 
-    // Sequential requests with a 700 ms inter-request delay.
-    // ~104 years × (avg ~200 ms response + 700 ms sleep) ≈ 94 seconds — within 300 s maxDuration.
-    // Early decades (1920s–1940s) may return sparse science results but resolve quickly.
-    // If we hit a 429, we back off 12 s and retry once before giving up on that year.
+    // Query the 5 candidate years sequentially.
     for (let i = 0; i < allYears.length; i++) {
       const year = allYears[i];
 
@@ -95,21 +95,21 @@ export async function POST(req: Request) {
       try {
         let res = await fetch(url, { headers: { Accept: 'application/json' } });
 
-        // If rate-limited, back off once and retry
+        // If rate-limited, back off once
         if (res.status === 429) {
           console.warn(`[OnThisDay] 429 at year ${year} — backing off 12 s…`);
           await sleep(12000);
           res = await fetch(url, { headers: { Accept: 'application/json' } });
         }
 
-        // If still failing, skip this year but don't abort the whole sweep
         if (!res.ok) {
           console.warn(`[OnThisDay] HTTP ${res.status} for year ${year}, skipping.`);
           continue;
         }
 
         const data = await res.json();
-        docs = (data.response?.docs as any[]) || [];
+        // Fallback correctly if docs is null
+        docs = (data.response && data.response.docs) ? data.response.docs : [];
       } catch (fetchErr) {
         console.error(`[OnThisDay] Network error for year ${year}:`, fetchErr);
         continue;
