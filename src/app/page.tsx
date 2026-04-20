@@ -509,9 +509,9 @@ export default function Home() {
         <div className="lg:col-span-4 flex flex-col gap-10 pl-0 lg:pl-6">
           
           {/* History Section */}
-          <section id="section-history" className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-[#fafafa] border border-editorial-border p-6 shadow-[4px_4px_0px_#e5e5e5]">
-            <div className="mb-5 border-b border-editorial-border pb-2 text-center">
-              <h3 className="font-serif font-black text-sm uppercase tracking-widest text-[#005587]">This Day in History</h3>
+          <section id="section-history">
+             <div className="mb-6 border-b-2 border-editorial-border-dark pb-2 text-center">
+              <h3 className="font-serif font-black text-lg uppercase tracking-widest">This Month in History</h3>
             </div>
             {!data.historyEvents ? (
                <div className="flex justify-center items-center py-4">
@@ -522,16 +522,20 @@ export default function Home() {
                  </div>
                </div>
             ) : (
-             <ul className="flex flex-col gap-6">
-              {data.historyEvents.map((ev: any) => (
-                <li key={ev.id} className="group border-b border-gray-200 pb-5 last:border-0 last:pb-0 block">
-                  <a href={ev.pageUrl || "#"} target="_blank" className="flex flex-col outline-none">
-                     <span className="text-xl font-serif font-bold text-center mb-2 group-hover:text-[#005587] transition-colors">{ev.year}</span>
-                     <p className="text-xs font-serif text-editorial-text leading-relaxed text-center" dangerouslySetInnerHTML={{ __html: ev.text }} />
-                  </a>
-                </li>
-              ))}
-             </ul>
+                <div className="flex flex-col gap-6">
+                  {data.historyEvents.map((ev: any) => (
+                    <a href={ev.pageUrl || "#"} target="_blank" rel="noopener noreferrer" key={ev.id} className="block outline-none group cursor-pointer border-b border-editorial-border pb-6 last:border-0">
+                      <article>
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                           <div className="w-4 border-t border-editorial-text"></div>
+                           <span className="text-[9px] uppercase font-sans font-bold tracking-widest text-[#005587] text-center">{ev.year}</span>
+                           <div className="w-4 border-t border-editorial-text"></div>
+                        </div>
+                        <p className="text-sm font-serif text-editorial-text leading-relaxed text-center group-hover:text-[#005587] transition-colors group-hover:underline decoration-1 underline-offset-4" dangerouslySetInnerHTML={{ __html: ev.text }} />
+                      </article>
+                    </a>
+                  ))}
+                </div>
             )}
           </section>
 
