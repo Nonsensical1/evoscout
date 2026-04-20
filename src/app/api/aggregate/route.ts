@@ -477,12 +477,13 @@ async function fetchLiveData(topicsMap: any = {}) {
     }
 
     const fetchNYTYear = async (year: number): Promise<any[]> => {
-      const dateStr = `${year}${monthDay}`;
+      const beginDateStr = `${year}${mm}01`;
+      const endDateStr = `${year}${mm}28`;
       const params = new URLSearchParams({
         q: scienceQuery,
         'api-key': NYT_API_KEY,
-        begin_date: dateStr,
-        end_date: dateStr,
+        begin_date: beginDateStr,
+        end_date: endDateStr,
         sort: 'relevance',
         fl: 'headline,abstract,pub_date,web_url',
       });
