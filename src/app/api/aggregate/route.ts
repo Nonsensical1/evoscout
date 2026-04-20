@@ -457,14 +457,17 @@ async function fetchLiveData(topicsMap: any = {}) {
     const monthDay = `${mm}${dd}`;
     const currentYear = today.getFullYear();
 
-    // The topics parsed for are those that are currently being parsed for by the daily news
-    const defaultNewsTopics = "CRISPR, Cas9, Cas12, gene, cell, RNA, proteomics, synthetic biology, epigenetic, microbiome, cancer, pathology, zoology";
-    const userTopicsStr = topicsMap.news || defaultNewsTopics;
-    const scienceQuery = userTopicsStr
-      .split(',')
-      .map((s: string) => `"${s.trim()}"`)
-      .slice(0, 10)
-      .join(' OR ');
+    // Build a concise OR-joined query from user's news topics, or fall back to defaults
+    const defaultQuery =
+      'biology OR genetics OR CRISPR OR cancer OR genomics OR proteomics OR science';
+    const scienceQuery = topicsMap.news
+      ? topicsMap.news
+          .split(',')
+          .map((s: string) => s.trim())
+          .filter(Boolean)
+          .slice(0, 5)
+          .join(' OR ')
+      : defaultQuery;
 
     // Sample 5 random historical years (min 1920) to stay within NYT 5 req/min free tier maximums
     const targetYears: number[] = [];
@@ -488,10 +491,18 @@ async function fetchLiveData(topicsMap: any = {}) {
         fl: 'headline,abstract,pub_date,web_url',
       });
       try {
-        const res = await fetch(
+        let res = await fetch(
           `https://api.nytimes.com/svc/search/v2/articlesearch.json?${params}`,
           { headers: { Accept: 'application/json' } }
         );
+        if (res.status === 429) {
+          console.warn(`[OnThisDay] API 429 rate limit. Backing off 8 seconds...`);
+          await new Promise(r => setTimeout(r, 8000));
+          res = await fetch(
+            `https://api.nytimes.com/svc/search/v2/articlesearch.json?${params}`,
+            { headers: { Accept: 'application/json' } }
+          );
+        }
         if (!res.ok) return [];
         const data = await res.json();
         return (data.response?.docs as any[]) || [];
