@@ -426,9 +426,9 @@ async function fetchLiveData(topicsMap: any = {}) {
         const parsed = JSON.parse(rawText);
         Object.assign(masterSummaryDict, parsed);
 
-        // Gently throttle seq calls to protect Free Tier
+        // Gently throttle seq calls to protect Free Tier (15 RPM max)
         if (i < batches.length - 1) {
-            await new Promise(res => setTimeout(res, 1500));
+            await new Promise(res => setTimeout(res, 4100));
         }
 
       } catch (e) {
