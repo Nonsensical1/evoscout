@@ -80,12 +80,16 @@ export async function POST(req: Request) {
       // Pause before every request except the very first
       if (i > 0) await sleep(700);
 
-      const dateStr = `${year}${monthDay}`;
+      // Search across the month to guarantee we actually find science articles, 
+      // preventing the query from failing due to empty publishing days.
+      const beginDateStr = `${year}${mm}01`;
+      const endDateStr = `${year}${mm}28`;
+      
       const params = new URLSearchParams({
         q: scienceQuery,
         'api-key': NYT_API_KEY,
-        begin_date: dateStr,
-        end_date: dateStr,
+        begin_date: beginDateStr,
+        end_date: endDateStr,
         sort: 'relevance',
         fl: 'headline,abstract,pub_date,web_url',
       });
