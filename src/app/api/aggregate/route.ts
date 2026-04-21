@@ -333,52 +333,57 @@ async function fetchLiveData(topicsMap: any = {}) {
   } catch (e) { console.error("Lit Fetch Error:", e); }
 
   try {
-    // Evergreen Career Portals — permanent, pre-filtered biology career search pages.
-    // Each URL is a live search or landing page that will ALWAYS return active listings.
-    const evergreenPortals = [
-      { institution: "Broad Institute",     url: "https://broadinstitute.wd1.myworkdayjobs.com/broad_institute_careers?q=biology", tag: "Cambridge, MA" },
-      { institution: "HHMI / Janelia",       url: "https://www.hhmi.org/careers",                                                  tag: "Ashburn, VA" },
-      { institution: "Wyss Institute",       url: "https://wyss.harvard.edu/about/careers/",                                        tag: "Boston, MA" },
-      { institution: "Ginkgo Bioworks",      url: "https://www.ginkgobioworks.com/careers/",                                        tag: "Boston, MA" },
-      { institution: "Dana-Farber Cancer",   url: "https://careers.dana-farber.org/",                                               tag: "Boston, MA" },
-      { institution: "NIH Scientific",       url: "https://hr.nih.gov/jobs/search/scientific",                                      tag: "Bethesda, MD" },
-      { institution: "Cold Spring Harbor",   url: "https://cshl.edu/careers/",                                                      tag: "Cold Spring Harbor, NY" },
-      { institution: "Nature Careers",       url: "https://www.nature.com/naturecareers/jobs/biology",                               tag: "Global" },
-      { institution: "Science Careers",      url: "https://jobs.sciencecareers.org/jobs/biology/",                                   tag: "Global" },
-      { institution: "Scripps Research",     url: "https://careers.scripps.edu/",                                                   tag: "La Jolla, CA" },
-      { institution: "Salk Institute",       url: "https://www.salk.edu/about/careers/",                                            tag: "La Jolla, CA" },
-      { institution: "Jackson Laboratory",   url: "https://www.jax.org/careers",                                                    tag: "Bar Harbor, ME" },
-      { institution: "Rockefeller University", url: "https://www.rockefeller.edu/hr/",                                              tag: "New York, NY" },
-      { institution: "Stowers Institute",    url: "https://www.stowers.org/careers",                                                tag: "Kansas City, MO" },
-      { institution: "MD Anderson",          url: "https://jobs.mdanderson.org/",                                                   tag: "Houston, TX" },
-      { institution: "Fred Hutch",           url: "https://www.fredhutch.org/en/about/careers.html",                                tag: "Seattle, WA" },
-      { institution: "Whitehead Institute",  url: "https://wi.mit.edu/about/careers",                                               tag: "Cambridge, MA" },
-      { institution: "Allen Institute",      url: "https://alleninstitute.org/careers/",                                             tag: "Seattle, WA" }
+    const jobFeeds = [
+       { url: 'https://www.jobs.ac.uk/jobs/biological-sciences?format=rss', tag: 'Biological Sciences' },
+       { url: 'https://www.jobs.ac.uk/jobs/medical-technology?format=rss', tag: 'Medical Technology' },
+       { url: 'https://www.jobs.ac.uk/jobs/pharmacy-and-pharmacology?format=rss', tag: 'Pharmacology' },
+       { url: 'https://www.jobs.ac.uk/jobs/biomedical-engineering?format=rss', tag: 'Biomedical Engineering' }
     ];
-
-    // If the user has custom institution preferences in their settings, filter to those
+    let allJobs: any[] = [];
+    
+    // Convert users' topics/locations string into matching queries
     const userInstitutions = topicsMap.careerInstitutions
-      ? topicsMap.careerInstitutions.split(',').map((s: string) => s.trim()).filter(Boolean)
+      ? topicsMap.careerInstitutions.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean)
       : null;
 
-    let activePortals = evergreenPortals;
-    if (userInstitutions && userInstitutions.length > 0) {
-      // Keep portals that match the user's list (case-insensitive partial match)
-      const filtered = evergreenPortals.filter(p =>
-        userInstitutions.some((ui: string) => p.institution.toLowerCase().includes(ui.toLowerCase()))
-      );
-      // If we matched at least some, use those; otherwise fall back to all
-      if (filtered.length > 0) activePortals = filtered;
-    }
+    for (const feedConfig of jobFeeds) {
+         try {
+             const feed = await parser.parseURL(feedConfig.url);
+             let items = feed.items;
+             
+             // If user defined specific keywords, forcefully filter the feed results
+             if (userInstitutions && userInstitutions.length > 0) {
+                 items = items.filter((item: any) => {
+                     const desc = (item.contentSnippet || "").toLowerCase();
+                     const title = (item.title || "").toLowerCase();
+                     return userInstitutions.some((ui: string) => desc.includes(ui) || title.includes(ui));
+                 });
+             }
 
-    results.positions = shuffleArray([...activePortals]).map((portal) => ({
-      id: `PORTAL-${portal.institution.replace(/[^a-zA-Z0-9]/g, '')}`,
-      title: portal.institution,
-      institution: portal.tag,
-      location: portal.tag,
-      url: portal.url,
-      dateAdded: new Date().toISOString()
-    }));
+             const mapped = items.map((item: any, i: number) => {
+                 let location = item.contentSnippet ? item.contentSnippet.split(' - ')[0] : feedConfig.tag;
+                 let institution = feedConfig.tag;
+                 
+                 // jobs.ac.uk typically encodes 'Institution Name - Department' in the first line
+                 if (item.contentSnippet && item.contentSnippet.includes(' - ')) {
+                     institution = item.contentSnippet.split(' - ')[0].trim();
+                 }
+
+                 return {
+                     id: `CAREER-${item.guid || item.link || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
+                     title: item.title || "Research Position",
+                     institution: institution,
+                     location: feedConfig.tag,
+                     url: item.link || "https://www.jobs.ac.uk",
+                     dateAdded: item.isoDate || new Date().toISOString()
+                 };
+             });
+             allJobs = allJobs.concat(mapped);
+         } catch (e) { console.error("Jobs RSS Fetch Error:", e); }
+    }
+    
+    // Limit to 30 shuffled positions to maintain performance
+    results.positions = shuffleArray(allJobs).slice(0, 30);
   } catch (e) { console.error("Evergreen Careers Error:", e); }
 
   try {
