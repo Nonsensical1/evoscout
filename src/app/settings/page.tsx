@@ -244,7 +244,7 @@ export default function SettingsPage() {
           </p>
 
           <div className="space-y-4">
-            <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 dark:bg-[#1e1e1e] transition-colors">
+            <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 dark:hover:bg-[#262626] transition-colors">
               <input 
                 type="radio" 
                 name="ttsEngine" 
@@ -260,7 +260,7 @@ export default function SettingsPage() {
             </label>
 
             <div className={`border border-editorial-border ${isModalLocked ? 'opacity-60 select-none bg-gray-50 dark:bg-[#1e1e1e]' : ''}`}>
-              <label className={`flex items-start gap-3 p-4 transition-colors ${isModalLocked ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50 dark:bg-[#1e1e1e]'}`}>
+              <label className={`flex items-start gap-3 p-4 transition-colors ${isModalLocked ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-[#262626]'}`}>
                 <input 
                   type="radio" 
                   name="ttsEngine" 

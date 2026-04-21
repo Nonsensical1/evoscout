@@ -60,7 +60,7 @@ export default function LedgerPage() {
                    <div className="flex flex-col gap-4 border-r-0 md:border-r border-editorial-border pr-0 md:pr-6">
                       <h4 className="text-sm font-sans font-bold uppercase tracking-widest mb-2 border-b border-gray-200 dark:border-[#333333] pb-1">Funding</h4>
                       {!edition.grants || edition.grants.length === 0 ? <p className="text-xs italic text-gray-500 dark:text-gray-400">None</p> : edition.grants.map((g: any, i: number) => (
-                         <a href={g.url} target="_blank" rel="noopener noreferrer" key={i} className="group block mb-3 border-b border-gray-100 dark:border-[#262626] pb-3 last:border-0 hover:bg-gray-50 dark:bg-[#1e1e1e] transition-colors -mx-2 px-2">
+                         <a href={g.url} target="_blank" rel="noopener noreferrer" key={i} className="group block mb-3 border-b border-gray-100 dark:border-[#262626] pb-3 last:border-0 hover:bg-gray-50 dark:hover:bg-[#262626] transition-colors -mx-2 px-2">
                            <h5 className="font-serif font-bold leading-tight group-hover:underline decoration-1 underline-offset-2">{g.title}</h5>
                            <div className="flex justify-between items-center text-xs mt-1">
                               <span className="text-[#005587] dark:text-[#60a5fa] font-bold">{g.agency}</span>
@@ -74,7 +74,7 @@ export default function LedgerPage() {
                    <div className="flex flex-col gap-4 border-r-0 md:border-r border-editorial-border pr-0 md:pr-6">
                       <h4 className="text-sm font-sans font-bold uppercase tracking-widest mb-2 border-b border-gray-200 dark:border-[#333333] pb-1">Literature & Pre-Prints</h4>
                       {!edition.literature || edition.literature.length === 0 ? <p className="text-xs italic text-gray-500 dark:text-gray-400">None</p> : edition.literature.map((l: any, i: number) => (
-                         <a href={`https://doi.org/${l.doi}`} target="_blank" rel="noopener noreferrer" key={i} className="group mb-3 border-b border-gray-100 dark:border-[#262626] pb-3 last:border-0 hover:bg-gray-50 dark:bg-[#1e1e1e] transition-colors p-2 -mx-2 block">
+                         <a href={`https://doi.org/${l.doi}`} target="_blank" rel="noopener noreferrer" key={i} className="group mb-3 border-b border-gray-100 dark:border-[#262626] pb-3 last:border-0 hover:bg-gray-50 dark:hover:bg-[#262626] transition-colors p-2 -mx-2 block">
                            <h5 className="font-serif font-bold leading-tight group-hover:underline">{l.title}</h5>
                            <p className="text-xs text-gray-500 dark:text-gray-400 italic mt-1">{l.authors}</p>
                            <span className="text-[10px] uppercase font-bold text-gray-400 mt-1 block">{l.journal}</span>
@@ -86,7 +86,7 @@ export default function LedgerPage() {
                    <div className="flex flex-col gap-4">
                       <h4 className="text-sm font-sans font-bold uppercase tracking-widest mb-2 border-b border-gray-200 dark:border-[#333333] pb-1">Positions & News</h4>
                       {!edition.positions || edition.positions.length === 0 ? null : edition.positions.map((p: any, i: number) => (
-                         <a href={p.url} target="_blank" rel="noopener noreferrer" key={`p-${i}`} className="group block mb-4 border-b border-dashed border-gray-100 dark:border-[#262626] pb-4 last:border-0 hover:bg-gray-50 dark:bg-[#1e1e1e] transition-colors p-2 -mx-2">
+                         <a href={p.url} target="_blank" rel="noopener noreferrer" key={`p-${i}`} className="group block mb-4 border-b border-dashed border-gray-100 dark:border-[#262626] pb-4 last:border-0 hover:bg-gray-50 dark:hover:bg-[#262626] transition-colors p-2 -mx-2">
                            <h5 className="font-serif text-sm font-bold text-[#b02a2a] dark:text-[#f87171] group-hover:underline">{p.title}</h5>
                            <span className="text-[10px] uppercase font-bold text-gray-400">{p.institution}</span>
                          </a>
