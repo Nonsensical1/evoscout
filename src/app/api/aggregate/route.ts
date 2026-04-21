@@ -334,10 +334,9 @@ async function fetchLiveData(topicsMap: any = {}) {
 
   try {
     const jobFeeds = [
-       { url: 'https://www.jobs.ac.uk/jobs/biological-sciences?format=rss', tag: 'Biological Sciences' },
-       { url: 'https://www.jobs.ac.uk/jobs/medical-technology?format=rss', tag: 'Medical Technology' },
-       { url: 'https://www.jobs.ac.uk/jobs/pharmacy-and-pharmacology?format=rss', tag: 'Pharmacology' },
-       { url: 'https://www.jobs.ac.uk/jobs/biomedical-engineering?format=rss', tag: 'Biomedical Engineering' }
+       { url: 'https://jobs.sciencecareers.org/jobsrss/?category=biology', flag: 'science' },
+       { url: 'https://www.nature.com/naturecareers/jobsrss/?discipline=biology', flag: 'nature' },
+       { url: 'https://www.jobs.ac.uk/jobs/biological-sciences?format=rss', flag: 'acuk' }
     ];
     let allJobs: any[] = [];
     
@@ -361,11 +360,18 @@ async function fetchLiveData(topicsMap: any = {}) {
              }
 
              const mapped = items.map((item: any, i: number) => {
-                 let location = item.contentSnippet ? item.contentSnippet.split(' - ')[0] : feedConfig.tag;
-                 let institution = feedConfig.tag;
+                 let title = item.title || "Research Position";
+                 let institution = feedConfig.flag === 'acuk' ? 'Academic Institute' : 'Research Institute';
                  
-                 // jobs.ac.uk typically encodes 'Institution Name - Department' in the first line
-                 if (item.contentSnippet && item.contentSnippet.includes(' - ')) {
+                 // If Nature/Science Careers format: "Institution: Job Title"
+                 if ((feedConfig.flag === 'nature' || feedConfig.flag === 'science') && title.includes(':')) {
+                     const parts = title.split(':');
+                     institution = parts[0].trim();
+                     title = parts.slice(1).join(':').trim();
+                 }
+                 
+                 // if jobs.ac.uk format
+                 if (feedConfig.flag === 'acuk' && item.contentSnippet && item.contentSnippet.includes(' - ')) {
                      institution = item.contentSnippet.split(' - ')[0].trim();
                  }
 
