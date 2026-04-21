@@ -524,7 +524,7 @@ export default function Home() {
                 <article key={paper.id} className="group grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-gray-100 dark:border-[#262626] pb-8 last:border-0 last:pb-0">
                   <div className="md:col-span-3 space-y-2 pr-0 md:pr-4">
                      <a href={`https://doi.org/${paper.doi}`} target="_blank" rel="noopener noreferrer" className="block outline-none cursor-pointer">
-                       <h4 className="font-serif font-bold text-2xl leading-tight group-hover:text-blue-800 transition-colors group-hover:underline decoration-[1.5px] underline-offset-4">{paper.title}</h4>
+                       <h4 className="font-serif font-bold text-2xl leading-tight group-hover:text-blue-800 dark:group-hover:text-blue-400 transition-colors group-hover:underline decoration-[1.5px] underline-offset-4">{paper.title}</h4>
                      </a>
                      <p className="font-serif text-editorial-muted italic text-base">{paper.authors}</p>
                      <p className="font-sans text-sm text-editorial-text leading-relaxed mt-2">{paper.summary}</p>
