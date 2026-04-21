@@ -377,10 +377,10 @@ async function fetchLiveData(topicsMap: any = {}) {
 
                  return {
                      id: `CAREER-${item.guid || item.link || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
-                     title: item.title || "Research Position",
+                     title: title,
                      institution: institution,
-                     location: feedConfig.tag,
-                     url: item.link || "https://www.jobs.ac.uk",
+                     location: 'Global',
+                     url: item.link || "https://www.nature.com/naturecareers",
                      dateAdded: item.isoDate || new Date().toISOString()
                  };
              });
