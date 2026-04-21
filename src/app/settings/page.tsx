@@ -350,7 +350,7 @@ export default function SettingsPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="w-full bg-editorial-text hover:bg-black text-white py-4 flex justify-center items-center gap-3 font-sans font-bold uppercase tracking-widest transition-colors disabled:opacity-70"
+            className="w-full bg-[#171717] dark:bg-black hover:bg-black dark:hover:bg-[#262626] text-white py-4 flex justify-center items-center gap-3 font-sans font-bold uppercase tracking-widest transition-colors disabled:opacity-70"
           >
             {saving ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
             {saving ? 'Transmitting...' : 'Commit Configuration'}

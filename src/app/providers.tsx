@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             </p>
             <button 
               onClick={signIn}
-              className="w-full bg-editorial-text text-white py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm hover:bg-black transition-colors"
+              className="w-full bg-[#171717] dark:bg-black hover:bg-black dark:hover:bg-[#262626] text-white py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm transition-colors"
             >
               Sign In with Google
             </button>
