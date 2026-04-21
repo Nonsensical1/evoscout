@@ -546,8 +546,13 @@ export default function Home() {
                      <p className="font-serif text-editorial-muted italic text-base">{paper.authors}</p>
                      <p className="font-sans text-sm text-editorial-text leading-relaxed mt-2">{paper.summary}</p>
                   </div>
-                  <div className="md:col-span-1 flex flex-col items-start md:items-end justify-start gap-4 border-l-0 md:border-l border-editorial-border md:pl-5">
+                  <div className="md:col-span-1 flex flex-col items-start md:items-end justify-start gap-3 border-l-0 md:border-l border-editorial-border md:pl-5 mt-2 md:mt-0">
                      <span className="text-[10px] font-sans font-bold uppercase tracking-widest bg-gray-100 dark:bg-[#262626] px-2 py-1 text-center border border-gray-200 dark:border-[#333333]">{paper.journal}</span>
+                     {paper.institution && (
+                        <span className="text-xs font-serif font-medium text-editorial-text text-left md:text-right opacity-80 leading-snug">
+                           {paper.institution}
+                        </span>
+                     )}
                   </div>
                 </article>
               ))}
