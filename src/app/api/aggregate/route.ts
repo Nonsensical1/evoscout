@@ -334,15 +334,14 @@ async function fetchLiveData(topicsMap: any = {}) {
 
   try {
     const jobFeeds = [
-       { url: 'https://jobs.sciencecareers.org/jobsrss/?category=biology', flag: 'science' },
-       { url: 'https://www.nature.com/naturecareers/jobsrss/?discipline=biology', flag: 'nature' },
-       { url: 'https://www.jobs.ac.uk/jobs/biological-sciences?format=rss', flag: 'acuk' }
+       { url: 'https://jobs.sciencecareers.org/jobsrss/?countrycode=US', flag: 'science' },
+       { url: 'https://www.nature.com/naturecareers/jobsrss/?countrycode=US', flag: 'nature' }
     ];
     let allJobs: any[] = [];
     
-    // Convert users' topics/locations string into matching queries
-    const userInstitutions = topicsMap.careerInstitutions
-      ? topicsMap.careerInstitutions.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean)
+    // Utilize the core 'news' topics array for granular career subject filtering, per user request
+    const userTopics = topicsMap.news
+      ? topicsMap.news.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean)
       : null;
 
     for (const feedConfig of jobFeeds) {
@@ -350,46 +349,75 @@ async function fetchLiveData(topicsMap: any = {}) {
              const feed = await parser.parseURL(feedConfig.url);
              let items = feed.items;
              
-             // If user defined specific keywords, forcefully filter the feed results
-             if (userInstitutions && userInstitutions.length > 0) {
+             // Strict feed filtering based on the user's defined news topics
+             if (userTopics && userTopics.length > 0) {
                  items = items.filter((item: any) => {
                      const desc = (item.contentSnippet || "").toLowerCase();
                      const title = (item.title || "").toLowerCase();
-                     return userInstitutions.some((ui: string) => desc.includes(ui) || title.includes(ui));
+                     return userTopics.some((ui: string) => desc.includes(ui) || title.includes(ui));
                  });
              }
 
              const mapped = items.map((item: any, i: number) => {
                  let title = item.title || "Research Position";
-                 let institution = feedConfig.flag === 'acuk' ? 'Academic Institute' : 'Research Institute';
+                 let institution = 'US Research Hub';
                  
                  // If Nature/Science Careers format: "Institution: Job Title"
-                 if ((feedConfig.flag === 'nature' || feedConfig.flag === 'science') && title.includes(':')) {
+                 if (title.includes(':')) {
                      const parts = title.split(':');
                      institution = parts[0].trim();
                      title = parts.slice(1).join(':').trim();
                  }
                  
-                 // if jobs.ac.uk format
-                 if (feedConfig.flag === 'acuk' && item.contentSnippet && item.contentSnippet.includes(' - ')) {
-                     institution = item.contentSnippet.split(' - ')[0].trim();
-                 }
-
                  return {
                      id: `CAREER-${item.guid || item.link || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
                      title: title,
                      institution: institution,
-                     location: 'Global',
-                     url: item.link || "https://www.nature.com/naturecareers",
-                     dateAdded: item.isoDate || new Date().toISOString()
+                     location: 'US',
+                     experienceLevel: 'Undergraduate / Entry Level', // Baseline default
+                     url: item.link || "https://sciencecareers.org",
+                     dateAdded: item.isoDate || new Date().toISOString(),
+                     rawText: item.contentSnippet || "" // Retained temporarily for AI extraction
                  };
              });
              allJobs = allJobs.concat(mapped);
          } catch (e) { console.error("Jobs RSS Fetch Error:", e); }
     }
     
-    // Limit to 30 shuffled positions to maintain performance
-    results.positions = shuffleArray(allJobs).slice(0, 30);
+    // Select upper bounds of matched jobs, limited efficiently for Gemini
+    results.positions = shuffleArray(allJobs).slice(0, 15);
+    
+    // Inline Gemini Pass for Complex Formatting (Experience Level & Location & True Institution mapping)
+    try {
+        const geminiKey = process.env.GEMINI_API_KEY;
+        if (geminiKey && results.positions.length > 0) {
+            const aiPayload = results.positions.map((p: any) => ({ id: p.id, raw: p.rawText }));
+            const prompt = `You are parsing raw XML descriptions from US biology job feeds. Extract the true hiring Institution, the Experience Level, and the Location from these snippet blobs. Return ONLY a strict JSON object mapping each job 'id' to an inner object containing: { institution: string, experienceLevel: string, location: string }. If you cannot find a clear experience level, strictly fallback and assign it: "Undergraduate / Entry Level". Jobs: ${JSON.stringify(aiPayload)}`;
+            
+            const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: "application/json" }
+              })
+            });
+            
+            if (gRes.ok) {
+               const gData = await gRes.json();
+               const parsedAI = JSON.parse(gData.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+               results.positions = results.positions.map((p: any) => {
+                   if (parsedAI[p.id]) {
+                       p.institution = parsedAI[p.id].institution && parsedAI[p.id].institution !== "US Research Hub" ? parsedAI[p.id].institution : p.institution;
+                       p.experienceLevel = parsedAI[p.id].experienceLevel || "Undergraduate / Entry Level";
+                       p.location = parsedAI[p.id].location || p.location;
+                   }
+                   delete p.rawText; // Clean payload before saving to firebase
+                   return p;
+               });
+            }
+        }
+    } catch (e) { console.error("Careers Gemini Intercept Error:", e); }
   } catch (e) { console.error("Evergreen Careers Error:", e); }
 
   try {

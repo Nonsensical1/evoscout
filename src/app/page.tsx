@@ -669,7 +669,14 @@ export default function Home() {
                 <li key={job.id} className="py-4 group cursor-pointer block">
                   <a href={job.url} target="_blank" className="flex flex-col items-center text-center">
                      <h4 className="text-md font-serif font-bold group-hover:underline decoration-1 underline-offset-2 text-[#b02a2a] dark:text-[#f87171]">{job.title}</h4>
-                     <p className="text-[10px] font-sans text-editorial-muted mt-2 uppercase tracking-widest font-bold">{job.institution}</p>
+                     <p className="text-[10px] font-sans text-editorial-text mt-2 uppercase tracking-widest font-bold">{job.institution}</p>
+                     
+                     <div className="flex items-center justify-center gap-2 mt-1.5 opacity-90">
+                        <span className="text-[9px] font-sans bg-gray-200 dark:bg-[#333] px-1.5 py-0.5 text-editorial-muted uppercase tracking-wider">{job.experienceLevel || "Undergraduate / Entry Level"}</span>
+                        {job.location && (
+                            <span className="text-[9px] font-sans border border-gray-300 dark:border-[#444] px-1.5 py-0.5 text-editorial-muted uppercase tracking-wider whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">{job.location}</span>
+                        )}
+                     </div>
                   </a>
                 </li>
               ))}
