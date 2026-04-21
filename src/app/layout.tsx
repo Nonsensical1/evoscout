@@ -3,7 +3,7 @@ import { Inter, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { ReactNode } from 'react';
 import Link from 'next/link';
-import { AuthProvider } from './providers';
+import { AppProviders } from './providers';
 import { UserMenu } from './UserMenu';
 import { CurrentDate } from './CurrentDate';
 import { DashboardDropdown } from './DashboardDropdown';
@@ -22,12 +22,12 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable} antialiased`}>
-      <body className="bg-editorial-bg text-editorial-text min-h-screen selection:bg-gray-200">
-        <AuthProvider>
+    <html lang="en" className={`${inter.variable} ${playfair.variable} antialiased`} suppressHydrationWarning>
+      <body className="bg-editorial-bg text-editorial-text min-h-screen selection:bg-gray-200 transition-colors duration-300">
+        <AppProviders>
           {/* Masthead */}
           <header className="bg-editorial-paper border-b border-editorial-border-dark sticky top-0 z-50 shadow-sm transition-all duration-300">
-            <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col items-center border-b border-gray-200 pb-4 relative">
+            <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col items-center border-b border-editorial-border pb-4 relative">
                <div className="w-full flex justify-between items-center text-[10px] md:text-xs font-sans text-editorial-muted uppercase tracking-widest mb-4">
                   <CurrentDate />
                   <span>Synthetic Biology Edition</span>
@@ -53,7 +53,7 @@ export default function RootLayout({
           <footer className="text-center py-10 font-sans text-xs text-editorial-muted uppercase tracking-widest border-t border-editorial-border-dark bg-editorial-paper">
             © {new Date().getFullYear()} The EvoScout Company. All Rights Reserved.
           </footer>
-        </AuthProvider>
+        </AppProviders>
       </body>
     </html>
   );

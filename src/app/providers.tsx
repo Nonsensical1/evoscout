@@ -1,5 +1,7 @@
 "use client";
 
+import { ThemeProvider } from "next-themes";
+
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
@@ -71,12 +73,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
       {loading ? (
-        <div className="min-h-screen bg-[#fafafa] flex items-center justify-center font-serif text-editorial-text">
+        <div className="min-h-screen bg-[#fafafa] dark:bg-[#1e1e1e] flex items-center justify-center font-serif text-editorial-text">
           Initializing secure database connection...
         </div>
       ) : !user ? (
-        <div className="min-h-screen bg-[#fafafa] bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] flex items-center justify-center p-4">
-          <div className="max-w-md w-full border-2 border-editorial-border p-8 text-center bg-white shadow-sm">
+        <div className="min-h-screen bg-[#fafafa] dark:bg-[#1e1e1e] bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] flex items-center justify-center p-4">
+          <div className="max-w-md w-full border-2 border-editorial-border p-8 text-center bg-white dark:bg-[#121212] shadow-sm">
             <h1 className="text-3xl font-serif font-black mb-2 uppercase tracking-tight text-editorial-text">EvoScout Auth</h1>
             <div className="w-16 h-1 bg-editorial-text mx-auto mb-6"></div>
             <p className="font-serif italic text-editorial-muted mb-8">
@@ -112,3 +114,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
+
+export function AppProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <AuthProvider>{children}</AuthProvider>
+    </ThemeProvider>
+  );
+}

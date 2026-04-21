@@ -18,6 +18,17 @@
   --foreground: var(--color-editorial-text);
 }
 
+html.dark {
+  --color-editorial-bg: #0a0a0a;
+  --color-editorial-paper: #121212;
+  --color-editorial-text: #e5e5e5;
+  --color-editorial-muted: #9ca3af;
+  --color-editorial-border: #262626;
+  --color-editorial-border-dark: #404040;
+  --background: var(--color-editorial-bg);
+  --foreground: var(--color-editorial-text);
+}
+
 html {
   scroll-behavior: smooth;
 }

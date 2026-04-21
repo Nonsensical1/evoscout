@@ -5,6 +5,7 @@ import { Settings, Save, RefreshCw, Cloud } from 'lucide-react';
 import { useAuth } from '@/app/providers';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useTheme } from 'next-themes';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -23,6 +24,13 @@ export default function SettingsPage() {
   const [ttsEngine, setTtsEngine] = useState('kokoro');
   const [customModalUrl, setCustomModalUrl] = useState('');
   const [modalQuotaExceededMonth, setModalQuotaExceededMonth] = useState<number | null>(null);
+
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     async function loadSettings() {
@@ -53,6 +61,9 @@ export default function SettingsPage() {
           if (snap.data().modalQuotaExceededMonth !== undefined) {
             setModalQuotaExceededMonth(snap.data().modalQuotaExceededMonth);
           }
+          if (snap.data().theme) {
+            setTheme(snap.data().theme);
+          }
         }
       } catch (e) {
         console.error("Error loading settings", e);
@@ -71,7 +82,8 @@ export default function SettingsPage() {
         ...limits,
         topics,
         ttsEngine,
-        customModalUrl
+        customModalUrl,
+        theme
       }, { merge: true });
       setSuccessMsg("Configuration committed successfully.");
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -120,7 +132,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="bg-white border-2 border-editorial-border p-8 md:p-12 relative overflow-hidden">
+      <div className="bg-white dark:bg-[#121212] border-2 border-editorial-border p-8 md:p-12 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -179,7 +191,7 @@ export default function SettingsPage() {
           </div>
         
           {/* RESTORED PAYLOAD METRICS */}
-          <div className="bg-[#fafafa] p-6 border border-editorial-border flex flex-col justify-center text-center items-center">
+          <div className="bg-[#fafafa] dark:bg-[#1e1e1e] p-6 border border-editorial-border flex flex-col justify-center text-center items-center">
             <div className="w-16 h-16 border-4 border-editorial-border rounded-full flex justify-center items-center mb-6">
               <span className="font-sans font-black text-xl italic">{limits.newsLimit + limits.literatureLimit + limits.grantsLimit}</span>
             </div>
@@ -224,7 +236,7 @@ export default function SettingsPage() {
         {/* PODCAST TTS TIER */}
         <div className="mt-16 pt-10 border-t-2 border-editorial-border-dark">
           <div className="flex items-center gap-3 mb-2">
-            <Cloud className="w-6 h-6 text-[#005587]" />
+            <Cloud className="w-6 h-6 text-[#005587] dark:text-[#60a5fa]" />
             <h2 className="text-2xl font-bold uppercase tracking-widest inline-block pb-1">AI Voice Engine</h2>
           </div>
           <p className="text-sm font-sans text-editorial-muted mt-2 mb-6">
@@ -232,7 +244,7 @@ export default function SettingsPage() {
           </p>
 
           <div className="space-y-4">
-            <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 transition-colors">
+            <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 dark:bg-[#1e1e1e] transition-colors">
               <input 
                 type="radio" 
                 name="ttsEngine" 
@@ -247,8 +259,8 @@ export default function SettingsPage() {
               </div>
             </label>
 
-            <div className={`border border-editorial-border ${isModalLocked ? 'opacity-60 select-none bg-gray-50' : ''}`}>
-              <label className={`flex items-start gap-3 p-4 transition-colors ${isModalLocked ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}>
+            <div className={`border border-editorial-border ${isModalLocked ? 'opacity-60 select-none bg-gray-50 dark:bg-[#1e1e1e]' : ''}`}>
+              <label className={`flex items-start gap-3 p-4 transition-colors ${isModalLocked ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50 dark:bg-[#1e1e1e]'}`}>
                 <input 
                   type="radio" 
                   name="ttsEngine" 
@@ -262,7 +274,7 @@ export default function SettingsPage() {
                   <span className="block font-bold font-sans uppercase tracking-wider text-sm">Fish Speech S2-Pro (Modal)</span>
                   <span className="text-sm font-sans text-editorial-muted mt-1 block">Zero-Shot clones your exact custom Al.mp3 and Matt.mp3 files. Requires linking your own Modal free-tier deployment.</span>
                   {isModalLocked && (
-                    <span className="block mt-3 text-[10px] sm:text-xs font-sans font-bold text-red-600 uppercase tracking-widest border border-red-200 bg-white p-2 text-center rounded-sm">
+                    <span className="block mt-3 text-[10px] sm:text-xs font-sans font-bold text-red-600 uppercase tracking-widest border border-red-200 bg-white dark:bg-[#121212] p-2 text-center rounded-sm">
                       🔒 Locked: Modal Free Credits Exhausted Until Next Month
                     </span>
                   )}
@@ -270,7 +282,7 @@ export default function SettingsPage() {
               </label>
 
               {ttsEngine === 'fish' && (
-                <div className="p-4 bg-gray-50 border-t border-editorial-border">
+                <div className="p-4 bg-gray-50 dark:bg-[#1e1e1e] border-t border-editorial-border">
                   <label className="block font-bold font-sans uppercase tracking-wider text-xs mb-2">Modal Web Endpoint URL</label>
                   <input
                     type="text"
@@ -288,6 +300,51 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* THEME PREFERENCE */}
+        <div className="mt-16 pt-10 border-t-2 border-editorial-border-dark">
+          <div className="flex items-center gap-3 mb-2">
+            <h2 className="text-2xl font-bold uppercase tracking-widest inline-block pb-1">Display Mode</h2>
+          </div>
+          <p className="text-sm font-sans text-editorial-muted mt-2 mb-6">
+            Adjust the color scheme of the EvoScout dashboard.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <label className="flex items-center gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 dark:hover:bg-[#1e1e1e] transition-colors flex-1">
+              <input
+                type="radio"
+                name="theme"
+                value="system"
+                checked={mounted && theme === 'system'}
+                onChange={() => setTheme('system')}
+                className="mt-1 accent-editorial-text w-4 h-4"
+              />
+              <div className="font-bold font-sans uppercase tracking-wider text-sm">System Default</div>
+            </label>
+            <label className="flex items-center gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 dark:hover:bg-[#1e1e1e] transition-colors flex-1">
+              <input
+                type="radio"
+                name="theme"
+                value="light"
+                checked={mounted && theme === 'light'}
+                onChange={() => setTheme('light')}
+                className="mt-1 accent-editorial-text w-4 h-4"
+              />
+              <div className="font-bold font-sans uppercase tracking-wider text-sm">Light Mode</div>
+            </label>
+            <label className="flex items-center gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 dark:hover:bg-[#1e1e1e] transition-colors flex-1">
+              <input
+                type="radio"
+                name="theme"
+                value="dark"
+                checked={mounted && theme === 'dark'}
+                onChange={() => setTheme('dark')}
+                className="mt-1 accent-editorial-text w-4 h-4"
+              />
+              <div className="font-bold font-sans uppercase tracking-wider text-sm">Dark Mode</div>
+            </label>
+          </div>
+        </div>
+
         {/* Submit Button Resituated */}
         <div className="pt-8 mt-12 border-t border-editorial-border">
           <button
@@ -299,7 +356,7 @@ export default function SettingsPage() {
             {saving ? 'Transmitting...' : 'Commit Configuration'}
           </button>
           {successMsg && (
-            <p className="text-center font-sans font-bold text-[#005587] text-sm mt-4 uppercase tracking-widest">
+            <p className="text-center font-sans font-bold text-[#005587] dark:text-[#60a5fa] text-sm mt-4 uppercase tracking-widest">
               {successMsg}
             </p>
           )}
