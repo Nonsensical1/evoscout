@@ -110,6 +110,23 @@ export default function Home() {
       const history = new Set(historyArr);
       let dailyFeed: any = feedSnap.exists() ? feedSnap.data() : { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [], paddingCache: {} };
 
+      // Make sure paddingCache is always materialized back by extracting retroactive chunks from the most recent ledger, preventing mid-day zero-arrays
+      if (!dailyFeed.paddingCache) {
+          const ledgerSnap = await getDocs(query(collection(db, 'users', user.uid, 'ledger'), orderBy('date', 'desc'), firestoreLimit(1)));
+          if (!ledgerSnap.empty) {
+              const lastLedger = ledgerSnap.docs[0].data();
+              dailyFeed.paddingCache = {
+                 news: [...(lastLedger.news || []), ...(lastLedger.paddingCache?.news || [])].slice(0, 40),
+                 literature: [...(lastLedger.literature || []), ...(lastLedger.paddingCache?.literature || [])].slice(0, 40),
+                 grants: [...(lastLedger.grants || []), ...(lastLedger.paddingCache?.grants || [])].slice(0, 40),
+                 openGovGrants: [...(lastLedger.openGovGrants || []), ...(lastLedger.paddingCache?.openGovGrants || [])].slice(0, 40),
+                 positions: [...(lastLedger.positions || []), ...(lastLedger.paddingCache?.positions || [])].slice(0, 40)
+              };
+          } else {
+             dailyFeed.paddingCache = {};
+          }
+      }
+
       // Archive if new day
       let oldFeed: any = null;
       if (dailyFeed.date !== today) {
