@@ -108,17 +108,31 @@ export default function Home() {
       const settings = settingsSnap.exists() ? settingsSnap.data() : { newsLimit: 12, grantsLimit: 12, literatureLimit: 12, positionsLimit: 12, topics: {} };
       const historyArr = historySnap.exists() ? historySnap.data()?.hashes || [] : [];
       const history = new Set(historyArr);
-      let dailyFeed: any = feedSnap.exists() ? feedSnap.data() : { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
+      let dailyFeed: any = feedSnap.exists() ? feedSnap.data() : { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [], paddingCache: {} };
 
       // Archive if new day
       let oldFeed: any = null;
       if (dailyFeed.date !== today) {
         const hasItems = dailyFeed.grants?.length || dailyFeed.news?.length || dailyFeed.literature?.length || dailyFeed.positions?.length;
         if (hasItems) {
-           await addDoc(collection(db, 'users', user.uid, 'ledger'), dailyFeed);
+           const ledgerData = { ...dailyFeed };
+           delete ledgerData.display;
+           delete ledgerData.paddingCache;
+           delete ledgerData.lastScrapeTimestamp;
+           delete ledgerData.quotaFilled;
+           await addDoc(collection(db, 'users', user.uid, 'ledger'), ledgerData);
         }
         oldFeed = JSON.parse(JSON.stringify(dailyFeed));
-        dailyFeed = { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
+        
+        const newPaddingCache = {
+           news: [...(oldFeed.news || []), ...(oldFeed.paddingCache?.news || [])].slice(0, 40),
+           literature: [...(oldFeed.literature || []), ...(oldFeed.paddingCache?.literature || [])].slice(0, 40),
+           grants: [...(oldFeed.grants || []), ...(oldFeed.paddingCache?.grants || [])].slice(0, 40),
+           openGovGrants: [...(oldFeed.openGovGrants || []), ...(oldFeed.paddingCache?.openGovGrants || [])].slice(0, 40),
+           positions: [...(oldFeed.positions || []), ...(oldFeed.paddingCache?.positions || [])].slice(0, 40)
+        };
+
+        dailyFeed = { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [], paddingCache: newPaddingCache };
       }
 
       setActionMessage("Harvesting Global Feeds...");
@@ -182,6 +196,28 @@ export default function Home() {
       // Positions are processed but NOT tracked in 'history.has' backfilling to avoid stale listings.
       // We always refresh positions entirely.
       dailyFeed.positions = liveData.positions ? liveData.positions.slice(0, settings.positionsLimit || 12) : [];
+
+      const populateDisplay = (active: any[], padding: any[], limit: number) => {
+         const out = [...(active || [])];
+         const ids = new Set(out.map(i => i.id));
+         const padSrc = padding || [];
+         for (const p of padSrc) {
+            if (out.length >= limit) break;
+            if (!ids.has(p.id)) {
+               out.push(p);
+               ids.add(p.id);
+            }
+         }
+         return out;
+      };
+
+      dailyFeed.display = {
+         news: populateDisplay(dailyFeed.news, dailyFeed.paddingCache?.news, newsLimit),
+         literature: populateDisplay(dailyFeed.literature, dailyFeed.paddingCache?.literature, litLimit),
+         grants: populateDisplay(dailyFeed.grants, dailyFeed.paddingCache?.grants, grantsLimit),
+         openGovGrants: populateDisplay(dailyFeed.openGovGrants, dailyFeed.paddingCache?.openGovGrants, grantsLimit),
+         positions: populateDisplay(dailyFeed.positions, dailyFeed.paddingCache?.positions, settings.positionsLimit || 12)
+      };
 
       // Always write historyEvents from the aggregate pipeline —
       // even on quota-full days so the sidebar never gets stuck loading.
@@ -254,12 +290,13 @@ export default function Home() {
         
         // Always update UI with current feed data first
         const historyEvents = feed.historyEvents || null;
+        const displayData = feed.display || {};
         setData({
-          grants: feed.grants || [],
-          openGovGrants: feed.openGovGrants || [],
-          news: feed.news || [],
-          literature: feed.literature || [],
-          positions: feed.positions || [],
+          grants: displayData.grants || feed.grants || [],
+          openGovGrants: displayData.openGovGrants || feed.openGovGrants || [],
+          news: displayData.news || feed.news || [],
+          literature: displayData.literature || feed.literature || [],
+          positions: displayData.positions || feed.positions || [],
           podcastUrl: feed.podcastUrl || null,
           podcastScript: feed.podcastScript || null,
           historyEvents
