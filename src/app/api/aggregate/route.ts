@@ -6,6 +6,26 @@ function shuffleArray(array: any[]) {
   return array.sort(() => 0.5 - Math.random());
 }
 
+// Sophisticated Heuristic Weighting
+// Rewards entry-level roles without outright deleting higher-tier academic listings
+function calculateEntryWeight(title: string, desc: string): number {
+    const text = (title + " " + desc).toLowerCase();
+    let score = 0;
+    
+    const entryKeywords = ['intern', 'assistant', 'technician', 'undergrad', 'bachelor', 'fellow', 'recent grad', 'junior', 'entry', 'student'];
+    entryKeywords.forEach(k => {
+        if (text.includes(k)) score += 15;
+    });
+    
+    const seniorKeywords = ['director', 'professor', 'postdoc', 'head', 'principal', 'dean', 'senior', 'sr', 'manager', 'executive', 'lead', 'chair'];
+    seniorKeywords.forEach(k => {
+        if (text.includes(k)) score -= 20;
+    });
+    
+    // Add mild random variance to prevent repetitive static sorting
+    return score + (Math.random() * 5);
+}
+
 const FALLBACK_EVENTS = [
   {
     id: "HIST-1953-XYZ",
@@ -372,8 +392,8 @@ async function fetchLiveData(topicsMap: any = {}) {
                     };
                 });
                 
-                // Retain full array of randomly shuffled Federal Jobs
-                federalJobs = shuffleArray(mappedFederal);
+                // Retain full array of weighted Federal Jobs
+                federalJobs = mappedFederal.sort((a: any, b: any) => calculateEntryWeight(b.title, b.rawText) - calculateEntryWeight(a.title, a.rawText));
             }
         }
     } catch (e) { console.error("USAJobs API Error:", e); }
@@ -415,6 +435,14 @@ async function fetchLiveData(topicsMap: any = {}) {
                 fjItems = fjItems.concat(internshipsData.jobs || internshipsData.data || internshipsData.results || []);
             }
             
+            // B2B Aggregators (like Internships & YC) require heavy secondary domain filters
+            const biologicalRegex = new RegExp(`${searchParam}|biology|genetics|CRISPR|cancer|genomics|proteomics|science|health|eco|bio|medical|pharma|clinical`, 'i');
+            fjItems = fjItems.filter((j: any) => {
+                const titleStr = j.title || "";
+                const descStr = j.description || j.snippet || "";
+                return biologicalRegex.test(titleStr) || biologicalRegex.test(descStr);
+            });
+            
             const mappedRapid = fjItems.map((job: any, i: number) => {
                 return {
                      id: `FJRAPID-${job.id || job.uuid || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
@@ -427,8 +455,8 @@ async function fetchLiveData(topicsMap: any = {}) {
                      rawText: job.description || job.snippet || ""
                 };
             });
-            // Retain full array of randomly shuffled B2B Jobs
-            rapidJobs = shuffleArray(mappedRapid);
+            // Heavily bias the B2B tech/startup jobs toward undergrad levels organically
+            rapidJobs = mappedRapid.sort((a: any, b: any) => calculateEntryWeight(b.title, b.rawText) - calculateEntryWeight(a.title, a.rawText));
         }
     } catch (e) { console.error("RapidAPI FantasticJobs Error:", e); }
 
@@ -477,8 +505,8 @@ async function fetchLiveData(topicsMap: any = {}) {
          } catch (e) { console.error("Jobs RSS Fetch Error:", e); }
     }
     
-    // Shuffle RSS feed results fully
-    rssJobs = shuffleArray(rssJobs);
+    // Sort inherently using identical multi-tiered organic weighting
+    rssJobs = rssJobs.sort((a: any, b: any) => calculateEntryWeight(b.title, b.rawText) - calculateEntryWeight(a.title, a.rawText));
     
     // Evenly distribute pools utilizing a 1:1:1 Round-Robin merge loop
     results.positions = [];
