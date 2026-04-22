@@ -339,7 +339,9 @@ async function fetchLiveData(topicsMap: any = {}) {
       : null;
       
     const searchParam = userTopics && userTopics.length > 0 ? userTopics[0] : "biology";
-    let allJobs: any[] = [];
+    let federalJobs: any[] = [];
+    let rapidJobs: any[] = [];
+    let rssJobs: any[] = [];
 
     // 1. USAJobs API Integration (Federal Jobs)
     try {
@@ -370,8 +372,8 @@ async function fetchLiveData(topicsMap: any = {}) {
                     };
                 });
                 
-                // Shuffle to pull an even distribution of Federal Jobs
-                allJobs = allJobs.concat(shuffleArray(mappedFederal).slice(0, 10));
+                // Retain full array of randomly shuffled Federal Jobs
+                federalJobs = shuffleArray(mappedFederal);
             }
         }
     } catch (e) { console.error("USAJobs API Error:", e); }
@@ -425,8 +427,8 @@ async function fetchLiveData(topicsMap: any = {}) {
                      rawText: job.description || job.snippet || ""
                 };
             });
-            // Shuffle to pull an even distribution
-            allJobs = allJobs.concat(shuffleArray(mappedRapid).slice(0, 10));
+            // Retain full array of randomly shuffled B2B Jobs
+            rapidJobs = shuffleArray(mappedRapid);
         }
     } catch (e) { console.error("RapidAPI FantasticJobs Error:", e); }
 
@@ -471,12 +473,28 @@ async function fetchLiveData(topicsMap: any = {}) {
                      rawText: item.contentSnippet || "" // Retained temporarily for AI extraction
                  };
              });
-             allJobs = allJobs.concat(mapped);
+             rssJobs = rssJobs.concat(mapped);
          } catch (e) { console.error("Jobs RSS Fetch Error:", e); }
     }
     
-    // Select upper bounds of matched jobs, limited efficiently for Gemini
-    results.positions = shuffleArray(allJobs).slice(0, 15);
+    // Shuffle RSS feed results fully
+    rssJobs = shuffleArray(rssJobs);
+    
+    // Evenly distribute pools utilizing a 1:1:1 Round-Robin merge loop
+    results.positions = [];
+    const targetTotal = 30; // Expanded limit
+    
+    while(results.positions.length < targetTotal) {
+        let added = false;
+        if(federalJobs.length > 0) { results.positions.push(federalJobs.shift()); added = true; }
+        if(rapidJobs.length > 0) { results.positions.push(rapidJobs.shift()); added = true; }
+        if(rssJobs.length > 0) { results.positions.push(rssJobs.shift()); added = true; }
+        
+        if(!added) break;
+    }
+    
+    // Final shuffle to randomize the symmetrically weighted list
+    results.positions = shuffleArray(results.positions);
     
     // Inline Gemini Pass for Complex Formatting (Experience Level & Location & True Institution mapping)
     try {
