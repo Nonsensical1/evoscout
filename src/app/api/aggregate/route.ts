@@ -7,17 +7,14 @@ function shuffleArray(array: any[]) {
 }
 
 // Strict Undergraduate Validation
-// Completely destructs any job posting that contains senior markers or fails to include entry markers
+// Rejects any job posting containing senior/advanced markers.
+// Jobs without senior markers pass through and get default "Undergraduate / Entry Level" from Gemini.
 function isStrictUndergrad(title: string, desc: string): boolean {
     const text = (title + " " + desc).toLowerCase();
     
     // Explicitly reject any senior/advanced markers
-    const seniorKeywords = ['director', 'professor', 'postdoc', 'postdoctoral', 'faculty', 'head', 'principal', 'dean', 'senior', 'sr', 'manager', 'executive', 'lead', 'chair', 'phd', 'ph.d', 'chief', 'post-doc', 'president'];
-    if (seniorKeywords.some(k => text.includes(k))) return false;
-    
-    // Explicitly require an entry level marker
-    const entryKeywords = ['intern', 'assistant', 'technician', 'undergrad', 'bachelor', 'fellow', 'recent grad', 'junior', 'entry', 'student'];
-    return entryKeywords.some(k => text.includes(k));
+    const seniorKeywords = ['director', 'professor', 'postdoc', 'postdoctoral', 'faculty', 'head of', 'principal investigator', 'dean', 'senior', 'sr.', 'manager', 'executive', 'lead scientist', 'chair', 'phd', 'ph.d', 'chief', 'post-doc', 'president', 'tenure', 'group leader'];
+    return !seniorKeywords.some(k => text.includes(k));
 }
 
 const FALLBACK_EVENTS = [
