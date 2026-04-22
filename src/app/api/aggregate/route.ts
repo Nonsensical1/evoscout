@@ -6,24 +6,18 @@ function shuffleArray(array: any[]) {
   return array.sort(() => 0.5 - Math.random());
 }
 
-// Sophisticated Heuristic Weighting
-// Rewards entry-level roles without outright deleting higher-tier academic listings
-function calculateEntryWeight(title: string, desc: string): number {
+// Strict Undergraduate Validation
+// Completely destructs any job posting that contains senior markers or fails to include entry markers
+function isStrictUndergrad(title: string, desc: string): boolean {
     const text = (title + " " + desc).toLowerCase();
-    let score = 0;
     
+    // Explicitly reject any senior/advanced markers
+    const seniorKeywords = ['director', 'professor', 'postdoc', 'postdoctoral', 'faculty', 'head', 'principal', 'dean', 'senior', 'sr', 'manager', 'executive', 'lead', 'chair', 'phd', 'ph.d', 'chief', 'post-doc', 'president'];
+    if (seniorKeywords.some(k => text.includes(k))) return false;
+    
+    // Explicitly require an entry level marker
     const entryKeywords = ['intern', 'assistant', 'technician', 'undergrad', 'bachelor', 'fellow', 'recent grad', 'junior', 'entry', 'student'];
-    entryKeywords.forEach(k => {
-        if (text.includes(k)) score += 15;
-    });
-    
-    const seniorKeywords = ['director', 'professor', 'postdoc', 'head', 'principal', 'dean', 'senior', 'sr', 'manager', 'executive', 'lead', 'chair'];
-    seniorKeywords.forEach(k => {
-        if (text.includes(k)) score -= 20;
-    });
-    
-    // Add mild random variance to prevent repetitive static sorting
-    return score + (Math.random() * 5);
+    return entryKeywords.some(k => text.includes(k));
 }
 
 const FALLBACK_EVENTS = [
@@ -392,8 +386,8 @@ async function fetchLiveData(topicsMap: any = {}) {
                     };
                 });
                 
-                // Retain full array of weighted Federal Jobs
-                federalJobs = mappedFederal.sort((a: any, b: any) => calculateEntryWeight(b.title, b.rawText) - calculateEntryWeight(a.title, a.rawText));
+                // Retain filtered array of randomly shuffled Federal Jobs
+                federalJobs = shuffleArray(mappedFederal.filter((j: any) => isStrictUndergrad(j.title, j.rawText)));
             }
         }
     } catch (e) { console.error("USAJobs API Error:", e); }
@@ -456,7 +450,7 @@ async function fetchLiveData(topicsMap: any = {}) {
                 };
             });
             // Heavily bias the B2B tech/startup jobs toward undergrad levels organically
-            rapidJobs = mappedRapid.sort((a: any, b: any) => calculateEntryWeight(b.title, b.rawText) - calculateEntryWeight(a.title, a.rawText));
+            rapidJobs = shuffleArray(mappedRapid.filter((j: any) => isStrictUndergrad(j.title, j.rawText)));
         }
     } catch (e) { console.error("RapidAPI FantasticJobs Error:", e); }
 
@@ -505,8 +499,8 @@ async function fetchLiveData(topicsMap: any = {}) {
          } catch (e) { console.error("Jobs RSS Fetch Error:", e); }
     }
     
-    // Sort inherently using identical multi-tiered organic weighting
-    rssJobs = rssJobs.sort((a: any, b: any) => calculateEntryWeight(b.title, b.rawText) - calculateEntryWeight(a.title, a.rawText));
+    // Hard sort using identical strict destructive filtering
+    rssJobs = shuffleArray(rssJobs.filter((j: any) => isStrictUndergrad(j.title, j.rawText)));
     
     // Evenly distribute pools utilizing a 1:1:1 Round-Robin merge loop
     results.positions = [];
