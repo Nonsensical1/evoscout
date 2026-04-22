@@ -377,31 +377,51 @@ async function fetchLiveData(topicsMap: any = {}) {
     } catch (e) { console.error("USAJobs API Error:", e); }
 
     // 2. Fantastic.jobs Generic API Integration
+    // 2. Fantastic.jobs RapidAPI Gateway (Active ATS & Startup DB)
     try {
         if (process.env.FANTASTIC_JOBS_API_KEY) {
-            const fjRes = await fetch(`https://api.fantastic.jobs/v1/search?query=${encodeURIComponent(searchParam)}&location=US`, {
-                headers: { 'Authorization': `Bearer ${process.env.FANTASTIC_JOBS_API_KEY}`, 'Content-Type': 'application/json' }
-            });
-            if (fjRes.ok) {
-                const fjData = await fjRes.json();
-                const items = fjData.jobs || fjData.results || [];
-                const mappedFj = items.map((job: any, i: number) => {
-                    return {
-                         id: `FJ-${job.id || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
-                         title: job.title || "Specialist",
-                         institution: job.company_name || job.company || "Private Enterprise",
-                         location: 'US',
-                         experienceLevel: 'Undergraduate / Entry Level',
-                         url: job.url || job.job_url || "https://fantastic.jobs",
-                         dateAdded: new Date().toISOString(),
-                         rawText: job.description || job.snippet || ""
-                    };
-                });
-                // Shuffle to pull an even distribution of B2B Jobs
-                allJobs = allJobs.concat(shuffleArray(mappedFj).slice(0, 10));
+            const rapidHeaders = {
+                'Content-Type': 'application/json',
+                'x-rapidapi-key': process.env.FANTASTIC_JOBS_API_KEY
+            };
+            
+            // Parallel execution across their two primary datasets (Active ATS & Startup Internships)
+            const [activeRes, startupRes] = await Promise.allSettled([
+                fetch(`https://active-jobs-db.p.rapidapi.com/active-ats-1h?offset=0&title_filter=%22${encodeURIComponent(searchParam)}%22&description_type=text`, {
+                    headers: { ...rapidHeaders, 'x-rapidapi-host': 'active-jobs-db.p.rapidapi.com' }
+                }),
+                fetch(`https://startup-jobs-api.p.rapidapi.com/active-jb-7d?source=ycombinator`, {
+                    headers: { ...rapidHeaders, 'x-rapidapi-host': 'startup-jobs-api.p.rapidapi.com' }
+                })
+            ]);
+            
+            let fjItems: any[] = [];
+            
+            if (activeRes.status === 'fulfilled' && activeRes.value.ok) {
+                const activeData = await activeRes.value.json();
+                fjItems = fjItems.concat(activeData.jobs || activeData.data || activeData.results || []);
             }
+            if (startupRes.status === 'fulfilled' && startupRes.value.ok) {
+                const startupData = await startupRes.value.json();
+                fjItems = fjItems.concat(startupData.jobs || startupData.data || startupData.results || []);
+            }
+            
+            const mappedRapid = fjItems.map((job: any, i: number) => {
+                return {
+                     id: `FJRAPID-${job.id || job.uuid || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
+                     title: job.title || "Specialist",
+                     institution: job.company_name || job.company || "Private Enterprise",
+                     location: job.location || job.location_name || 'US',
+                     experienceLevel: 'Undergraduate / Entry Level',
+                     url: job.url || job.job_url || "https://fantastic.jobs",
+                     dateAdded: job.posted_at || new Date().toISOString(),
+                     rawText: job.description || job.snippet || ""
+                };
+            });
+            // Shuffle to pull an even distribution
+            allJobs = allJobs.concat(shuffleArray(mappedRapid).slice(0, 10));
         }
-    } catch (e) { console.error("FantasticJobs API Error:", e); }
+    } catch (e) { console.error("RapidAPI FantasticJobs Error:", e); }
 
     const jobFeeds = [
        { url: 'https://jobs.sciencecareers.org/jobsrss/?countrycode=US', flag: 'science' },
