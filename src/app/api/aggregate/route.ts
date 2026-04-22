@@ -6,17 +6,6 @@ function shuffleArray(array: any[]) {
   return array.sort(() => 0.5 - Math.random());
 }
 
-// Strict Undergraduate Validation
-// Rejects any job posting containing senior/advanced markers.
-// Jobs without senior markers pass through and get default "Undergraduate / Entry Level" from Gemini.
-function isStrictUndergrad(title: string, desc: string): boolean {
-    const text = (title + " " + desc).toLowerCase();
-    
-    // Explicitly reject any senior/advanced markers
-    const seniorKeywords = ['director', 'professor', 'postdoc', 'postdoctoral', 'faculty', 'head of', 'principal investigator', 'dean', 'senior', 'sr.', 'manager', 'executive', 'lead scientist', 'chair', 'phd', 'ph.d', 'chief', 'post-doc', 'president', 'tenure', 'group leader'];
-    return !seniorKeywords.some(k => text.includes(k));
-}
-
 const FALLBACK_EVENTS = [
   {
     id: "HIST-1953-XYZ",
@@ -383,8 +372,8 @@ async function fetchLiveData(topicsMap: any = {}) {
                     };
                 });
                 
-                // Retain filtered array of randomly shuffled Federal Jobs
-                federalJobs = shuffleArray(mappedFederal.filter((j: any) => isStrictUndergrad(j.title, j.rawText)));
+                // Retain full array of randomly shuffled Federal Jobs
+                federalJobs = shuffleArray(mappedFederal);
             }
         }
     } catch (e) { console.error("USAJobs API Error:", e); }
@@ -426,14 +415,6 @@ async function fetchLiveData(topicsMap: any = {}) {
                 fjItems = fjItems.concat(internshipsData.jobs || internshipsData.data || internshipsData.results || []);
             }
             
-            // B2B Aggregators (like Internships & YC) require heavy secondary domain filters
-            const biologicalRegex = new RegExp(`${searchParam}|biology|genetics|CRISPR|cancer|genomics|proteomics|science|health|eco|bio|medical|pharma|clinical`, 'i');
-            fjItems = fjItems.filter((j: any) => {
-                const titleStr = j.title || "";
-                const descStr = j.description || j.snippet || "";
-                return biologicalRegex.test(titleStr) || biologicalRegex.test(descStr);
-            });
-            
             const mappedRapid = fjItems.map((job: any, i: number) => {
                 return {
                      id: `FJRAPID-${job.id || job.uuid || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
@@ -446,8 +427,8 @@ async function fetchLiveData(topicsMap: any = {}) {
                      rawText: job.description || job.snippet || ""
                 };
             });
-            // Heavily bias the B2B tech/startup jobs toward undergrad levels organically
-            rapidJobs = shuffleArray(mappedRapid.filter((j: any) => isStrictUndergrad(j.title, j.rawText)));
+            // Retain full array of randomly shuffled B2B Jobs
+            rapidJobs = shuffleArray(mappedRapid);
         }
     } catch (e) { console.error("RapidAPI FantasticJobs Error:", e); }
 
@@ -496,8 +477,8 @@ async function fetchLiveData(topicsMap: any = {}) {
          } catch (e) { console.error("Jobs RSS Fetch Error:", e); }
     }
     
-    // Hard sort using identical strict destructive filtering
-    rssJobs = shuffleArray(rssJobs.filter((j: any) => isStrictUndergrad(j.title, j.rawText)));
+    // Shuffle RSS feed results fully
+    rssJobs = shuffleArray(rssJobs);
     
     // Evenly distribute pools utilizing a 1:1:1 Round-Robin merge loop
     results.positions = [];
