@@ -385,13 +385,16 @@ async function fetchLiveData(topicsMap: any = {}) {
                 'x-rapidapi-key': process.env.FANTASTIC_JOBS_API_KEY
             };
             
-            // Parallel execution across their two primary datasets (Active ATS & Startup Internships)
-            const [activeRes, startupRes] = await Promise.allSettled([
+            // Parallel execution across their three primary datasets (Active ATS, Startup, Internships)
+            const [activeRes, startupRes, internshipsRes] = await Promise.allSettled([
                 fetch(`https://active-jobs-db.p.rapidapi.com/active-ats-1h?offset=0&title_filter=%22${encodeURIComponent(searchParam)}%22&description_type=text`, {
                     headers: { ...rapidHeaders, 'x-rapidapi-host': 'active-jobs-db.p.rapidapi.com' }
                 }),
                 fetch(`https://startup-jobs-api.p.rapidapi.com/active-jb-7d?source=ycombinator`, {
                     headers: { ...rapidHeaders, 'x-rapidapi-host': 'startup-jobs-api.p.rapidapi.com' }
+                }),
+                fetch(`https://internships-api.p.rapidapi.com/active-jb-7d`, {
+                    headers: { ...rapidHeaders, 'x-rapidapi-host': 'internships-api.p.rapidapi.com' }
                 })
             ]);
             
@@ -404,6 +407,10 @@ async function fetchLiveData(topicsMap: any = {}) {
             if (startupRes.status === 'fulfilled' && startupRes.value.ok) {
                 const startupData = await startupRes.value.json();
                 fjItems = fjItems.concat(startupData.jobs || startupData.data || startupData.results || []);
+            }
+            if (internshipsRes.status === 'fulfilled' && internshipsRes.value.ok) {
+                const internshipsData = await internshipsRes.value.json();
+                fjItems = fjItems.concat(internshipsData.jobs || internshipsData.data || internshipsData.results || []);
             }
             
             const mappedRapid = fjItems.map((job: any, i: number) => {
