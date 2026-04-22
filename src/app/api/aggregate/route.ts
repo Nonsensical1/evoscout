@@ -333,16 +333,80 @@ async function fetchLiveData(topicsMap: any = {}) {
   } catch (e) { console.error("Lit Fetch Error:", e); }
 
   try {
-    const jobFeeds = [
-       { url: 'https://jobs.sciencecareers.org/jobsrss/?countrycode=US', flag: 'science' },
-       { url: 'https://www.nature.com/naturecareers/jobsrss/?countrycode=US', flag: 'nature' }
-    ];
-    let allJobs: any[] = [];
-    
     // Utilize the core 'news' topics array for granular career subject filtering, per user request
     const userTopics = topicsMap.news
       ? topicsMap.news.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean)
       : null;
+      
+    const searchParam = userTopics && userTopics.length > 0 ? userTopics[0] : "biology";
+    let allJobs: any[] = [];
+
+    // 1. USAJobs API Integration (Federal Jobs)
+    try {
+        if (process.env.USAJOBS_API_KEY && process.env.USAJOBS_USER_EMAIL) {
+            const usajobsRes = await fetch(`https://data.usajobs.gov/api/search?Keyword=${encodeURIComponent(searchParam)}`, {
+                headers: {
+                    'Host': 'data.usajobs.gov',
+                    'User-Agent': process.env.USAJOBS_USER_EMAIL,
+                    'Authorization-Key': process.env.USAJOBS_API_KEY
+                }
+            });
+            if (usajobsRes.ok) {
+                const usajobsData = await usajobsRes.json();
+                const items = usajobsData.SearchResult?.SearchResultItems || [];
+                const mappedFederal = items.map((item: any, i: number) => {
+                    const pos = item.MatchedObjectId || "";
+                    const title = item.MatchedObjectDescriptor?.PositionTitle || "Federal Position";
+                    const institution = item.MatchedObjectDescriptor?.OrganizationName || "US Federal Government";
+                    return {
+                         id: `USAJ-${pos || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
+                         title: title,
+                         institution: institution,
+                         location: 'US',
+                         experienceLevel: 'Undergraduate / Entry Level', // Handled by Gemini later
+                         url: item.MatchedObjectDescriptor?.PositionURI || "https://usajobs.gov",
+                         dateAdded: new Date().toISOString(),
+                         rawText: `${institution} - ${title}. Requirements: ${item.MatchedObjectDescriptor?.UserArea?.Details?.JobSummary || ""}`
+                    };
+                });
+                
+                // Shuffle to pull an even distribution of Federal Jobs
+                allJobs = allJobs.concat(shuffleArray(mappedFederal).slice(0, 10));
+            }
+        }
+    } catch (e) { console.error("USAJobs API Error:", e); }
+
+    // 2. Fantastic.jobs Generic API Integration
+    try {
+        if (process.env.FANTASTIC_JOBS_API_KEY) {
+            const fjRes = await fetch(`https://api.fantastic.jobs/v1/search?query=${encodeURIComponent(searchParam)}&location=US`, {
+                headers: { 'Authorization': `Bearer ${process.env.FANTASTIC_JOBS_API_KEY}`, 'Content-Type': 'application/json' }
+            });
+            if (fjRes.ok) {
+                const fjData = await fjRes.json();
+                const items = fjData.jobs || fjData.results || [];
+                const mappedFj = items.map((job: any, i: number) => {
+                    return {
+                         id: `FJ-${job.id || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
+                         title: job.title || "Specialist",
+                         institution: job.company_name || job.company || "Private Enterprise",
+                         location: 'US',
+                         experienceLevel: 'Undergraduate / Entry Level',
+                         url: job.url || job.job_url || "https://fantastic.jobs",
+                         dateAdded: new Date().toISOString(),
+                         rawText: job.description || job.snippet || ""
+                    };
+                });
+                // Shuffle to pull an even distribution of B2B Jobs
+                allJobs = allJobs.concat(shuffleArray(mappedFj).slice(0, 10));
+            }
+        }
+    } catch (e) { console.error("FantasticJobs API Error:", e); }
+
+    const jobFeeds = [
+       { url: 'https://jobs.sciencecareers.org/jobsrss/?countrycode=US', flag: 'science' },
+       { url: 'https://www.nature.com/naturecareers/jobsrss/?countrycode=US', flag: 'nature' }
+    ];
 
     for (const feedConfig of jobFeeds) {
          try {
