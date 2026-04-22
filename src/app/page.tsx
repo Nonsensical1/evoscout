@@ -233,7 +233,7 @@ export default function Home() {
          literature: populateDisplay(dailyFeed.literature, dailyFeed.paddingCache?.literature, litLimit),
          grants: populateDisplay(dailyFeed.grants, dailyFeed.paddingCache?.grants, grantsLimit),
          openGovGrants: populateDisplay(dailyFeed.openGovGrants, dailyFeed.paddingCache?.openGovGrants, grantsLimit),
-         positions: populateDisplay(dailyFeed.positions, dailyFeed.paddingCache?.positions, settings.positionsLimit || 12)
+         positions: dailyFeed.positions || []  // Positions are always fully refreshed from API — never backfill from stale cache
       };
 
       // Always write historyEvents from the aggregate pipeline —
