@@ -216,7 +216,7 @@ async function fetchLiveData(topicsMap: any = {}) {
       { url: 'https://www.cell.com/cell/inpress.rss', source: 'Cell Press' }
     ];
     let allNews: any[] = [];
-    const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|pathology|zoology";
+    const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|DNA|pathology|zoology";
     const biologicalTerms = new RegExp(newsTermsSafe, 'i');
     let newsLookbackHours = 48; // Rolling 48-hour window (captures everything published 'yesterday' and 'today' globally)
     const dayOfWeek = new Date().getDay(); // 0 is Sunday, 1 is Monday ... 6 is Saturday
