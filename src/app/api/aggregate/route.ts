@@ -339,6 +339,11 @@ async function fetchLiveData(topicsMap: any = {}) {
       : null;
       
     const searchParam = userTopics && userTopics.length > 0 ? userTopics[0] : "biology";
+    
+    // Create a strict regex for career relevance (same as news/literature)
+    const careerTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|DNA|pathology|zoology|microbiology|molecular|biotech";
+    const biologicalCareerTerms = new RegExp(careerTermsSafe, 'i');
+
     let federalJobs: any[] = [];
     let rapidJobs: any[] = [];
     let rssJobs: any[] = [];
@@ -373,9 +378,16 @@ async function fetchLiveData(topicsMap: any = {}) {
       'co-op', 'coop', 'fellowship', 'rotational'
     ];
 
-    /** Returns true if a job should be KEPT (i.e. is NOT a senior-level position). */
-    const passesEntryLevelFilter = (title: string, rawText: string): boolean => {
+    /** Returns true if a job should be KEPT (i.e. is NOT a senior-level position AND is relevant to topics). */
+    const isValidJob = (title: string, rawText: string): boolean => {
       const titleLower = title.toLowerCase();
+      
+      // Hard reject: generic non-science roles that might slip through search queries
+      const NON_SCIENCE_ROLES = ['police', 'firefighter', 'publisher', 'sales', 'marketing', 'accountant', 'hr ', 'human resources', 'recruiter', 'driver', 'custodian', 'security', 'law enforcement'];
+      for (const non of NON_SCIENCE_ROLES) {
+        if (titleLower.includes(non)) return false;
+      }
+
       // Hard reject: any negative keyword in the title alone is an immediate disqualify
       for (const neg of NEGATIVE_TITLE_KEYWORDS) {
         if (titleLower.includes(neg)) return false;
@@ -383,6 +395,11 @@ async function fetchLiveData(topicsMap: any = {}) {
       // Soft reject: senior-level signals in description body
       const seniorDescPatterns = /\b(10\+|8\+|7\+|6\+|5\+)\s*years?\b|\bsenior\b|\bpostdoc|\bph\.?d\s*(required|preferred|only)|\bmanag(e|ing)\s+(a\s+)?team/i;
       if (seniorDescPatterns.test(rawText)) return false;
+      
+      // Strict Relevance Filter: Must match at least one biological/news topic in title or description
+      const fullText = `${title} ${rawText}`;
+      if (!biologicalCareerTerms.test(fullText)) return false;
+      
       return true;
     };
 
@@ -563,9 +580,9 @@ async function fetchLiveData(topicsMap: any = {}) {
     // ──────────────────────────────────────────────────────────────────────
     // PRE-MERGE ENTRY-LEVEL FILTER — strip senior/PhD/postdoc from ALL pools
     // ──────────────────────────────────────────────────────────────────────
-    federalJobs = boostEntryLevel(shuffleArray(usajobsRaw.filter((j: any) => passesEntryLevelFilter(j.title, j.rawText))));
-    rapidJobs   = boostEntryLevel(shuffleArray(rapidRaw.filter((j: any) => passesEntryLevelFilter(j.title, j.rawText))));
-    rssJobs     = boostEntryLevel(shuffleArray(rssRaw.filter((j: any) => passesEntryLevelFilter(j.title, j.rawText))));
+    federalJobs = boostEntryLevel(shuffleArray(usajobsRaw.filter((j: any) => isValidJob(j.title, j.rawText))));
+    rapidJobs   = boostEntryLevel(shuffleArray(rapidRaw.filter((j: any) => isValidJob(j.title, j.rawText))));
+    rssJobs     = boostEntryLevel(shuffleArray(rssRaw.filter((j: any) => isValidJob(j.title, j.rawText))));
 
     console.log(`[Careers] Source breakdown — Federal: ${usajobsRaw.length} raw → ${federalJobs.length} filtered | RapidAPI: ${rapidRaw.length} raw → ${rapidJobs.length} filtered | RSS: ${rssRaw.length} raw → ${rssJobs.length} filtered`);
     console.log(`[Careers] Post-filter counts — Federal: ${federalJobs.length}, RapidAPI(6): ${rapidJobs.length}, RSS: ${rssJobs.length}`);
