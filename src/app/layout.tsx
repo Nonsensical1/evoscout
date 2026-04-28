@@ -50,8 +50,16 @@ export default function RootLayout({
             {children}
           </main>
 
-          <footer className="text-center py-10 font-sans text-xs text-editorial-muted uppercase tracking-widest border-t border-editorial-border-dark bg-editorial-paper">
-            © {new Date().getFullYear()} The EvoScout Company. All Rights Reserved.
+          <footer className="text-center py-10 font-sans text-xs text-editorial-muted uppercase tracking-widest border-t border-editorial-border-dark bg-editorial-paper flex flex-col items-center gap-4">
+            <p>
+              © {new Date().getFullYear()} The EvoScout Company. All Rights Reserved.
+            </p>
+            <div className="flex flex-col items-center gap-2 normal-case tracking-normal opacity-80">
+              <span className="text-[11px]">Made with ❤️</span>
+              <a href="mailto:elijahryal@outlook.com" className="text-[11px] font-bold hover:text-editorial-text transition-colors border border-editorial-border px-3 py-1.5 rounded-full hover:bg-gray-50 dark:hover:bg-[#1a1a1a] flex items-center gap-2">
+                <span>☕</span> Buy me a coffee
+              </a>
+            </div>
           </footer>
         </AppProviders>
       </body>
