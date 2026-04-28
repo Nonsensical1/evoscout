@@ -417,6 +417,11 @@ def main():
         except Exception:
             user_settings = {}
             
+        podcast_enabled = user_settings.get('podcastEnabled', False)
+        if not podcast_enabled:
+            print(f"Skipping {user.id} - Podcast disabled in settings.")
+            continue
+            
         tts_engine = user_settings.get('ttsEngine', 'kokoro').lower()  # normalize FISH/Fish/fish -> fish
         
         try:

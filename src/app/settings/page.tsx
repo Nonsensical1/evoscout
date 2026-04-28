@@ -24,6 +24,7 @@ export default function SettingsPage() {
   const [ttsEngine, setTtsEngine] = useState('kokoro');
   const [customModalUrl, setCustomModalUrl] = useState('');
   const [modalQuotaExceededMonth, setModalQuotaExceededMonth] = useState<number | null>(null);
+  const [podcastEnabled, setPodcastEnabled] = useState(false);
 
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -64,6 +65,9 @@ export default function SettingsPage() {
           if (snap.data().theme) {
             setTheme(snap.data().theme);
           }
+          if (snap.data().podcastEnabled !== undefined) {
+            setPodcastEnabled(snap.data().podcastEnabled);
+          }
         }
       } catch (e) {
         console.error("Error loading settings", e);
@@ -83,7 +87,8 @@ export default function SettingsPage() {
         topics,
         ttsEngine,
         customModalUrl,
-        theme
+        theme,
+        podcastEnabled
       }, { merge: true });
       setSuccessMsg("Configuration committed successfully.");
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -235,69 +240,81 @@ export default function SettingsPage() {
         
         {/* PODCAST TTS TIER */}
         <div className="mt-16 pt-10 border-t-2 border-editorial-border-dark">
-          <div className="flex items-center gap-3 mb-2">
-            <Cloud className="w-6 h-6 text-[#005587] dark:text-[#60a5fa]" />
-            <h2 className="text-2xl font-bold uppercase tracking-widest inline-block pb-1">AI Voice Engine</h2>
-          </div>
-          <p className="text-sm font-sans text-editorial-muted mt-2 mb-6">
-            Select the core technology used to synthesize your podcast hosts. 
-          </p>
-
-          <div className="space-y-4">
-            <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 dark:hover:bg-[#262626] transition-colors">
-              <input 
-                type="radio" 
-                name="ttsEngine" 
-                value="kokoro" 
-                checked={ttsEngine === 'kokoro'} 
-                onChange={(e) => setTtsEngine(e.target.value)}
-                className="mt-1 accent-editorial-text w-4 h-4"
-              />
-              <div>
-                <span className="block font-bold font-sans uppercase tracking-wider text-sm">Kokoro TTS (Default)</span>
-                <span className="text-sm font-sans text-editorial-muted mt-1 block">100% Free, Unlimited duration. Uses ultra-realistic built-in studio broadcast voices (am_michael & am_adam).</span>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <Cloud className="w-6 h-6 text-[#005587] dark:text-[#60a5fa]" />
+                <h2 className="text-2xl font-bold uppercase tracking-widest inline-block pb-1">AI Voice Engine</h2>
               </div>
+              <p className="text-sm font-sans text-editorial-muted mt-2">
+                Enable and configure the daily AI podcast synthesis. (Disabled by default).
+              </p>
+            </div>
+            
+            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+              <input type="checkbox" className="sr-only peer" checked={podcastEnabled} onChange={(e) => setPodcastEnabled(e.target.checked)} />
+              <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none dark:bg-[#333] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-[#005587] dark:peer-checked:bg-[#2563eb]"></div>
+              <span className="ml-3 text-sm font-bold font-sans uppercase tracking-wider text-editorial-text">{podcastEnabled ? 'Enabled' : 'Disabled'}</span>
             </label>
+          </div>
 
-            <div className={`border border-editorial-border ${isModalLocked ? 'opacity-60 select-none bg-gray-50 dark:bg-[#1e1e1e]' : ''}`}>
-              <label className={`flex items-start gap-3 p-4 transition-colors ${isModalLocked ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-[#262626]'}`}>
+          {podcastEnabled && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <label className="flex items-start gap-3 p-4 border border-editorial-border cursor-pointer hover:bg-gray-50 dark:hover:bg-[#262626] transition-colors">
                 <input 
                   type="radio" 
                   name="ttsEngine" 
-                  value="fish" 
-                  checked={ttsEngine === 'fish'} 
+                  value="kokoro" 
+                  checked={ttsEngine === 'kokoro'} 
                   onChange={(e) => setTtsEngine(e.target.value)}
-                  disabled={isModalLocked}
-                  className="mt-1 accent-editorial-text w-4 h-4 disabled:bg-gray-300"
+                  className="mt-1 accent-editorial-text w-4 h-4"
                 />
                 <div>
-                  <span className="block font-bold font-sans uppercase tracking-wider text-sm">Fish Speech S2-Pro (Modal)</span>
-                  <span className="text-sm font-sans text-editorial-muted mt-1 block">Zero-Shot clones your exact custom Al.mp3 and Matt.mp3 files. Requires linking your own Modal free-tier deployment.</span>
-                  {isModalLocked && (
-                    <span className="block mt-3 text-[10px] sm:text-xs font-sans font-bold text-red-600 uppercase tracking-widest border border-red-200 bg-white dark:bg-[#121212] p-2 text-center rounded-sm">
-                      🔒 Locked: Modal Free Credits Exhausted Until Next Month
-                    </span>
-                  )}
+                  <span className="block font-bold font-sans uppercase tracking-wider text-sm">Kokoro TTS (Default)</span>
+                  <span className="text-sm font-sans text-editorial-muted mt-1 block">100% Free, Unlimited duration. Uses ultra-realistic built-in studio broadcast voices (am_michael & am_adam).</span>
                 </div>
               </label>
 
-              {ttsEngine === 'fish' && (
-                <div className="p-4 bg-gray-50 dark:bg-[#1e1e1e] border-t border-editorial-border">
-                  <label className="block font-bold font-sans uppercase tracking-wider text-xs mb-2">Modal Web Endpoint URL</label>
-                  <input
-                    type="text"
-                    value={customModalUrl}
-                    onChange={(e) => setCustomModalUrl(e.target.value)}
-                    placeholder="https://your-workspace--fish-speech-app.modal.run"
-                    className="w-full p-2 border border-editorial-border font-sans text-sm focus:outline-editorial-text"
+              <div className={`border border-editorial-border ${isModalLocked ? 'opacity-60 select-none bg-gray-50 dark:bg-[#1e1e1e]' : ''}`}>
+                <label className={`flex items-start gap-3 p-4 transition-colors ${isModalLocked ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-[#262626]'}`}>
+                  <input 
+                    type="radio" 
+                    name="ttsEngine" 
+                    value="fish" 
+                    checked={ttsEngine === 'fish'} 
+                    onChange={(e) => setTtsEngine(e.target.value)}
+                    disabled={isModalLocked}
+                    className="mt-1 accent-editorial-text w-4 h-4 disabled:bg-gray-300"
                   />
-                  <p className="text-xs font-sans text-editorial-muted mt-2">
-                    Must route directly to your deployed <code>@modal.asgi_app()</code>. Example format above.
-                  </p>
-                </div>
-              )}
+                  <div>
+                    <span className="block font-bold font-sans uppercase tracking-wider text-sm">Fish Speech S2-Pro (Modal)</span>
+                    <span className="text-sm font-sans text-editorial-muted mt-1 block">Zero-Shot clones your exact custom Al.mp3 and Matt.mp3 files. Requires linking your own Modal free-tier deployment.</span>
+                    {isModalLocked && (
+                      <span className="block mt-3 text-[10px] sm:text-xs font-sans font-bold text-red-600 uppercase tracking-widest border border-red-200 bg-white dark:bg-[#121212] p-2 text-center rounded-sm">
+                        🔒 Locked: Modal Free Credits Exhausted Until Next Month
+                      </span>
+                    )}
+                  </div>
+                </label>
+
+                {ttsEngine === 'fish' && (
+                  <div className="p-4 bg-gray-50 dark:bg-[#1e1e1e] border-t border-editorial-border">
+                    <label className="block font-bold font-sans uppercase tracking-wider text-xs mb-2">Modal Web Endpoint URL</label>
+                    <input
+                      type="text"
+                      value={customModalUrl}
+                      onChange={(e) => setCustomModalUrl(e.target.value)}
+                      placeholder="https://your-workspace--fish-speech-app.modal.run"
+                      className="w-full p-2 border border-editorial-border font-sans text-sm focus:outline-editorial-text"
+                    />
+                    <p className="text-xs font-sans text-editorial-muted mt-2">
+                      Must route directly to your deployed <code>@modal.asgi_app()</code>. Example format above.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* THEME PREFERENCE */}

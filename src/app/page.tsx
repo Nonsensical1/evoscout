@@ -8,7 +8,7 @@ import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc, query,
 
 export default function Home() {
   const { user } = useAuth();
-  const [data, setData] = useState<any>({ grants: [], openGovGrants: [], news: [], literature: [], positions: [], podcastUrl: null, podcastScript: null, historyEvents: null });
+  const [data, setData] = useState<any>({ grants: [], openGovGrants: [], news: [], literature: [], positions: [], podcastUrl: null, podcastScript: null, historyEvents: null, podcastEnabled: false });
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
   const [quotaNotice, setQuotaNotice] = useState<string | null>(null);
@@ -308,7 +308,8 @@ export default function Home() {
         // Always update UI with current feed data first
         const historyEvents = feed.historyEvents || null;
         const displayData = feed.display || {};
-        setData({
+        setData((prev: any) => ({
+          ...prev,
           grants: displayData.grants || feed.grants || [],
           openGovGrants: displayData.openGovGrants || feed.openGovGrants || [],
           news: displayData.news || feed.news || [],
@@ -317,7 +318,7 @@ export default function Home() {
           podcastUrl: feed.podcastUrl || null,
           podcastScript: feed.podcastScript || null,
           historyEvents
-        });
+        }));
         setLoading(false);
 
         // If the feed has no history events, fetch them on-demand right now
@@ -368,7 +369,18 @@ export default function Home() {
       }
     });
 
-    return () => unsub();
+    const unsubSettings = onSnapshot(doc(db, 'users', user.uid, 'settings', 'config'), (docSnap) => {
+      if (docSnap.exists()) {
+        setData((prev: any) => ({ ...prev, podcastEnabled: docSnap.data().podcastEnabled || false }));
+      } else {
+        setData((prev: any) => ({ ...prev, podcastEnabled: false }));
+      }
+    });
+
+    return () => {
+      unsub();
+      unsubSettings();
+    };
   }, [user, handleRunScraper, fetchAndSaveHistoryEvents, SCRAPE_COOLDOWN_MS]);
 
 
@@ -404,7 +416,7 @@ export default function Home() {
       </section>
 
       {/* Podcast Audio Player */}
-      {(data.podcastUrl || (data.news && data.news.length > 0)) && (
+      {data.podcastEnabled && (data.podcastUrl || (data.news && data.news.length > 0)) && (
         <section className="mb-12 bg-white dark:bg-[#121212] border border-editorial-border p-8 shadow-[8px_8px_0px_#f0f0f0] dark:shadow-[8px_8px_0px_#111111] relative overflow-hidden transition-all duration-500">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-[#005587] dark:bg-[#2563eb]"></div>
           
