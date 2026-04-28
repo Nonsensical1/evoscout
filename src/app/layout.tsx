@@ -54,10 +54,10 @@ export default function RootLayout({
             <p>
               © {new Date().getFullYear()} The EvoScout Company. All Rights Reserved.
             </p>
-            <div className="flex flex-col items-center gap-2 normal-case tracking-normal opacity-80">
-              <span className="text-[11px]">Made with ❤️</span>
-              <a href="mailto:elijahryal@outlook.com" className="text-[11px] font-bold hover:text-editorial-text transition-colors border border-editorial-border px-3 py-1.5 rounded-full hover:bg-gray-50 dark:hover:bg-[#1a1a1a] flex items-center gap-2">
-                <span>☕</span> Buy me a coffee
+            <div className="flex flex-col items-center gap-3 normal-case tracking-normal opacity-90 mt-2">
+              <span className="text-sm">Made with ❤️</span>
+              <a href="mailto:elijahryal@outlook.com" className="text-sm font-bold hover:text-editorial-text transition-colors border border-editorial-border px-4 py-2 rounded-full hover:bg-gray-50 dark:hover:bg-[#1a1a1a] flex items-center gap-2 shadow-sm">
+                <span className="text-base">☕</span> Buy me a coffee
               </a>
             </div>
           </footer>
