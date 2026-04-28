@@ -343,8 +343,63 @@ async function fetchLiveData(topicsMap: any = {}) {
     let rapidJobs: any[] = [];
     let rssJobs: any[] = [];
 
-    // 1. USAJobs API Integration (Federal Jobs)
-    try {
+    // ──────────────────────────────────────────────────────────────────────
+    // AGGRESSIVE EXPERIENCE-LEVEL FILTER — applied to ALL pools pre-merge
+    // ──────────────────────────────────────────────────────────────────────
+    const NEGATIVE_TITLE_KEYWORDS = [
+      'senior', 'sr.', 'sr ', 'principal', 'staff', 'lead', 'director',
+      'manager', 'vp ', 'vice president', 'chief', 'head of',
+      'postdoc', 'post-doc', 'postdoctoral', 'post-doctoral',
+      'phd', 'ph.d', 'doctorate', 'doctoral',
+      'professor', 'assistant professor', 'associate professor', 'lecturer',
+      'tenure', 'tenured', 'faculty', 'chair',
+      'executive', 'architect', 'distinguished', 'emeritus',
+      '10+ years', '8+ years', '7+ years', '5+ years',
+      'experienced', 'mid-senior',
+      'head ', 'dean', 'provost',
+      ' ii', ' iii', ' iv',
+      'specialist ii', 'specialist iii',
+      'scientist ii', 'scientist iii', 'engineer ii', 'engineer iii',
+      'established investigator', 'group leader',
+      'attending', 'physician',
+      'research fellow', 'postdoctoral fellow'
+    ];
+    const POSITIVE_TITLE_KEYWORDS = [
+      'intern', 'internship', 'entry level', 'entry-level',
+      'junior', 'jr.', 'jr ', 'associate', 'trainee', 'apprentice',
+      'undergraduate', 'undergrad', 'student',
+      'assistant', 'coordinator', 'analyst', 'technician',
+      'new grad', 'recent graduate', 'early career',
+      'co-op', 'coop', 'fellowship', 'rotational'
+    ];
+
+    /** Returns true if a job should be KEPT (i.e. is NOT a senior-level position). */
+    const passesEntryLevelFilter = (title: string, rawText: string): boolean => {
+      const titleLower = title.toLowerCase();
+      // Hard reject: any negative keyword in the title alone is an immediate disqualify
+      for (const neg of NEGATIVE_TITLE_KEYWORDS) {
+        if (titleLower.includes(neg)) return false;
+      }
+      // Soft reject: senior-level signals in description body
+      const seniorDescPatterns = /\b(10\+|8\+|7\+|6\+|5\+)\s*years?\b|\bsenior\b|\bpostdoc|\bph\.?d\s*(required|preferred|only)|\bmanag(e|ing)\s+(a\s+)?team/i;
+      if (seniorDescPatterns.test(rawText)) return false;
+      return true;
+    };
+
+    /** Sorts jobs so those with positive entry-level signals appear first. */
+    const boostEntryLevel = (jobs: any[]) => {
+      return [...jobs].sort((a, b) => {
+        const aHit = POSITIVE_TITLE_KEYWORDS.some(kw => (a.title || '').toLowerCase().includes(kw)) ? 0 : 1;
+        const bHit = POSITIVE_TITLE_KEYWORDS.some(kw => (b.title || '').toLowerCase().includes(kw)) ? 0 : 1;
+        return aHit - bHit;
+      });
+    };
+
+    // ──────────────────────────────────────────────────────────────────────
+    // RUN ALL 3 SOURCE GROUPS IN PARALLEL (USAJobs + 6x RapidAPI + RSS)
+    // ──────────────────────────────────────────────────────────────────────
+    const usajobsPromise = (async () => {
+      try {
         if (process.env.USAJOBS_API_KEY && process.env.USAJOBS_USER_EMAIL) {
             const usajobsRes = await fetch(`https://data.usajobs.gov/api/search?Keyword=${encodeURIComponent(searchParam)}`, {
                 headers: {
@@ -356,7 +411,7 @@ async function fetchLiveData(topicsMap: any = {}) {
             if (usajobsRes.ok) {
                 const usajobsData = await usajobsRes.json();
                 const items = usajobsData.SearchResult?.SearchResultItems || [];
-                const mappedFederal = items.map((item: any, i: number) => {
+                return items.map((item: any, i: number) => {
                     const pos = item.MatchedObjectId || "";
                     const title = item.MatchedObjectDescriptor?.PositionTitle || "Federal Position";
                     const institution = item.MatchedObjectDescriptor?.OrganizationName || "US Federal Government";
@@ -365,143 +420,212 @@ async function fetchLiveData(topicsMap: any = {}) {
                          title: title,
                          institution: institution,
                          location: 'US',
-                         experienceLevel: 'Undergraduate / Entry Level', // Handled by Gemini later
+                         experienceLevel: 'Undergraduate / Entry Level',
                          url: item.MatchedObjectDescriptor?.PositionURI || "https://usajobs.gov",
                          dateAdded: new Date().toISOString(),
                          rawText: `${institution} - ${title}. Requirements: ${item.MatchedObjectDescriptor?.UserArea?.Details?.JobSummary || ""}`
                     };
                 });
-                
-                // Retain full array of randomly shuffled Federal Jobs
-                federalJobs = shuffleArray(mappedFederal);
             }
         }
-    } catch (e) { console.error("USAJobs API Error:", e); }
+        return [];
+      } catch (e) { console.error("USAJobs API Error:", e); return []; }
+    })();
 
-    // 2. Fantastic.jobs Generic API Integration
-    // 2. Fantastic.jobs RapidAPI Gateway (Active ATS & Startup DB)
-    try {
-        if (process.env.FANTASTIC_JOBS_API_KEY) {
-            const rapidHeaders = {
-                'Content-Type': 'application/json',
-                'x-rapidapi-key': process.env.FANTASTIC_JOBS_API_KEY
-            };
-            
-            // Parallel execution across their three primary datasets (Active ATS, Startup, Internships)
-            const [activeRes, startupRes, internshipsRes] = await Promise.allSettled([
-                fetch(`https://active-jobs-db.p.rapidapi.com/active-ats-1h?offset=0&title_filter=%22${encodeURIComponent(searchParam)}%22&description_type=text`, {
-                    headers: { ...rapidHeaders, 'x-rapidapi-host': 'active-jobs-db.p.rapidapi.com' }
-                }),
-                fetch(`https://startup-jobs-api.p.rapidapi.com/active-jb-7d?source=ycombinator`, {
-                    headers: { ...rapidHeaders, 'x-rapidapi-host': 'startup-jobs-api.p.rapidapi.com' }
-                }),
-                fetch(`https://internships-api.p.rapidapi.com/active-jb-7d`, {
-                    headers: { ...rapidHeaders, 'x-rapidapi-host': 'internships-api.p.rapidapi.com' }
-                })
-            ]);
-            
-            let fjItems: any[] = [];
-            
-            if (activeRes.status === 'fulfilled' && activeRes.value.ok) {
-                const activeData = await activeRes.value.json();
-                fjItems = fjItems.concat(activeData.jobs || activeData.data || activeData.results || []);
-            }
-            if (startupRes.status === 'fulfilled' && startupRes.value.ok) {
-                const startupData = await startupRes.value.json();
-                fjItems = fjItems.concat(startupData.jobs || startupData.data || startupData.results || []);
-            }
-            if (internshipsRes.status === 'fulfilled' && internshipsRes.value.ok) {
-                const internshipsData = await internshipsRes.value.json();
-                fjItems = fjItems.concat(internshipsData.jobs || internshipsData.data || internshipsData.results || []);
-            }
-            
-            const mappedRapid = fjItems.map((job: any, i: number) => {
-                return {
-                     id: `FJRAPID-${job.id || job.uuid || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
-                     title: job.title || "Specialist",
-                     institution: job.company_name || job.company || "Private Enterprise",
-                     location: job.location || job.location_name || 'US',
-                     experienceLevel: 'Undergraduate / Entry Level',
-                     url: job.url || job.job_url || "https://fantastic.jobs",
-                     dateAdded: job.posted_at || new Date().toISOString(),
-                     rawText: job.description || job.snippet || ""
-                };
-            });
-            // Retain full array of randomly shuffled B2B Jobs
-            rapidJobs = shuffleArray(mappedRapid);
+    const rapidApiPromise = (async () => {
+      try {
+        if (!process.env.FANTASTIC_JOBS_API_KEY) {
+          console.warn('[FantasticJobs] ⚠ FANTASTIC_JOBS_API_KEY is not set — skipping all 6 RapidAPI endpoints. Careers will only use USAJobs + RSS feeds.');
+          return [];
         }
-    } catch (e) { console.error("RapidAPI FantasticJobs Error:", e); }
+        const rapidHeaders = {
+            'Content-Type': 'application/json',
+            'x-rapidapi-key': process.env.FANTASTIC_JOBS_API_KEY
+        };
+        
+        // All 6 Fantastic.jobs endpoints fire simultaneously
+        const [activeRes, startupRes, internshipsRes, ycombinatorRes, workdayRes, jobPostingsRes] = await Promise.allSettled([
+            fetch(`https://active-jobs-db.p.rapidapi.com/active-ats-1h?offset=0&include_ai=true&title_filter=%22${encodeURIComponent(searchParam)}%22&location_filter=%22United%20States%22%20OR%20%22United%20Kingdom%22&description_type=text`, {
+                headers: { ...rapidHeaders, 'x-rapidapi-host': 'active-jobs-db.p.rapidapi.com' }
+            }),
+            fetch(`https://startup-jobs-api.p.rapidapi.com/active-jb-7d?source=ycombinator`, {
+                headers: { ...rapidHeaders, 'x-rapidapi-host': 'startup-jobs-api.p.rapidapi.com' }
+            }),
+            fetch(`https://internships-api.p.rapidapi.com/active-jb-7d`, {
+                headers: { ...rapidHeaders, 'x-rapidapi-host': 'internships-api.p.rapidapi.com' }
+            }),
+            fetch(`https://free-y-combinator-jobs-api.p.rapidapi.com/active-jb-7d`, {
+                headers: { ...rapidHeaders, 'x-rapidapi-host': 'free-y-combinator-jobs-api.p.rapidapi.com' }
+            }),
+            fetch(`https://workday-jobs-api.p.rapidapi.com/active-ats-24h?include_ai=true&title_filter=%22${encodeURIComponent(searchParam)}%22&location_filter=%22United%20States%22`, {
+                headers: { ...rapidHeaders, 'x-rapidapi-host': 'workday-jobs-api.p.rapidapi.com' }
+            }),
+            fetch(`https://job-posting-feed-api.p.rapidapi.com/active-ats-6m?include_ai=true&description_type=text`, {
+                headers: { ...rapidHeaders, 'x-rapidapi-host': 'job-posting-feed-api.p.rapidapi.com' }
+            })
+        ]);
+        
+        const extractJobs = (data: any): any[] => {
+            if (Array.isArray(data)) return data;
+            return data.jobs || data.data || data.results || [];
+        };
+        
+        let fjItems: any[] = [];
+        const apiResults = [
+            { res: activeRes, label: 'Active Jobs DB' },
+            { res: startupRes, label: 'Startup Jobs' },
+            { res: internshipsRes, label: 'Internships' },
+            { res: ycombinatorRes, label: 'YC Free Jobs' },
+            { res: workdayRes, label: 'Workday Jobs' },
+            { res: jobPostingsRes, label: 'Job Postings Feed' }
+        ];
+        
+        for (const { res, label } of apiResults) {
+            try {
+                if (res.status === 'fulfilled' && res.value.ok) {
+                    const body = await res.value.json();
+                    const items = extractJobs(body);
+                    console.log(`[FantasticJobs] ${label}: ${items.length} jobs ingested`);
+                    fjItems = fjItems.concat(items);
+                } else if (res.status === 'fulfilled') {
+                    console.warn(`[FantasticJobs] ${label}: HTTP ${res.value.status}`);
+                } else {
+                    console.warn(`[FantasticJobs] ${label}: Network error — ${(res as PromiseRejectedResult).reason}`);
+                }
+            } catch (parseErr) {
+                console.error(`[FantasticJobs] ${label} parse error:`, parseErr);
+            }
+        }
+        
+        return fjItems.map((job: any, i: number) => ({
+             id: `FJRAPID-${job.id || job.uuid || job.job_id || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
+             title: job.title || job.job_title || "Specialist",
+             institution: job.company_name || job.company || job.organization || "Private Enterprise",
+             location: job.location || job.location_name || job.city || 'US',
+             experienceLevel: job.experience_level || job.ai_experience_level || 'Undergraduate / Entry Level',
+             url: job.url || job.job_url || job.apply_url || job.application_url || "https://fantastic.jobs",
+             dateAdded: job.posted_at || job.date_posted || job.created_at || new Date().toISOString(),
+             rawText: job.description || job.snippet || job.job_description || ""
+        }));
+      } catch (e) { console.error("RapidAPI FantasticJobs Error:", e); return []; }
+    })();
 
-    const jobFeeds = [
-       { url: 'https://jobs.sciencecareers.org/jobsrss/?countrycode=US', flag: 'science' },
-       { url: 'https://www.nature.com/naturecareers/jobsrss/?countrycode=US', flag: 'nature' }
-    ];
+    const rssPromise = (async () => {
+      const jobFeeds = [
+         { url: 'https://jobs.sciencecareers.org/jobsrss/?countrycode=US', flag: 'science' },
+         { url: 'https://www.nature.com/naturecareers/jobsrss/?countrycode=US', flag: 'nature' },
+         { url: 'https://jobs.cell.com/jobsrss/', flag: 'cell' },
+         { url: 'https://www.biospace.com/jobs/rss', flag: 'biospace' },
+         { url: 'https://jobs.newscientist.com/en-gb/jobsrss/', flag: 'newscientist' }
+      ];
+      let collected: any[] = [];
+      for (const feedConfig of jobFeeds) {
+           try {
+               const feed = await parser.parseURL(feedConfig.url);
+               let items = feed.items;
+               
+               if (userTopics && userTopics.length > 0) {
+                   items = items.filter((item: any) => {
+                       const desc = (item.contentSnippet || "").toLowerCase();
+                       const title = (item.title || "").toLowerCase();
+                       return userTopics.some((ui: string) => desc.includes(ui) || title.includes(ui));
+                   });
+               }
 
-    for (const feedConfig of jobFeeds) {
-         try {
-             const feed = await parser.parseURL(feedConfig.url);
-             let items = feed.items;
-             
-             // Strict feed filtering based on the user's defined news topics
-             if (userTopics && userTopics.length > 0) {
-                 items = items.filter((item: any) => {
-                     const desc = (item.contentSnippet || "").toLowerCase();
-                     const title = (item.title || "").toLowerCase();
-                     return userTopics.some((ui: string) => desc.includes(ui) || title.includes(ui));
-                 });
-             }
+               const mapped = items.map((item: any, i: number) => {
+                   let title = item.title || "Research Position";
+                   let institution = 'US Research Hub';
+                   if (title.includes(':')) {
+                       const parts = title.split(':');
+                       institution = parts[0].trim();
+                       title = parts.slice(1).join(':').trim();
+                   }
+                   return {
+                       id: `CAREER-${item.guid || item.link || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
+                       title: title,
+                       institution: institution,
+                       location: 'US',
+                       experienceLevel: 'Undergraduate / Entry Level',
+                       url: item.link || "https://sciencecareers.org",
+                       dateAdded: item.isoDate || new Date().toISOString(),
+                       rawText: item.contentSnippet || ""
+                   };
+               });
+               collected = collected.concat(mapped);
+           } catch (e) { console.error("Jobs RSS Fetch Error:", e); }
+      }
+      return collected;
+    })();
 
-             const mapped = items.map((item: any, i: number) => {
-                 let title = item.title || "Research Position";
-                 let institution = 'US Research Hub';
-                 
-                 // If Nature/Science Careers format: "Institution: Job Title"
-                 if (title.includes(':')) {
-                     const parts = title.split(':');
-                     institution = parts[0].trim();
-                     title = parts.slice(1).join(':').trim();
-                 }
-                 
-                 return {
-                     id: `CAREER-${item.guid || item.link || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
-                     title: title,
-                     institution: institution,
-                     location: 'US',
-                     experienceLevel: 'Undergraduate / Entry Level', // Baseline default
-                     url: item.link || "https://sciencecareers.org",
-                     dateAdded: item.isoDate || new Date().toISOString(),
-                     rawText: item.contentSnippet || "" // Retained temporarily for AI extraction
-                 };
-             });
-             rssJobs = rssJobs.concat(mapped);
-         } catch (e) { console.error("Jobs RSS Fetch Error:", e); }
-    }
+    // AWAIT ALL THREE SOURCE GROUPS IN PARALLEL
+    const [usajobsRaw, rapidRaw, rssRaw] = await Promise.all([usajobsPromise, rapidApiPromise, rssPromise]);
+
+    // ──────────────────────────────────────────────────────────────────────
+    // PRE-MERGE ENTRY-LEVEL FILTER — strip senior/PhD/postdoc from ALL pools
+    // ──────────────────────────────────────────────────────────────────────
+    federalJobs = boostEntryLevel(shuffleArray(usajobsRaw.filter((j: any) => passesEntryLevelFilter(j.title, j.rawText))));
+    rapidJobs   = boostEntryLevel(shuffleArray(rapidRaw.filter((j: any) => passesEntryLevelFilter(j.title, j.rawText))));
+    rssJobs     = boostEntryLevel(shuffleArray(rssRaw.filter((j: any) => passesEntryLevelFilter(j.title, j.rawText))));
+
+    console.log(`[Careers] Source breakdown — Federal: ${usajobsRaw.length} raw → ${federalJobs.length} filtered | RapidAPI: ${rapidRaw.length} raw → ${rapidJobs.length} filtered | RSS: ${rssRaw.length} raw → ${rssJobs.length} filtered`);
+    console.log(`[Careers] Post-filter counts — Federal: ${federalJobs.length}, RapidAPI(6): ${rapidJobs.length}, RSS: ${rssJobs.length}`);
     
-    // Shuffle RSS feed results fully
-    rssJobs = shuffleArray(rssJobs);
-    
-    // Evenly distribute pools utilizing a 1:1:1 Round-Robin merge loop
+    // ──────────────────────────────────────────────────────────────────────
+    // WEIGHTED ROUND-ROBIN MERGE — 1 federal : 3 rapid : 1 RSS per cycle
+    // RapidAPI gets 3x slots per cycle because it represents 6 APIs and
+    // should not be under-represented vs single-source pools.
+    // ──────────────────────────────────────────────────────────────────────
     results.positions = [];
-    const targetTotal = 30; // Expanded limit
+    const targetTotal = 50;
     
     while(results.positions.length < targetTotal) {
         let added = false;
+        // 1 federal slot
         if(federalJobs.length > 0) { results.positions.push(federalJobs.shift()); added = true; }
-        if(rapidJobs.length > 0) { results.positions.push(rapidJobs.shift()); added = true; }
+        // 3 rapid slots (one per cycle to give 6 APIs proportional representation)
+        for (let r = 0; r < 3 && rapidJobs.length > 0; r++) {
+            results.positions.push(rapidJobs.shift()); added = true;
+        }
+        // 1 RSS slot
         if(rssJobs.length > 0) { results.positions.push(rssJobs.shift()); added = true; }
         
         if(!added) break;
     }
+
+    // Drain any remaining from rapidJobs if we haven't hit 50 yet
+    while (results.positions.length < targetTotal && rapidJobs.length > 0) {
+        results.positions.push(rapidJobs.shift());
+    }
+    // Same for federal and RSS
+    while (results.positions.length < targetTotal && federalJobs.length > 0) {
+        results.positions.push(federalJobs.shift());
+    }
+    while (results.positions.length < targetTotal && rssJobs.length > 0) {
+        results.positions.push(rssJobs.shift());
+    }
     
-    // Final shuffle to randomize the symmetrically weighted list
+    // Final shuffle to randomize the weighted list
     results.positions = shuffleArray(results.positions);
     
-    // Inline Gemini Pass for Complex Formatting (Experience Level & Location & True Institution mapping)
+    // ──────────────────────────────────────────────────────────────────────
+    // GEMINI PASS — extract true institution, experience level & location
+    // ──────────────────────────────────────────────────────────────────────
     try {
         const geminiKey = process.env.GEMINI_API_KEY;
         if (geminiKey && results.positions.length > 0) {
-            const aiPayload = results.positions.map((p: any) => ({ id: p.id, raw: p.rawText }));
-            const prompt = `You are parsing raw XML descriptions from US biology job feeds. Extract the true hiring Institution, the Experience Level, and the Location from these snippet blobs. Return ONLY a strict JSON object mapping each job 'id' to an inner object containing: { institution: string, experienceLevel: string, location: string }. If you cannot find a clear experience level, strictly fallback and assign it: "Undergraduate / Entry Level". Jobs: ${JSON.stringify(aiPayload)}`;
+            const aiPayload = results.positions.map((p: any) => ({ id: p.id, title: p.title, raw: p.rawText }));
+            const prompt = `You are parsing raw job descriptions. For each job, determine:
+1. The true hiring Institution/Company name.
+2. The Experience Level — use EXACTLY one of: "Internship", "Undergraduate / Entry Level", "Junior", "Mid-Level", "Senior", "PhD / Postdoctoral", "Faculty / Professor", "Management / Director".
+3. The Location (city, state, or country).
+
+CRITICAL RULES:
+- If the title or description contains words like "Senior", "Principal", "Director", "VP", "Postdoc", "PhD required", "Professor", "Faculty", "10+ years", classify the experience level accordingly — do NOT default to entry level.
+- Only use "Undergraduate / Entry Level" for positions that genuinely require 0-2 years experience, a bachelor's degree, or are explicitly labeled entry-level.
+- Internships, co-ops, and trainee roles should be "Internship".
+
+Return ONLY a strict JSON object mapping each job 'id' to: { institution: string, experienceLevel: string, location: string }.
+Jobs: ${JSON.stringify(aiPayload)}`;
             
             const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
               method: 'POST',
@@ -527,6 +651,35 @@ async function fetchLiveData(topicsMap: any = {}) {
             }
         }
     } catch (e) { console.error("Careers Gemini Intercept Error:", e); }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // POST-GEMINI HARD FILTER — reject anything Gemini classified as senior+
+    // This is the safety net that catches positions the keyword filter missed
+    // ──────────────────────────────────────────────────────────────────────
+    const REJECTED_LEVELS = ['senior', 'phd', 'postdoc', 'post-doc', 'postdoctoral', 'faculty', 'professor', 'management', 'director', 'mid-level', 'mid level'];
+    const beforeCount = results.positions.length;
+    results.positions = results.positions.filter((p: any) => {
+        const level = (p.experienceLevel || '').toLowerCase();
+        return !REJECTED_LEVELS.some(rej => level.includes(rej));
+    });
+
+    // ──────────────────────────────────────────────────────────────────────
+    // SORT BY EXPERIENCE LEVEL
+    // ──────────────────────────────────────────────────────────────────────
+    const EXP_ORDER: Record<string, number> = {
+        "internship": 1,
+        "undergraduate / entry level": 2,
+        "junior": 3,
+        "mid-level": 4,
+    };
+    
+    results.positions.sort((a: any, b: any) => {
+        const aVal = EXP_ORDER[(a.experienceLevel || "").toLowerCase()] || 99;
+        const bVal = EXP_ORDER[(b.experienceLevel || "").toLowerCase()] || 99;
+        return aVal - bVal;
+    });
+
+    console.log(`[Careers] Post-Gemini filter: ${beforeCount} → ${results.positions.length} positions (removed ${beforeCount - results.positions.length} senior/PhD/faculty roles)`);
   } catch (e) { console.error("Evergreen Careers Error:", e); }
 
   try {

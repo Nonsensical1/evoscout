@@ -657,24 +657,24 @@ export default function Home() {
           </section>
 
           {/* Open Positions */}
-          <section id="section-positions" className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-[#fafafa] dark:bg-[#1e1e1e] border border-editorial-border p-6 shadow-[4px_4px_0px_#e5e5e5] dark:shadow-[4px_4px_0px_#111111]">
-            <div className="mb-5 border-b border-editorial-border pb-2 text-center">
-              <h3 className="font-serif font-black text-sm uppercase tracking-widest">Open Classifieds</h3>
+          <section id="section-positions">
+             <div className="mb-6 border-b-2 border-editorial-border-dark pb-2 text-center mt-8">
+              <h3 className="font-serif font-black text-lg uppercase tracking-widest text-editorial-text">Open Classifieds</h3>
             </div>
             {data.positions.length === 0 ? (
-               <p className="font-serif text-sm italic text-center text-editorial-muted">No listings.</p>
+               <p className="font-serif text-sm italic text-editorial-muted text-center border border-dashed border-gray-200 dark:border-[#333333] py-4 bg-gray-50 dark:bg-[#1e1e1e]">No listings.</p>
             ) : (
-             <ul className="flex flex-col divide-y divide-editorial-border">
+             <ul className="flex flex-col gap-6 mt-4">
               {data.positions.map((job: any) => (
-                <li key={job.id} className="py-4 group cursor-pointer block">
+                <li key={job.id} className="block outline-none group cursor-pointer border-b border-editorial-border pb-6 last:border-0">
                   <a href={job.url} target="_blank" className="flex flex-col items-center text-center">
-                     <h4 className="text-md font-serif font-bold group-hover:underline decoration-1 underline-offset-2 text-[#b02a2a] dark:text-[#f87171]">{job.title}</h4>
+                     <h4 className="text-xl font-serif font-bold leading-snug group-hover:underline decoration-1 underline-offset-4 text-[#b02a2a] dark:text-[#f87171]">{job.title}</h4>
                      <p className="text-[10px] font-sans text-editorial-text mt-2 uppercase tracking-widest font-bold">{job.institution}</p>
                      
-                     <div className="flex items-center justify-center gap-2 mt-1.5 opacity-90">
-                        <span className="text-[9px] font-sans bg-gray-200 dark:bg-[#333] px-1.5 py-0.5 text-editorial-muted uppercase tracking-wider">{job.experienceLevel || "Undergraduate / Entry Level"}</span>
+                     <div className="flex items-center justify-center gap-2 mt-2 opacity-90">
+                        <span className="text-[9px] font-sans bg-gray-200 dark:bg-[#333] px-2 py-1 text-editorial-muted uppercase tracking-wider font-bold">{job.experienceLevel || "Undergraduate / Entry Level"}</span>
                         {job.location && (
-                            <span className="text-[9px] font-sans border border-gray-300 dark:border-[#444] px-1.5 py-0.5 text-editorial-muted uppercase tracking-wider whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">{job.location}</span>
+                            <span className="text-[9px] font-sans border border-gray-300 dark:border-[#444] px-2 py-1 text-editorial-muted uppercase tracking-wider whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px] font-bold">{job.location}</span>
                         )}
                      </div>
                   </a>
