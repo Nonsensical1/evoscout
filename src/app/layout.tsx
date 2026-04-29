@@ -7,6 +7,8 @@ import { AppProviders } from './providers';
 import { UserMenu } from './UserMenu';
 import { CurrentDate } from './CurrentDate';
 import { DashboardDropdown } from './DashboardDropdown';
+import { Github, Mail } from 'lucide-react';
+
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-serif' });
@@ -54,11 +56,19 @@ export default function RootLayout({
             <p>
               © {new Date().getFullYear()} The EvoScout Company. All Rights Reserved.
             </p>
-            <div className="flex flex-col items-center gap-3 normal-case tracking-normal opacity-90 mt-2">
+            <div className="flex flex-col items-center gap-4 normal-case tracking-normal opacity-90 mt-2">
               <span className="text-base">Made with ❤️</span>
-              <a href="mailto:elijahryal@outlook.com" className="text-base font-bold hover:text-editorial-text transition-colors border border-editorial-border px-5 py-2.5 rounded-full hover:bg-gray-50 dark:hover:bg-[#1a1a1a] flex items-center gap-2 shadow-sm">
-                <span className="text-lg">☕</span> Buy me a coffee
-              </a>
+              <div className="flex flex-wrap items-center justify-center gap-4">
+                <a href="https://buymeacoffee.com/elistewart" target="_blank" rel="noopener noreferrer" className="text-sm font-bold hover:text-editorial-text transition-colors border border-editorial-border px-5 py-2.5 rounded-full hover:bg-gray-50 dark:hover:bg-[#1a1a1a] flex items-center gap-2 shadow-sm">
+                  <span className="text-lg">☕</span> Buy me a coffee
+                </a>
+                <a href="mailto:elijahryal@outlook.com" className="text-sm font-bold hover:text-editorial-text transition-colors border border-editorial-border px-5 py-2.5 rounded-full hover:bg-gray-50 dark:hover:bg-[#1a1a1a] flex items-center gap-2 shadow-sm">
+                  <Mail className="w-4 h-4" /> Email
+                </a>
+                <a href="https://github.com/Nonsensical1" target="_blank" rel="noopener noreferrer" className="text-sm font-bold hover:text-editorial-text transition-colors border border-editorial-border px-5 py-2.5 rounded-full hover:bg-gray-50 dark:hover:bg-[#1a1a1a] flex items-center gap-2 shadow-sm">
+                  <Github className="w-4 h-4" /> GitHub
+                </a>
+              </div>
             </div>
           </footer>
         </AppProviders>
