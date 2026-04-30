@@ -14,7 +14,7 @@ export function LiteratureCard({ paper }: { paper: any }) {
       setIsExpanded(true);
       setIsLoading(true);
       try {
-        const res = await fetch(`/api/semanticscholar?doi=${encodeURIComponent(paper.doi)}`);
+        const res = await fetch(`/api/semanticscholar?doi=${encodeURIComponent(paper.doi)}&title=${encodeURIComponent(paper.title)}`);
         const data = await res.json();
         setRecommendedPapers(data.recommendedPapers || []);
       } catch (err) {
