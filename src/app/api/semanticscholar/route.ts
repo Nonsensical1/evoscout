@@ -79,9 +79,48 @@ export async function GET(request: Request) {
       } else {
          console.error(`Semantic Scholar Fallback Search Error: ${searchRes.status} ${searchRes.statusText}`);
       }
+
+      // 3. Keyword Extraction Fallback
+      // If the title search failed (e.g. title too long, obscure, or rate limited), use Gemini to extract core keywords and try one final broad search.
+      const geminiKey = process.env.GEMINI_API_KEY;
+      if (geminiKey) {
+        console.warn(`[Semantic Scholar] Title search failed or returned empty. Extracting keywords via Gemini...`);
+        try {
+          const prompt = `Extract the 2 to 3 most important scientific keywords from this paper title. Return ONLY the keywords separated by spaces. Title: "${title}"`;
+          const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { maxOutputTokens: 20 }
+            })
+          });
+          
+          if (gRes.ok) {
+            const gData = await gRes.json();
+            const keywords = gData.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (keywords) {
+              console.log(`[Semantic Scholar] Extracted keywords: ${keywords.trim()}`);
+              await new Promise(r => setTimeout(r, 1200)); // Delay again to respect limits
+              
+              const keywordSearchUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(keywords.trim())}&limit=5&fields=${fields}`;
+              const keywordRes = await fetchWithRetry(keywordSearchUrl, { method: 'GET', headers: reqHeaders, next: { revalidate: 86400 } });
+              
+              if (keywordRes.ok) {
+                const keywordData = await keywordRes.json();
+                if (keywordData.data && keywordData.data.length > 0) {
+                  return NextResponse.json({ recommendedPapers: keywordData.data.slice(0, 5) });
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Keyword fallback error:", err);
+        }
+      }
     }
 
-    // 3. Complete Failure
+    // 4. Complete Failure
     return NextResponse.json({ recommendedPapers: [] });
   } catch (error) {
     console.error("Semantic Scholar proxy error:", error);
