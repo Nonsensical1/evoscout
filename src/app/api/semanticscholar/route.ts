@@ -80,53 +80,38 @@ export async function GET(request: Request) {
          console.error(`Semantic Scholar Fallback Search Error: ${searchRes.status} ${searchRes.statusText}`);
       }
 
-      // 3. Keyword Extraction Fallback
-      // If the title search failed (e.g. title too long, obscure, or rate limited), use Gemini to extract core keywords and try one final broad search.
-      const geminiKey = process.env.GEMINI_API_KEY;
-      if (geminiKey) {
-        console.warn(`[Semantic Scholar] Title search failed or returned empty. Extracting keywords via Gemini...`);
-        try {
-          const prompt = `Extract the most important scientific keywords from this paper title. You should extract about 50-60% of the total words in the title, focusing strictly on the core scientific concepts and dropping filler words. Return ONLY the keywords separated by spaces. Title: "${title}"`;
-          const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { maxOutputTokens: 50 }
-            })
-          });
+      // 3. Keyword Extraction Fallback (Local Algorithm)
+      // If the title search failed, use a local stopword filter to extract 50-60% of the core scientific keywords
+      // and try one final broad search without relying on rate-limited AI APIs.
+      console.warn(`[Semantic Scholar] Title search failed or returned empty. Extracting keywords locally...`);
+      try {
+        const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from', 'of', 'about', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'can', 'could', 'will', 'would', 'may', 'might', 'must', 'new', 'how', 'why', 'what', 'where', 'when', 'who', 'which', 'study', 'research', 'scientists', 'discover', 'discovery', 'finds', 'findings', 'shows', 'reveals', 'uncovers', 'identifies', 'novel', 'allows', 'using', 'during', 'expression', 'mechanism', 'analysis', 'through', 'between', 'human', 'their', 'these', 'those', 'that', 'this', 'than', 'then', 'its', 'based', 'approach', 'method', 'toward', 'towards', 'into']);
+        const words = title.replace(/[^a-zA-Z0-9 -]/g, ' ').split(/\s+/);
+        const keywordsArray = words.filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
+        
+        // Take the top 5-6 significant keywords to represent ~50-60% of typical academic titles
+        const keywords = keywordsArray.slice(0, 6).join(' ');
+
+        if (keywords) {
+          console.log(`[Semantic Scholar] Extracted keywords: ${keywords.trim()}`);
+          await new Promise(r => setTimeout(r, 1200)); // Delay again to respect limits
           
-          if (gRes.ok) {
-            const gData = await gRes.json();
-            const keywords = gData.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (keywords) {
-              console.log(`[Semantic Scholar] Extracted keywords: ${keywords.trim()}`);
-              await new Promise(r => setTimeout(r, 1200)); // Delay again to respect limits
-              
-              const keywordSearchUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(keywords.trim())}&limit=5&fields=${fields}`;
-              const keywordRes = await fetchWithRetry(keywordSearchUrl, { method: 'GET', headers: reqHeaders, next: { revalidate: 86400 } });
-              
-              if (keywordRes.ok) {
-                const keywordData = await keywordRes.json();
-                if (keywordData.data && keywordData.data.length > 0) {
-                  return NextResponse.json({ recommendedPapers: keywordData.data.slice(0, 5) });
-                } else {
-                  console.warn(`[Semantic Scholar] Keyword search succeeded but returned 0 results.`);
-                }
-              } else {
-                console.error(`[Semantic Scholar] Keyword search failed: HTTP ${keywordRes.status}`);
-              }
+          const keywordSearchUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(keywords.trim())}&limit=5&fields=${fields}`;
+          const keywordRes = await fetchWithRetry(keywordSearchUrl, { method: 'GET', headers: reqHeaders, next: { revalidate: 86400 } });
+          
+          if (keywordRes.ok) {
+            const keywordData = await keywordRes.json();
+            if (keywordData.data && keywordData.data.length > 0) {
+              return NextResponse.json({ recommendedPapers: keywordData.data.slice(0, 5) });
             } else {
-               console.warn(`[Gemini] Failed to parse keywords from response.`);
+              console.warn(`[Semantic Scholar] Keyword search succeeded but returned 0 results.`);
             }
           } else {
-             console.error(`[Gemini] API Error during keyword extraction: HTTP ${gRes.status}`);
-             const text = await gRes.text();
-             console.error(`[Gemini] API Response: ${text}`);
+            console.error(`[Semantic Scholar] Keyword search failed: HTTP ${keywordRes.status}`);
           }
-        } catch (err) {
-          console.error("Keyword fallback network error:", err);
         }
+      } catch (err) {
+        console.error("Local keyword fallback error:", err);
       }
     }
 
