@@ -96,19 +96,51 @@ export async function GET(request: Request) {
         const keywordsArray = words.filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
         
         // Take the top 5-6 significant keywords to represent ~50-60% of typical academic titles
-        const keywords = keywordsArray.slice(0, 6).join(' ');
+        const topKeywords = keywordsArray.slice(0, 6);
+        const keywords = topKeywords.join(' ');
 
         if (keywords) {
           console.log(`[Semantic Scholar] Extracted keywords: ${keywords.trim()}`);
           await new Promise(r => setTimeout(r, 1200)); // Delay again to respect limits
           
-          const keywordSearchUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(keywords.trim())}&limit=5&fields=${fields}`;
+          // Fetch a larger pool of 30 papers to filter locally for strict relevance
+          const keywordSearchUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(keywords.trim())}&limit=30&fields=${fields}`;
           const keywordRes = await fetchWithRetry(keywordSearchUrl, { method: 'GET', headers: reqHeaders, next: { revalidate: 86400 } });
           
           if (keywordRes.ok) {
             const keywordData = await keywordRes.json();
             if (keywordData.data && keywordData.data.length > 0) {
-              return NextResponse.json({ recommendedPapers: keywordData.data.slice(0, 5) });
+              
+              // Local Relevance Scoring
+              // Forces the returned papers to actually contain the extracted keywords.
+              const scoredPapers = keywordData.data.map((paper: any) => {
+                let score = 0;
+                const pTitle = (paper.title || "").toLowerCase();
+                const pAbstract = (paper.abstract || "").toLowerCase();
+                
+                topKeywords.forEach(kw => {
+                  const kwLower = kw.toLowerCase();
+                  if (pTitle.includes(kwLower)) score += 3; // Title matches are highly relevant
+                  else if (pAbstract.includes(kwLower)) score += 1;
+                });
+                return { ...paper, score };
+              });
+              
+              // Filter out completely irrelevant papers (score 0) and sort by relevance
+              const filteredPapers = scoredPapers
+                .filter((p: any) => p.score > 0)
+                .sort((a: any, b: any) => b.score - a.score);
+              
+              if (filteredPapers.length > 0) {
+                // Strip the temporary 'score' attribute and return the top 5
+                const finalPapers = filteredPapers.slice(0, 5).map((p: any) => {
+                  const { score, ...rest } = p;
+                  return rest;
+                });
+                return NextResponse.json({ recommendedPapers: finalPapers });
+              } else {
+                console.warn(`[Semantic Scholar] Fetched 30 papers but 0 passed the strict keyword relevance filter.`);
+              }
             } else {
               console.warn(`[Semantic Scholar] Keyword search succeeded but returned 0 results.`);
             }
