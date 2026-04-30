@@ -67,7 +67,49 @@ export async function GET(request: Request) {
       }
     }
 
-    // 3. Absolute fallback
+    // 3. Absolute Fallback: Gemini AI Synthesized Context
+    // If Semantic Scholar is completely rate-limiting us or has no data, we ask Gemini to synthesize the background context directly.
+    console.warn(`[Semantic Scholar] All API attempts failed or returned empty for DOI ${doi}. Engaging Gemini AI fallback.`);
+    
+    if (title) {
+      const geminiKey = process.env.GEMINI_API_KEY;
+      if (geminiKey) {
+        try {
+          const prompt = `As an expert scientific researcher, provide a 3-4 sentence background context explaining the core concepts, importance, and foundation for a newly published paper titled: "${title}". Focus strictly on the scientific background. Do not wrap in markdown or quotes, just return the raw paragraph.`;
+          
+          const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { maxOutputTokens: 250 }
+            })
+          });
+          
+          if (gRes.ok) {
+            const gData = await gRes.json();
+            const abstract = gData.candidates?.[0]?.content?.parts?.[0]?.text;
+            
+            if (abstract) {
+              return NextResponse.json({
+                recommendedPapers: [{
+                  paperId: 'evoscout-ai-synthetic-context',
+                  title: 'Synthesized Background Context',
+                  authors: [{ name: 'EvoScout AI Synthesis Engine' }],
+                  year: new Date().getFullYear(),
+                  abstract: abstract.trim(),
+                  url: `https://doi.org/${doi}` // Just link back to the paper
+                }]
+              });
+            }
+          }
+        } catch (geminiErr) {
+          console.error("Gemini context fallback error:", geminiErr);
+        }
+      }
+    }
+
+    // 4. Complete Failure
     return NextResponse.json({ recommendedPapers: [] });
   } catch (error) {
     console.error("Semantic Scholar proxy error:", error);
