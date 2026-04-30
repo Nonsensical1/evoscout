@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     return fetch(url, options); // Final attempt
   };
 
-  const apiKey = process.env.SEMANTIC_SCHOLAR_API_KEY || 's2k-emI21tuaeRGISoglkQuQM5r4cXsKJSYgR06ToucG';
+  const apiKey = process.env.SEMANTIC_SCHOLAR_API_KEY;
   const reqHeaders: any = { 'Accept': 'application/json' };
   if (apiKey) {
     reqHeaders['x-api-key'] = apiKey;
