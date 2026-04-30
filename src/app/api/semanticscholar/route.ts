@@ -85,7 +85,13 @@ export async function GET(request: Request) {
       // and try one final broad search without relying on rate-limited AI APIs.
       console.warn(`[Semantic Scholar] Title search failed or returned empty. Extracting keywords locally...`);
       try {
-        const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from', 'of', 'about', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'can', 'could', 'will', 'would', 'may', 'might', 'must', 'new', 'how', 'why', 'what', 'where', 'when', 'who', 'which', 'study', 'research', 'scientists', 'discover', 'discovery', 'finds', 'findings', 'shows', 'reveals', 'uncovers', 'identifies', 'novel', 'allows', 'using', 'during', 'expression', 'mechanism', 'analysis', 'through', 'between', 'human', 'their', 'these', 'those', 'that', 'this', 'than', 'then', 'its', 'based', 'approach', 'method', 'toward', 'towards', 'into']);
+        const stopWords = new Set([
+          'the', 'a', 'an', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from', 'of', 'about', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'doing', 'can', 'could', 'will', 'would', 'may', 'might', 'must', 'should', 'shall', 
+          'new', 'how', 'why', 'what', 'where', 'when', 'who', 'which', 'while', 'within', 'without', 'over', 'under', 'above', 'below', 'before', 'after', 
+          'study', 'studies', 'research', 'scientists', 'discover', 'discovery', 'finds', 'findings', 'shows', 'reveals', 'uncovers', 'identifies', 'novel', 'allows', 'using', 'during', 'expression', 'mechanism', 'mechanisms', 'analysis', 'through', 'between', 'human', 'their', 'these', 'those', 'that', 'this', 'than', 'then', 'its', 'based', 'approach', 'method', 'methodology', 'toward', 'towards', 'into', 
+          'effect', 'effects', 'role', 'impact', 'evaluate', 'evaluating', 'evaluation', 'analyze', 'analyzing', 'investigate', 'investigation', 'review', 'systematic', 'meta-analysis', 'case', 'report', 'clinical', 'trial', 'assessment', 'assess', 'determine', 'determining', 'determination', 'explore', 'exploring', 'exploration', 'understanding', 'understand', 'overview', 'update', 
+          'model', 'models', 'system', 'systems', 'development', 'developing', 'develop', 'application', 'applications', 'implications', 'future', 'directions', 'perspectives', 'perspective', 'insights', 'insight', 'evidence', 'data', 'results', 'structure', 'function', 'properties', 'characterization', 'characteristics', 'design', 'performance', 'response', 'responses', 'activity', 'activities'
+        ]);
         const words = title.replace(/[^a-zA-Z0-9 -]/g, ' ').split(/\s+/);
         const keywordsArray = words.filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
         
