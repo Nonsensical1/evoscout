@@ -12,13 +12,15 @@ export async function GET(request: Request) {
 
   const fields = 'title,authors,year,abstract,url';
 
-  // Helper to retry fetches on 429 Too Many Requests
-  const fetchWithRetry = async (url: string, options: any, retries = 2) => {
+  // Helper to retry fetches on 429 Too Many Requests with exponential backoff
+  const fetchWithRetry = async (url: string, options: any, retries = 3) => {
+    let delay = 3000; // start with a generous 3 second wait
     for (let i = 0; i < retries; i++) {
       const res = await fetch(url, options);
       if (res.status === 429) {
-        console.warn(`[Semantic Scholar] 429 Rate Limit Hit. Retrying... (${i + 1}/${retries})`);
-        await new Promise(r => setTimeout(r, 1200)); // wait 1.2s
+        console.warn(`[Semantic Scholar] 429 Rate Limit Hit. Retrying in ${delay}ms... (${i + 1}/${retries})`);
+        await new Promise(r => setTimeout(r, delay));
+        delay += 1500; // 3s -> 4.5s -> 6s
         continue;
       }
       return res;
