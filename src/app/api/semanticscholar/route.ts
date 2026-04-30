@@ -110,12 +110,22 @@ export async function GET(request: Request) {
                 const keywordData = await keywordRes.json();
                 if (keywordData.data && keywordData.data.length > 0) {
                   return NextResponse.json({ recommendedPapers: keywordData.data.slice(0, 5) });
+                } else {
+                  console.warn(`[Semantic Scholar] Keyword search succeeded but returned 0 results.`);
                 }
+              } else {
+                console.error(`[Semantic Scholar] Keyword search failed: HTTP ${keywordRes.status}`);
               }
+            } else {
+               console.warn(`[Gemini] Failed to parse keywords from response.`);
             }
+          } else {
+             console.error(`[Gemini] API Error during keyword extraction: HTTP ${gRes.status}`);
+             const text = await gRes.text();
+             console.error(`[Gemini] API Response: ${text}`);
           }
         } catch (err) {
-          console.error("Keyword fallback error:", err);
+          console.error("Keyword fallback network error:", err);
         }
       }
     }
