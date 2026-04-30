@@ -28,13 +28,17 @@ export async function GET(request: Request) {
     return fetch(url, options); // Final attempt
   };
 
-  const apiKey = process.env.SEMANTIC_SCHOLAR_API_KEY;
+  const apiKey = process.env.SEMANTIC_SCHOLAR_API_KEY || 's2k-emI21tuaeRGISoglkQuQM5r4cXsKJSYgR06ToucG';
   const reqHeaders: any = { 'Accept': 'application/json' };
   if (apiKey) {
     reqHeaders['x-api-key'] = apiKey;
   }
 
   try {
+    // Explicitly enforce <1 request per second globally per invocation 
+    // to protect the API key from concurrent burst limits
+    await new Promise(r => setTimeout(r, 1200));
+
     // 1. First try the true recommendations endpoint
     const recommendUrl = `https://api.semanticscholar.org/recommendations/v1/papers/forpaper/DOI:${doi}?fields=${fields}&limit=5`;
     
@@ -54,6 +58,10 @@ export async function GET(request: Request) {
     // 2. Fallback: If paper isn't indexed yet (404) or has no recommendations, perform a semantic search on its title
     if (title) {
       console.log(`[Semantic Scholar] DOI ${doi} missing recommendations. Falling back to title search.`);
+      
+      // Enforce strict < 1 req/sec before fallback to protect API limits
+      await new Promise(r => setTimeout(r, 1200));
+      
       const searchUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(title)}&limit=6&fields=${fields}`;
       
       const searchRes = await fetchWithRetry(searchUrl, {
