@@ -531,7 +531,6 @@ async function fetchLiveData(topicsMap: any = {}) {
       const jobFeeds = [
          { url: 'https://jobs.sciencecareers.org/jobsrss/?countrycode=US', flag: 'science' },
          { url: 'https://www.nature.com/naturecareers/jobsrss/?countrycode=US', flag: 'nature' },
-         { url: 'https://jobs.cell.com/jobsrss/', flag: 'cell' },
          { url: 'https://www.biospace.com/jobs/rss', flag: 'biospace' },
          { url: 'https://jobs.newscientist.com/en-gb/jobsrss/', flag: 'newscientist' }
       ];
@@ -569,7 +568,9 @@ async function fetchLiveData(topicsMap: any = {}) {
                    };
                });
                collected = collected.concat(mapped);
-           } catch (e) { console.error("Jobs RSS Fetch Error:", e); }
+           } catch (e) { 
+               console.warn(`[Jobs RSS] Skipping feed ${feedConfig.url} due to parsing error: ${e instanceof Error ? e.message : 'Unknown'}`); 
+           }
       }
       return collected;
     })();
@@ -750,7 +751,7 @@ Jobs: ${JSON.stringify(aiPayload)}`;
         }
 
       } catch (e) {
-        console.error("Gemini batch failure:", e);
+        console.warn(`[Gemini] Batch summarization failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
       }
     }
 
