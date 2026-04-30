@@ -86,13 +86,13 @@ export async function GET(request: Request) {
       if (geminiKey) {
         console.warn(`[Semantic Scholar] Title search failed or returned empty. Extracting keywords via Gemini...`);
         try {
-          const prompt = `Extract the 2 to 3 most important scientific keywords from this paper title. Return ONLY the keywords separated by spaces. Title: "${title}"`;
+          const prompt = `Extract the most important scientific keywords from this paper title. You should extract about 50-60% of the total words in the title, focusing strictly on the core scientific concepts and dropping filler words. Return ONLY the keywords separated by spaces. Title: "${title}"`;
           const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { maxOutputTokens: 20 }
+              generationConfig: { maxOutputTokens: 50 }
             })
           });
           
