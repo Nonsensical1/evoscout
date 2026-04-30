@@ -12,11 +12,25 @@ export async function GET(request: Request) {
 
   const fields = 'title,authors,year,abstract,url';
 
+  // Helper to retry fetches on 429 Too Many Requests
+  const fetchWithRetry = async (url: string, options: any, retries = 2) => {
+    for (let i = 0; i < retries; i++) {
+      const res = await fetch(url, options);
+      if (res.status === 429) {
+        console.warn(`[Semantic Scholar] 429 Rate Limit Hit. Retrying... (${i + 1}/${retries})`);
+        await new Promise(r => setTimeout(r, 1200)); // wait 1.2s
+        continue;
+      }
+      return res;
+    }
+    return fetch(url, options); // Final attempt
+  };
+
   try {
     // 1. First try the true recommendations endpoint
     const recommendUrl = `https://api.semanticscholar.org/recommendations/v1/papers/forpaper/DOI:${doi}?fields=${fields}&limit=5`;
     
-    let response = await fetch(recommendUrl, {
+    let response = await fetchWithRetry(recommendUrl, {
       method: 'GET',
       headers: { 'Accept': 'application/json' },
       next: { revalidate: 86400 } 
@@ -34,7 +48,7 @@ export async function GET(request: Request) {
       console.log(`[Semantic Scholar] DOI ${doi} missing recommendations. Falling back to title search.`);
       const searchUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(title)}&limit=6&fields=${fields}`;
       
-      const searchRes = await fetch(searchUrl, {
+      const searchRes = await fetchWithRetry(searchUrl, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
         next: { revalidate: 86400 }

@@ -63,7 +63,13 @@ function isTopInstitution(institution: string): boolean {
 
 async function fetchLiveData(topicsMap: any = {}) {
   const parseTopics = (str: string | undefined, fallback: string[]) => str ? str.split(',').map((s: string) => s.trim()).filter(Boolean) : fallback;
-  const parser = new Parser({ customFields: { item: [['media:thumbnail', 'mediaThumbnail']] } });
+  const parser = new Parser({ 
+    customFields: { item: [['media:thumbnail', 'mediaThumbnail']] },
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+    }
+  });
   const results: any = { grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
   const usedImages = new Set<string>(); // Global pool to prevent duplicate photos
 
@@ -461,57 +467,41 @@ async function fetchLiveData(topicsMap: any = {}) {
         };
         
         // All 6 Fantastic.jobs endpoints fire simultaneously
-        const [activeRes, startupRes, internshipsRes, ycombinatorRes, workdayRes, jobPostingsRes] = await Promise.allSettled([
-            fetch(`https://active-jobs-db.p.rapidapi.com/active-ats-1h?offset=0&include_ai=true&title_filter=%22${encodeURIComponent(searchParam)}%22&location_filter=%22United%20States%22%20OR%20%22United%20Kingdom%22&description_type=text`, {
-                headers: { ...rapidHeaders, 'x-rapidapi-host': 'active-jobs-db.p.rapidapi.com' }
-            }),
-            fetch(`https://startup-jobs-api.p.rapidapi.com/active-jb-7d?source=ycombinator`, {
-                headers: { ...rapidHeaders, 'x-rapidapi-host': 'startup-jobs-api.p.rapidapi.com' }
-            }),
-            fetch(`https://internships-api.p.rapidapi.com/active-jb-7d`, {
-                headers: { ...rapidHeaders, 'x-rapidapi-host': 'internships-api.p.rapidapi.com' }
-            }),
-            fetch(`https://free-y-combinator-jobs-api.p.rapidapi.com/active-jb-7d`, {
-                headers: { ...rapidHeaders, 'x-rapidapi-host': 'free-y-combinator-jobs-api.p.rapidapi.com' }
-            }),
-            fetch(`https://workday-jobs-api.p.rapidapi.com/active-ats-24h?include_ai=true&title_filter=%22${encodeURIComponent(searchParam)}%22&location_filter=%22United%20States%22`, {
-                headers: { ...rapidHeaders, 'x-rapidapi-host': 'workday-jobs-api.p.rapidapi.com' }
-            }),
-            fetch(`https://job-posting-feed-api.p.rapidapi.com/active-ats-6m?include_ai=true&description_type=text`, {
-                headers: { ...rapidHeaders, 'x-rapidapi-host': 'job-posting-feed-api.p.rapidapi.com' }
-            })
-        ]);
-        
         const extractJobs = (data: any): any[] => {
             if (Array.isArray(data)) return data;
             return data.jobs || data.data || data.results || [];
         };
-        
-        let fjItems: any[] = [];
-        const apiResults = [
-            { res: activeRes, label: 'Active Jobs DB' },
-            { res: startupRes, label: 'Startup Jobs' },
-            { res: internshipsRes, label: 'Internships' },
-            { res: ycombinatorRes, label: 'YC Free Jobs' },
-            { res: workdayRes, label: 'Workday Jobs' },
-            { res: jobPostingsRes, label: 'Job Postings Feed' }
+
+        const fetchDefinitions = [
+            { label: 'Active Jobs DB', url: `https://active-jobs-db.p.rapidapi.com/active-ats-1h?offset=0&include_ai=true&title_filter=%22${encodeURIComponent(searchParam)}%22&location_filter=%22United%20States%22%20OR%20%22United%20Kingdom%22&description_type=text`, host: 'active-jobs-db.p.rapidapi.com' },
+            { label: 'Startup Jobs', url: `https://startup-jobs-api.p.rapidapi.com/active-jb-7d?source=ycombinator`, host: 'startup-jobs-api.p.rapidapi.com' },
+            { label: 'Internships', url: `https://internships-api.p.rapidapi.com/active-jb-7d`, host: 'internships-api.p.rapidapi.com' },
+            { label: 'YC Free Jobs', url: `https://free-y-combinator-jobs-api.p.rapidapi.com/active-jb-7d`, host: 'free-y-combinator-jobs-api.p.rapidapi.com' },
+            { label: 'Workday Jobs', url: `https://workday-jobs-api.p.rapidapi.com/active-ats-24h?include_ai=true&title_filter=%22${encodeURIComponent(searchParam)}%22&location_filter=%22United%20States%22`, host: 'workday-jobs-api.p.rapidapi.com' },
+            { label: 'Job Postings Feed', url: `https://job-posting-feed-api.p.rapidapi.com/active-ats-6m?include_ai=true&description_type=text`, host: 'job-posting-feed-api.p.rapidapi.com' }
         ];
+
+        let fjItems: any[] = [];
         
-        for (const { res, label } of apiResults) {
+        for (const def of fetchDefinitions) {
             try {
-                if (res.status === 'fulfilled' && res.value.ok) {
-                    const body = await res.value.json();
+                const res = await fetch(def.url, {
+                    headers: { ...rapidHeaders, 'x-rapidapi-host': def.host }
+                });
+                
+                if (res.ok) {
+                    const body = await res.json();
                     const items = extractJobs(body);
-                    console.log(`[FantasticJobs] ${label}: ${items.length} jobs ingested`);
+                    console.log(`[FantasticJobs] ${def.label}: ${items.length} jobs ingested`);
                     fjItems = fjItems.concat(items);
-                } else if (res.status === 'fulfilled') {
-                    console.warn(`[FantasticJobs] ${label}: HTTP ${res.value.status}`);
                 } else {
-                    console.warn(`[FantasticJobs] ${label}: Network error — ${(res as PromiseRejectedResult).reason}`);
+                    console.warn(`[FantasticJobs] ${def.label}: HTTP ${res.status}`);
                 }
-            } catch (parseErr) {
-                console.error(`[FantasticJobs] ${label} parse error:`, parseErr);
+            } catch (err) {
+                console.error(`[FantasticJobs] ${def.label} network error:`, err);
             }
+            // Sequential delay to protect against RapidAPI rate limit spikes
+            await new Promise(r => setTimeout(r, 800));
         }
         
         return fjItems.map((job: any, i: number) => ({
