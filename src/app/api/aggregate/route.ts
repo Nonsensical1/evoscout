@@ -219,7 +219,14 @@ async function fetchLiveData(topicsMap: any = {}) {
       { url: 'https://www.nature.com/nature.rss', source: 'Nature' },
       { url: 'https://www.science.org/rss/news_current.xml', source: 'Science Mag' },
       { url: 'https://phys.org/rss-feed/biology-news/', source: 'Phys.org' },
-      { url: 'https://www.cell.com/cell/inpress.rss', source: 'Cell Press' }
+      { url: 'https://www.cell.com/cell/inpress.rss', source: 'Cell Press' },
+      { url: 'https://www.nature.com/nmicrobiol.rss', source: 'Nature Microbiology' },
+      { url: 'https://www.nature.com/nbt.rss', source: 'Nature Biotechnology' },
+      { url: 'https://www.nature.com/ng.rss', source: 'Nature Genetics' },
+      { url: 'https://www.cell.com/cell-systems/current.rss', source: 'Cell Systems' },
+      { url: 'https://www.cell.com/cell/current.rss', source: 'Cell' },
+      { url: 'https://www.cell.com/molecular-cell/current.rss', source: 'Molecular Cell' },
+      { url: 'https://www.pnas.org/action/showFeed?type=etoc&feed=rss&jc=pnas', source: 'PNAS' }
     ];
     let allNews: any[] = [];
     const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|DNA|pathology|zoology";
@@ -235,7 +242,13 @@ async function fetchLiveData(topicsMap: any = {}) {
       try {
         const feed = await parser.parseURL(feedConfig.url);
         const filteredNews = feed.items.filter((item: any) => {
-          const isBioMatch = biologicalTerms.test(item.title || '') || biologicalTerms.test(item.contentSnippet || '');
+          let itemCats = "";
+          if (item.categories && Array.isArray(item.categories)) {
+              itemCats = item.categories.map((c: any) => typeof c === 'string' ? c : c?._ || "").join(' ');
+          } else if (item.categories) {
+              itemCats = String(item.categories);
+          }
+          const isBioMatch = biologicalTerms.test(item.title || '') || biologicalTerms.test(item.contentSnippet || '') || biologicalTerms.test(itemCats);
           const isRecent = item.isoDate ? (new Date(item.isoDate).getTime() > timeWindowLimit) : true;
           return isBioMatch && isRecent;
         });
@@ -287,6 +300,106 @@ async function fetchLiveData(topicsMap: any = {}) {
         allNews = allNews.concat(mapped);
       } catch (e) { console.error(`News Fetch Error for ${feedConfig.source}:`, e); }
     }
+
+    // --- REST APIs for Open Access Publishers ---
+    const plosPromise = (async () => {
+      try {
+        const queryTerms = newsTermsSafe.split('|').slice(0, 3).map((t: string) => `title:"${t}" OR abstract:"${t}"`).join(' OR ');
+        const plosUrl = `http://api.plos.org/search?q=${encodeURIComponent(queryTerms)}&fl=id,title_display,abstract,publication_date&wt=json&rows=15`;
+        const res = await fetch(plosUrl);
+        if (res.ok) {
+           const data = await res.json();
+           const docs = data.response?.docs || [];
+           return docs.map((doc: any, i: number) => ({
+             id: `NEWS-PLOS-${doc.id || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
+             title: doc.title_display,
+             source: "PLOS",
+             url: `https://journals.plos.org/plosone/article?id=${doc.id}`,
+             image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100",
+             rawSnippet: (doc.abstract && doc.abstract.length > 0) ? doc.abstract[0] : "",
+             isoDate: doc.publication_date || new Date().toISOString()
+           }));
+        }
+      } catch (e) { console.error("PLOS API Error:", e); }
+      return [];
+    })();
+
+    const eLifePromise = (async () => {
+      try {
+        const q = newsTermsSafe.split('|')[0] || "biology";
+        const eLifeUrl = `https://api.elifesciences.org/search?for=${encodeURIComponent(q)}&per-page=15`;
+        const res = await fetch(eLifeUrl);
+        if (res.ok) {
+           const data = await res.json();
+           const items = data.items || [];
+           return items.map((item: any, i: number) => ({
+             id: `NEWS-ELIFE-${item.id || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
+             title: item.title,
+             source: "eLife",
+             url: item.id ? `https://elifesciences.org/articles/${item.id}` : "https://elifesciences.org",
+             image: item.image?.thumbnail?.source?.uri || "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100",
+             rawSnippet: item.impactStatement || item.abstract || "",
+             isoDate: item.published || new Date().toISOString()
+           }));
+        }
+      } catch (e) { console.error("eLife API Error:", e); }
+      return [];
+    })();
+
+    const bmcPromise = (async () => {
+      try {
+        if (!process.env.SPRINGER_NATURE_API_KEY) return [];
+        const q = newsTermsSafe.split('|')[0] || "biology";
+        const bmcUrl = `https://api.springernature.com/openaccess/json?q=keyword:"${encodeURIComponent(q)}"&p=15&api_key=${process.env.SPRINGER_NATURE_API_KEY}`;
+        const res = await fetch(bmcUrl);
+        if (res.ok) {
+           const data = await res.json();
+           const records = data.records || [];
+           return records.map((rec: any, i: number) => ({
+             id: `NEWS-BMC-${rec.identifier || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
+             title: rec.title,
+             source: rec.publicationName || "BioMed Central",
+             url: rec.url && rec.url.length > 0 ? rec.url[0].value : "https://www.biomedcentral.com",
+             image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100",
+             rawSnippet: rec.abstract || "",
+             isoDate: rec.publicationDate || new Date().toISOString()
+           }));
+        }
+      } catch (e) { console.error("BMC API Error:", e); }
+      return [];
+    })();
+
+    const [plosRaw, eLifeRaw, bmcRaw] = await Promise.all([plosPromise, eLifePromise, bmcPromise]);
+    let apiNews = [...plosRaw, ...eLifeRaw, ...bmcRaw];
+    
+    apiNews = apiNews.filter((item: any) => {
+        return item.isoDate ? (new Date(item.isoDate).getTime() > timeWindowLimit) : true;
+    });
+
+    for (let item of apiNews) {
+      if (item.image === "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100") {
+          try {
+              const searchKeyword = getProminentWord(item.title);
+              const KeywordQuery = searchKeyword + " science";
+              const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(KeywordQuery)}&per_page=30&size=large&orientation=landscape`, {
+                headers: { Authorization: "c5w6mctmy3dgyaA69iUsDjgccGUojIlKEa3Y8JtsLU2yJm2HUp2gjQy6" }
+              });
+              if (pexelsRes.ok) {
+                const pexelsData = await pexelsRes.json();
+                if (pexelsData.photos && pexelsData.photos.length > 0) {
+                  const availablePhotos = pexelsData.photos.filter((p: any) => !usedImages.has(p.src.original));
+                  if (availablePhotos.length > 0) {
+                    const randomIdx = Math.floor(Math.random() * availablePhotos.length);
+                    item.image = availablePhotos[randomIdx].src.original;
+                    usedImages.add(item.image);
+                  }
+                }
+              }
+          } catch(e) {}
+      }
+    }
+
+    allNews = allNews.concat(apiNews);
 
     results.news = allNews.sort((a, b) => new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime());
   } catch (e) { console.error("Top-level News Fetch Error:", e); }
