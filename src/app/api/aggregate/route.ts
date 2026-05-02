@@ -453,6 +453,20 @@ async function fetchLiveData(topicsMap: any = {}) {
         const arxivRes = await fetch(arxivUrl);
         if (arxivRes.ok) {
            const arxivXml = await arxivRes.text();
+
+           const affilDict: Record<string, string> = {};
+           const entries = arxivXml.split('<entry>');
+           for (let i = 1; i < entries.length; i++) {
+               const entry = entries[i];
+               const idMatch = entry.match(/<id>(.*?)<\/id>/);
+               if (idMatch) {
+                   const affilMatch = entry.match(/<arxiv:affiliation[^>]*>([\s\S]*?)<\/arxiv:affiliation>/);
+                   if (affilMatch) {
+                       affilDict[idMatch[1].trim()] = affilMatch[1].trim();
+                   }
+               }
+           }
+
            const arxivFeed = await parser.parseString(arxivXml);
            mappedArxiv = arxivFeed.items.map((item: any, i: number) => {
                let authorStr = "Various Authors";
@@ -461,11 +475,18 @@ async function fetchLiveData(topicsMap: any = {}) {
                } else if (item.author) {
                    authorStr = item.author;
                }
+
+               let inst = "arXiv.org";
+               const itemId = item.id || item.guid || "";
+               if (itemId && affilDict[itemId]) {
+                   inst = affilDict[itemId];
+               }
+
                return {
                   id: `ARXIV-${item.guid || item.id || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
                   title: item.title,
                   authors: authorStr,
-                  institution: "arXiv.org",
+                  institution: inst,
                   journal: "arXiv q-bio",
                   doi: item.link || item.id || "",
                   rawAbstract: item.contentSnippet || item.summary || item.content || "",
