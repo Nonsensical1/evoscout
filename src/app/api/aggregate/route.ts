@@ -429,7 +429,7 @@ async function fetchLiveData(topicsMap: any = {}) {
       if (filtered.length < 5) filtered = papers;
 
       const uniquePapers = Array.from(new Map(filtered.map((p: any) => [p.doi, p])).values()) as any[];
-      results.literature = uniquePapers
+      let mappedBiorxiv = uniquePapers
         .map((p: any) => ({
           id: `LIT-${p.doi}`,
           title: p.title,
@@ -439,7 +439,43 @@ async function fetchLiveData(topicsMap: any = {}) {
           doi: p.doi,
           rawAbstract: p.abstract,
           isoDate: p.date ? new Date(p.date).toISOString() : new Date().toISOString()
-        }))
+        }));
+
+      let mappedArxiv: any[] = [];
+      try {
+        const arxivCats = ['q-bio.GN', 'q-bio.MN', 'q-bio.BM', 'q-bio.PE'];
+        const catQuery = arxivCats.map((c: string) => `cat:${c}`).join('+OR+');
+        const arxivLitTerms = topicsMap.literature ? topicsMap.literature.split(',').map((s:string)=>s.trim()).filter(Boolean) : ["CRISPR", "Cas9", "RNA", "DNA", "synthetic biology"];
+        const keywordQuery = arxivLitTerms.slice(0, 3).map((t: string) => `all:"${t}"`).join('+OR+');
+        const arxivQuery = `(%28${catQuery}%29+AND+%28${keywordQuery}%29)`;
+        const arxivUrl = `http://export.arxiv.org/api/query?search_query=${arxivQuery}&start=0&max_results=15&sortBy=submittedDate&sortOrder=descending`;
+        
+        const arxivRes = await fetch(arxivUrl);
+        if (arxivRes.ok) {
+           const arxivXml = await arxivRes.text();
+           const arxivFeed = await parser.parseString(arxivXml);
+           mappedArxiv = arxivFeed.items.map((item: any, i: number) => {
+               let authorStr = "Various Authors";
+               if (item.creator) {
+                   authorStr = item.creator;
+               } else if (item.author) {
+                   authorStr = item.author;
+               }
+               return {
+                  id: `ARXIV-${item.guid || item.id || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
+                  title: item.title,
+                  authors: authorStr,
+                  institution: "arXiv.org",
+                  journal: "arXiv q-bio",
+                  doi: item.link || item.id || "",
+                  rawAbstract: item.contentSnippet || item.summary || item.content || "",
+                  isoDate: item.isoDate || new Date().toISOString()
+               };
+           });
+        }
+      } catch (e) { console.error("arXiv Fetch Error:", e); }
+
+      results.literature = [...mappedBiorxiv, ...mappedArxiv]
         .sort((a, b) => {
           // Tier 1: top-40 institution papers come first
           const aTop = isTopInstitution(a.institution) ? 0 : 1;
