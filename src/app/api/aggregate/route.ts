@@ -654,24 +654,37 @@ async function fetchLiveData(topicsMap: any = {}) {
         let fjItems: any[] = [];
         
         for (const def of fetchDefinitions) {
-            try {
-                const res = await fetch(def.url, {
-                    headers: { ...rapidHeaders, 'x-rapidapi-host': def.host }
-                });
-                
-                if (res.ok) {
-                    const body = await res.json();
-                    const items = extractJobs(body);
-                    console.log(`[FantasticJobs] ${def.label}: ${items.length} jobs ingested`);
-                    fjItems = fjItems.concat(items);
-                } else {
-                    console.warn(`[FantasticJobs] ${def.label}: HTTP ${res.status}`);
+            let retries = 3;
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const res = await fetch(def.url, {
+                        headers: { ...rapidHeaders, 'x-rapidapi-host': def.host }
+                    });
+                    
+                    if (res.ok) {
+                        const body = await res.json();
+                        const items = extractJobs(body);
+                        console.log(`[FantasticJobs] ${def.label}: ${items.length} jobs ingested`);
+                        fjItems = fjItems.concat(items);
+                        break;
+                    } else if (res.status === 429) {
+                        console.warn(`[FantasticJobs] ${def.label}: HTTP 429. Retrying... (${i+1}/${retries})`);
+                        await new Promise(r => setTimeout(r, 2000));
+                        continue;
+                    } else if (res.status === 401 || res.status === 403) {
+                        console.warn(`[FantasticJobs] ${def.label}: HTTP ${res.status}. Auth error, skipping.`);
+                        break;
+                    } else {
+                        console.warn(`[FantasticJobs] ${def.label}: HTTP ${res.status}`);
+                        break;
+                    }
+                } catch (err) {
+                    console.error(`[FantasticJobs] ${def.label} network error:`, err);
+                    break;
                 }
-            } catch (err) {
-                console.error(`[FantasticJobs] ${def.label} network error:`, err);
             }
             // Sequential delay to protect against RapidAPI rate limit spikes
-            await new Promise(r => setTimeout(r, 800));
+            await new Promise(r => setTimeout(r, 1200));
         }
         
         return fjItems.map((job: any, i: number) => ({
@@ -691,8 +704,7 @@ async function fetchLiveData(topicsMap: any = {}) {
       const jobFeeds = [
          { url: 'https://jobs.sciencecareers.org/jobsrss/?countrycode=US', flag: 'science' },
          { url: 'https://www.nature.com/naturecareers/jobsrss/?countrycode=US', flag: 'nature' },
-         { url: 'https://www.biospace.com/jobs/rss', flag: 'biospace' },
-         { url: 'https://jobs.newscientist.com/en-gb/jobsrss/', flag: 'newscientist' }
+         { url: 'https://jobs.biospace.com/jobsrss/?countrycode=US', flag: 'biospace' }
       ];
       let collected: any[] = [];
       for (const feedConfig of jobFeeds) {
@@ -805,16 +817,28 @@ CRITICAL RULES:
 Return ONLY a strict JSON object mapping each job 'id' to: { institution: string, experienceLevel: string, location: string }.
 Jobs: ${JSON.stringify(aiPayload)}`;
             
-            const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { responseMimeType: "application/json" }
-              })
-            });
+            let gRes;
+            let retries = 3;
+            for (let i = 0; i < retries; i++) {
+                gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { responseMimeType: "application/json" }
+                  })
+                });
+                if (gRes.ok) break;
+                if (gRes.status === 429) {
+                    console.warn(`[Gemini] Batch summarization failed: Gemini API Error: 429. Retrying... (${i+1}/${retries})`);
+                    await new Promise(r => setTimeout(r, 3000));
+                } else {
+                    console.warn(`[Gemini] Batch summarization failed: HTTP ${gRes.status}`);
+                    break;
+                }
+            }
             
-            if (gRes.ok) {
+            if (gRes && gRes.ok) {
                const gData = await gRes.json();
                const parsedAI = JSON.parse(gData.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
                results.positions = results.positions.map((p: any) => {
