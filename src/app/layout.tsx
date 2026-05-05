@@ -29,7 +29,7 @@ export default function RootLayout({
         <AppProviders>
           {/* Masthead */}
           <header className="bg-editorial-paper border-b border-editorial-border-dark sticky top-0 z-50 shadow-sm transition-all duration-300">
-            <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col items-center border-b border-editorial-border pb-4 relative">
+            <div className="max-w-[1600px] mx-auto px-6 py-4 flex flex-col items-center border-b border-editorial-border pb-4 relative">
                <div className="w-full flex justify-between items-center text-[10px] md:text-xs font-sans text-editorial-muted uppercase tracking-widest mb-4">
                   <CurrentDate />
                   <span>Synthetic Biology Edition</span>
@@ -40,7 +40,7 @@ export default function RootLayout({
                  </h1>
                </Link>
             </div>
-            <nav className="max-w-7xl mx-auto px-6 h-12 flex items-center justify-center gap-10 text-[11px] md:text-xs font-sans font-bold text-editorial-text uppercase tracking-widest relative">
+            <nav className="max-w-[1600px] mx-auto px-6 h-12 flex items-center justify-center gap-10 text-[11px] md:text-xs font-sans font-bold text-editorial-text uppercase tracking-widest relative">
                <DashboardDropdown />
                <Link href="/history" className="hover-underline">Ledger</Link>
                <Link href="/settings" className="hover-underline">Settings</Link>
@@ -48,7 +48,7 @@ export default function RootLayout({
             </nav>
           </header>
 
-          <main className="py-12 px-6 max-w-7xl mx-auto bg-editorial-paper shadow-sm min-h-screen my-8 border border-editorial-border relative">
+          <main className="py-12 px-6 max-w-[1600px] mx-auto bg-editorial-paper shadow-sm min-h-screen my-8 border border-editorial-border relative">
             {children}
           </main>
 
