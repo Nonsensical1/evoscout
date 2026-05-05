@@ -539,7 +539,7 @@ async function fetchLiveData(topicsMap: any = {}) {
       'experienced', 'mid-senior',
       'head ', 'dean', 'provost',
       ' ii', ' iii', ' iv',
-      'specialist ii', 'specialist iii',
+      'specialist ii', 'specialist iii', 'specialist', 'consultant',
       'scientist ii', 'scientist iii', 'engineer ii', 'engineer iii',
       'established investigator', 'group leader',
       'attending', 'physician',
@@ -594,7 +594,7 @@ async function fetchLiveData(topicsMap: any = {}) {
     const usajobsPromise = (async () => {
       try {
         if (process.env.USAJOBS_API_KEY && process.env.USAJOBS_USER_EMAIL) {
-            const usajobsRes = await fetch(`https://data.usajobs.gov/api/search?Keyword=${encodeURIComponent(searchParam)}`, {
+            const usajobsRes = await fetch(`https://data.usajobs.gov/api/search?Keyword=${encodeURIComponent(searchParam)}&ResultsPerPage=50`, {
                 headers: {
                     'Host': 'data.usajobs.gov',
                     'User-Agent': process.env.USAJOBS_USER_EMAIL,
