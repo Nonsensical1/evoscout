@@ -668,7 +668,7 @@ async function fetchLiveData(topicsMap: any = {}) {
                         fjItems = fjItems.concat(items);
                         break;
                     } else if (res.status === 429) {
-                        await new Promise(r => setTimeout(r, 2000));
+                        await new Promise(r => setTimeout(r, 5000));
                         continue;
                     } else if (res.status === 401 || res.status === 403) {
                         break;
@@ -680,7 +680,7 @@ async function fetchLiveData(topicsMap: any = {}) {
                 }
             }
             // Sequential delay to protect against RapidAPI rate limit spikes
-            await new Promise(r => setTimeout(r, 1200));
+            await new Promise(r => setTimeout(r, 2500));
         }
         
         return fjItems.map((job: any, i: number) => ({
