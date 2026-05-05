@@ -826,7 +826,7 @@ Jobs: ${JSON.stringify(aiPayload)}`;
                 });
                 if (gRes.ok) break;
                 if (gRes.status === 429) {
-                    await new Promise(r => setTimeout(r, 3000));
+                    await new Promise(r => setTimeout(r, 6000));
                 } else {
                     break;
                 }
@@ -858,6 +858,31 @@ Jobs: ${JSON.stringify(aiPayload)}`;
         const level = (p.experienceLevel || '').toLowerCase();
         return !REJECTED_LEVELS.some(rej => level.includes(rej));
     });
+
+    // ──────────────────────────────────────────────────────────────────────
+    // DEDUPLICATE SPAM / BULK POSTINGS
+    // ──────────────────────────────────────────────────────────────────────
+    const uniqueJobs = new Map();
+    results.positions.forEach((p: any) => {
+        const inst = (p.institution || "unknown").toLowerCase().trim();
+        // Extract base title to group identical jobs across different cities
+        let baseTitle = (p.title || "").toLowerCase();
+        if (baseTitle.includes('-')) baseTitle = baseTitle.split('-')[0].trim();
+        if (baseTitle.includes('(')) baseTitle = baseTitle.split('(')[0].trim();
+        const key = `${inst}::${baseTitle}`;
+        
+        if (!uniqueJobs.has(key)) {
+            uniqueJobs.set(key, []);
+        }
+        uniqueJobs.get(key).push(p);
+    });
+    
+    // Flatten and limit to max 2 similar jobs per institution
+    let deduplicatedPositions: any[] = [];
+    uniqueJobs.forEach((jobs) => {
+        deduplicatedPositions = deduplicatedPositions.concat(jobs.slice(0, 2));
+    });
+    results.positions = deduplicatedPositions;
 
     // ──────────────────────────────────────────────────────────────────────
     // SORT BY EXPERIENCE LEVEL
