@@ -668,18 +668,14 @@ async function fetchLiveData(topicsMap: any = {}) {
                         fjItems = fjItems.concat(items);
                         break;
                     } else if (res.status === 429) {
-                        console.warn(`[FantasticJobs] ${def.label}: HTTP 429. Retrying... (${i+1}/${retries})`);
                         await new Promise(r => setTimeout(r, 2000));
                         continue;
                     } else if (res.status === 401 || res.status === 403) {
-                        console.warn(`[FantasticJobs] ${def.label}: HTTP ${res.status}. Auth error, skipping.`);
                         break;
                     } else {
-                        console.warn(`[FantasticJobs] ${def.label}: HTTP ${res.status}`);
                         break;
                     }
                 } catch (err) {
-                    console.error(`[FantasticJobs] ${def.label} network error:`, err);
                     break;
                 }
             }
@@ -741,7 +737,7 @@ async function fetchLiveData(topicsMap: any = {}) {
                });
                collected = collected.concat(mapped);
            } catch (e) { 
-               console.warn(`[Jobs RSS] Skipping feed ${feedConfig.url} due to parsing error: ${e instanceof Error ? e.message : 'Unknown'}`); 
+               // Silently skip on 403 or parsing errors to prevent noisy console logs
            }
       }
       return collected;
@@ -830,10 +826,8 @@ Jobs: ${JSON.stringify(aiPayload)}`;
                 });
                 if (gRes.ok) break;
                 if (gRes.status === 429) {
-                    console.warn(`[Gemini] Batch summarization failed: Gemini API Error: 429. Retrying... (${i+1}/${retries})`);
                     await new Promise(r => setTimeout(r, 3000));
                 } else {
-                    console.warn(`[Gemini] Batch summarization failed: HTTP ${gRes.status}`);
                     break;
                 }
             }
