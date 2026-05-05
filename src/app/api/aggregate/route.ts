@@ -643,7 +643,7 @@ async function fetchLiveData(topicsMap: any = {}) {
         };
 
         const fetchDefinitions = [
-            { label: 'Active Jobs DB', url: `https://active-jobs-db.p.rapidapi.com/active-ats-1h?offset=0&include_ai=true&title_filter=%22${encodeURIComponent(searchParam)}%22&location_filter=%22United%20States%22%20OR%20%22United%20Kingdom%22&description_type=text`, host: 'active-jobs-db.p.rapidapi.com' },
+            { label: 'Active Jobs DB', url: `https://active-jobs-db.p.rapidapi.com/active-ats-24h?offset=0&include_ai=true&title_filter=%22${encodeURIComponent(searchParam)}%22&location_filter=%22United%20States%22%20OR%20%22United%20Kingdom%22&description_type=text`, host: 'active-jobs-db.p.rapidapi.com' },
             { label: 'Startup Jobs', url: `https://startup-jobs-api.p.rapidapi.com/active-jb-7d?source=ycombinator`, host: 'startup-jobs-api.p.rapidapi.com' },
             { label: 'Internships', url: `https://internships-api.p.rapidapi.com/active-jb-7d`, host: 'internships-api.p.rapidapi.com' },
             { label: 'YC Free Jobs', url: `https://free-y-combinator-jobs-api.p.rapidapi.com/active-jb-7d`, host: 'free-y-combinator-jobs-api.p.rapidapi.com' },
