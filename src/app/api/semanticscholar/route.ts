@@ -12,6 +12,17 @@ export async function GET(request: Request) {
 
   const fields = 'title,authors,year,abstract,url';
 
+  const filterSelf = (papers: any[]) => {
+    if (!papers || !Array.isArray(papers)) return [];
+    const queryDoi = doi ? doi.toLowerCase() : '';
+    const queryTitle = title ? title.toLowerCase() : '';
+    return papers.filter(p => {
+      if (p.doi && queryDoi && p.doi.toLowerCase() === queryDoi) return false;
+      if (p.title && queryTitle && p.title.toLowerCase() === queryTitle) return false;
+      return true;
+    });
+  };
+
   // Helper to retry fetches on 429 Too Many Requests with exponential backoff
   const fetchWithRetry = async (url: string, options: any, retries = 3) => {
     let delay = 5000; // start with a very generous 5 second wait to ensure Semantic Scholar resets
@@ -51,7 +62,10 @@ export async function GET(request: Request) {
     if (response.ok) {
       const data = await response.json();
       if (data.recommendedPapers && data.recommendedPapers.length > 0) {
-        return NextResponse.json({ recommendedPapers: data.recommendedPapers });
+        const validPapers = filterSelf(data.recommendedPapers);
+        if (validPapers.length > 0) {
+          return NextResponse.json({ recommendedPapers: validPapers.slice(0, 5) });
+        }
       }
     }
 
@@ -74,82 +88,75 @@ export async function GET(request: Request) {
         const searchData = await searchRes.json();
         if (searchData.data && searchData.data.length > 0) {
           // Take up to 5 results to serve as contextual background
-          return NextResponse.json({ recommendedPapers: searchData.data.slice(0, 5) });
+          const validPapers = filterSelf(searchData.data);
+          if (validPapers.length > 0) {
+            return NextResponse.json({ recommendedPapers: validPapers.slice(0, 5) });
+          }
         }
       } else {
          console.error(`Semantic Scholar Fallback Search Error: ${searchRes.status} ${searchRes.statusText}`);
       }
 
-      // 3. Keyword Extraction Fallback (Local Algorithm)
-      // If the title search failed, use a local stopword filter to extract 50-60% of the core scientific keywords
-      // and try one final broad search without relying on rate-limited AI APIs.
-      console.warn(`[Semantic Scholar] Title search failed or returned empty. Extracting keywords locally...`);
+      // 3. Groq-based Contextual Search Fallback
+      console.warn(`[Semantic Scholar] Title search failed or returned empty. Using Groq fallback...`);
       try {
-        const stopWords = new Set([
-          'the', 'a', 'an', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'from', 'of', 'about', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'doing', 'can', 'could', 'will', 'would', 'may', 'might', 'must', 'should', 'shall', 
-          'new', 'how', 'why', 'what', 'where', 'when', 'who', 'which', 'while', 'within', 'without', 'over', 'under', 'above', 'below', 'before', 'after', 
-          'study', 'studies', 'research', 'scientists', 'discover', 'discovery', 'finds', 'findings', 'shows', 'reveals', 'uncovers', 'identifies', 'novel', 'allows', 'using', 'during', 'expression', 'mechanism', 'mechanisms', 'analysis', 'through', 'between', 'human', 'their', 'these', 'those', 'that', 'this', 'than', 'then', 'its', 'based', 'approach', 'method', 'methodology', 'toward', 'towards', 'into', 
-          'effect', 'effects', 'role', 'impact', 'evaluate', 'evaluating', 'evaluation', 'analyze', 'analyzing', 'investigate', 'investigation', 'review', 'systematic', 'meta-analysis', 'case', 'report', 'clinical', 'trial', 'assessment', 'assess', 'determine', 'determining', 'determination', 'explore', 'exploring', 'exploration', 'understanding', 'understand', 'overview', 'update', 
-          'model', 'models', 'system', 'systems', 'development', 'developing', 'develop', 'application', 'applications', 'implications', 'future', 'directions', 'perspectives', 'perspective', 'insights', 'insight', 'evidence', 'data', 'results', 'structure', 'function', 'properties', 'characterization', 'characteristics', 'design', 'performance', 'response', 'responses', 'activity', 'activities'
-        ]);
-        const words = title.replace(/[^a-zA-Z0-9 -]/g, ' ').split(/\s+/);
-        const keywordsArray = words.filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
-        
-        // Take the top 5-6 significant keywords to represent ~50-60% of typical academic titles
-        const topKeywords = keywordsArray.slice(0, 6);
-        const keywords = topKeywords.join(' ');
+        const groqApiKey = process.env.GROQ_API_KEY;
+        if (!groqApiKey) {
+          console.warn("[Semantic Scholar] No GROQ_API_KEY provided. Skipping Groq fallback.");
+          return NextResponse.json({ recommendedPapers: [] });
+        }
 
-        if (keywords) {
-          console.log(`[Semantic Scholar] Extracted keywords: ${keywords.trim()}`);
-          await new Promise(r => setTimeout(r, 1200)); // Delay again to respect limits
+        const prompt = `Analyze the following scientific paper title: "${title}"\nExtract the core scientific topic or terms and construct a concise, generalized search phrase (maximum 5 words) that can be used to find broad contextual background literature for this topic. Do not include the specific novel findings, just the general field or mechanisms. Return ONLY the search phrase, nothing else.`;
+
+        const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${groqApiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.1,
+            max_completion_tokens: 20,
+          })
+        });
+
+        if (groqResponse.ok) {
+          const groqData = await groqResponse.json();
+          let searchPhrase = groqData.choices?.[0]?.message?.content?.trim();
           
-          // Fetch a larger pool of 30 papers to filter locally for strict relevance
-          const keywordSearchUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(keywords.trim())}&limit=30&fields=${fields}`;
-          const keywordRes = await fetchWithRetry(keywordSearchUrl, { method: 'GET', headers: reqHeaders, next: { revalidate: 86400 } });
-          
-          if (keywordRes.ok) {
-            const keywordData = await keywordRes.json();
-            if (keywordData.data && keywordData.data.length > 0) {
-              
-              // Local Relevance Scoring
-              // Forces the returned papers to actually contain the extracted keywords.
-              const scoredPapers = keywordData.data.map((paper: any) => {
-                let score = 0;
-                const pTitle = (paper.title || "").toLowerCase();
-                const pAbstract = (paper.abstract || "").toLowerCase();
-                
-                topKeywords.forEach(kw => {
-                  const kwLower = kw.toLowerCase();
-                  if (pTitle.includes(kwLower)) score += 3; // Title matches are highly relevant
-                  else if (pAbstract.includes(kwLower)) score += 1;
-                });
-                return { ...paper, score };
-              });
-              
-              // Filter out completely irrelevant papers (score 0) and sort by relevance
-              const filteredPapers = scoredPapers
-                .filter((p: any) => p.score > 0)
-                .sort((a: any, b: any) => b.score - a.score);
-              
-              if (filteredPapers.length > 0) {
-                // Strip the temporary 'score' attribute and return the top 5
-                const finalPapers = filteredPapers.slice(0, 5).map((p: any) => {
-                  const { score, ...rest } = p;
-                  return rest;
-                });
-                return NextResponse.json({ recommendedPapers: finalPapers });
+          if (searchPhrase) {
+            searchPhrase = searchPhrase.replace(/^"|"/g, '');
+            console.log(`[Semantic Scholar] Groq generated search phrase: ${searchPhrase}`);
+            
+            await new Promise(r => setTimeout(r, 1200));
+            
+            const keywordSearchUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(searchPhrase)}&limit=15&fields=${fields}`;
+            const keywordRes = await fetchWithRetry(keywordSearchUrl, { method: 'GET', headers: reqHeaders, next: { revalidate: 86400 } });
+            
+            if (keywordRes.ok) {
+              const keywordData = await keywordRes.json();
+              if (keywordData.data && keywordData.data.length > 0) {
+                // Return the filtered results
+                const validPapers = filterSelf(keywordData.data);
+                if (validPapers.length > 0) {
+                   return NextResponse.json({ recommendedPapers: validPapers.slice(0, 5) });
+                } else {
+                   console.warn(`[Semantic Scholar] Groq search returned papers but all were filtered out.`);
+                }
               } else {
-                console.warn(`[Semantic Scholar] Fetched 30 papers but 0 passed the strict keyword relevance filter.`);
+                console.warn(`[Semantic Scholar] Groq keyword search succeeded but returned 0 results.`);
               }
             } else {
-              console.warn(`[Semantic Scholar] Keyword search succeeded but returned 0 results.`);
+              console.error(`[Semantic Scholar] Groq keyword search failed: HTTP ${keywordRes.status}`);
             }
-          } else {
-            console.error(`[Semantic Scholar] Keyword search failed: HTTP ${keywordRes.status}`);
           }
+        } else {
+          console.error(`[Semantic Scholar] Groq API call failed: ${groqResponse.status} ${groqResponse.statusText}`);
         }
       } catch (err) {
-        console.error("Local keyword fallback error:", err);
+        console.error("Groq fallback error:", err);
       }
     }
 
