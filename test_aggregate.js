@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+
 import Parser from 'rss-parser';
 
 // Utility to shuffle array
@@ -63,13 +63,7 @@ function isTopInstitution(institution: string): boolean {
 
 async function fetchLiveData(topicsMap: any = {}) {
   const parseTopics = (str: string | undefined, fallback: string[]) => str ? str.split(',').map((s: string) => s.trim()).filter(Boolean) : fallback;
-  const parser = new Parser({ 
-    customFields: { item: [['media:thumbnail', 'mediaThumbnail']] },
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'application/rss+xml, application/xml, text/xml, */*'
-    }
-  });
+  const parser = new Parser({ customFields: { item: [['media:thumbnail', 'mediaThumbnail']] } });
   const results: any = { grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
   const usedImages = new Set<string>(); // Global pool to prevent duplicate photos
   let didCallCareersGemini = false;
@@ -220,17 +214,10 @@ async function fetchLiveData(topicsMap: any = {}) {
       { url: 'https://www.nature.com/nature.rss', source: 'Nature' },
       { url: 'https://www.science.org/rss/news_current.xml', source: 'Science Mag' },
       { url: 'https://phys.org/rss-feed/biology-news/', source: 'Phys.org' },
-      { url: 'https://www.cell.com/cell/inpress.rss', source: 'Cell Press' },
-      { url: 'https://www.nature.com/nmicrobiol.rss', source: 'Nature Microbiology' },
-      { url: 'https://www.nature.com/nbt.rss', source: 'Nature Biotechnology' },
-      { url: 'https://www.nature.com/ng.rss', source: 'Nature Genetics' },
-      { url: 'https://www.cell.com/cell-systems/current.rss', source: 'Cell Systems' },
-      { url: 'https://www.cell.com/cell/current.rss', source: 'Cell' },
-      { url: 'https://www.cell.com/molecular-cell/current.rss', source: 'Molecular Cell' },
-      { url: 'https://www.pnas.org/action/showFeed?type=etoc&feed=rss&jc=pnas', source: 'PNAS' }
+      { url: 'https://www.cell.com/cell/inpress.rss', source: 'Cell Press' }
     ];
     let allNews: any[] = [];
-    const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|DNA|pathology|zoology";
+    const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|pathology|zoology";
     const biologicalTerms = new RegExp(newsTermsSafe, 'i');
     let newsLookbackHours = 48; // Rolling 48-hour window (captures everything published 'yesterday' and 'today' globally)
     const dayOfWeek = new Date().getDay(); // 0 is Sunday, 1 is Monday ... 6 is Saturday
@@ -243,13 +230,7 @@ async function fetchLiveData(topicsMap: any = {}) {
       try {
         const feed = await parser.parseURL(feedConfig.url);
         const filteredNews = feed.items.filter((item: any) => {
-          let itemCats = "";
-          if (item.categories && Array.isArray(item.categories)) {
-              itemCats = item.categories.map((c: any) => typeof c === 'string' ? c : c?._ || "").join(' ');
-          } else if (item.categories) {
-              itemCats = String(item.categories);
-          }
-          const isBioMatch = biologicalTerms.test(item.title || '') || biologicalTerms.test(item.contentSnippet || '') || biologicalTerms.test(itemCats);
+          const isBioMatch = biologicalTerms.test(item.title || '') || biologicalTerms.test(item.contentSnippet || '');
           const isRecent = item.isoDate ? (new Date(item.isoDate).getTime() > timeWindowLimit) : true;
           return isBioMatch && isRecent;
         });
@@ -302,106 +283,6 @@ async function fetchLiveData(topicsMap: any = {}) {
       } catch (e) { console.error(`News Fetch Error for ${feedConfig.source}:`, e); }
     }
 
-    // --- REST APIs for Open Access Publishers ---
-    const plosPromise = (async () => {
-      try {
-        const queryTerms = newsTermsSafe.split('|').slice(0, 3).map((t: string) => `title:"${t}" OR abstract:"${t}"`).join(' OR ');
-        const plosUrl = `http://api.plos.org/search?q=${encodeURIComponent(queryTerms)}&fl=id,title_display,abstract,publication_date&wt=json&rows=15`;
-        const res = await fetch(plosUrl);
-        if (res.ok) {
-           const data = await res.json();
-           const docs = data.response?.docs || [];
-           return docs.map((doc: any, i: number) => ({
-             id: `NEWS-PLOS-${doc.id || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
-             title: doc.title_display,
-             source: "PLOS",
-             url: `https://journals.plos.org/plosone/article?id=${doc.id}`,
-             image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100",
-             rawSnippet: (doc.abstract && doc.abstract.length > 0) ? doc.abstract[0] : "",
-             isoDate: doc.publication_date || new Date().toISOString()
-           }));
-        }
-      } catch (e) { console.error("PLOS API Error:", e); }
-      return [];
-    })();
-
-    const eLifePromise = (async () => {
-      try {
-        const q = newsTermsSafe.split('|')[0] || "biology";
-        const eLifeUrl = `https://api.elifesciences.org/search?for=${encodeURIComponent(q)}&per-page=15`;
-        const res = await fetch(eLifeUrl);
-        if (res.ok) {
-           const data = await res.json();
-           const items = data.items || [];
-           return items.map((item: any, i: number) => ({
-             id: `NEWS-ELIFE-${item.id || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
-             title: item.title,
-             source: "eLife",
-             url: item.id ? `https://elifesciences.org/articles/${item.id}` : "https://elifesciences.org",
-             image: item.image?.thumbnail?.source?.uri || "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100",
-             rawSnippet: item.impactStatement || item.abstract || "",
-             isoDate: item.published || new Date().toISOString()
-           }));
-        }
-      } catch (e) { console.error("eLife API Error:", e); }
-      return [];
-    })();
-
-    const bmcPromise = (async () => {
-      try {
-        if (!process.env.SPRINGER_NATURE_API_KEY) return [];
-        const q = newsTermsSafe.split('|')[0] || "biology";
-        const bmcUrl = `https://api.springernature.com/openaccess/json?q=keyword:"${encodeURIComponent(q)}"&p=15&api_key=${process.env.SPRINGER_NATURE_API_KEY}`;
-        const res = await fetch(bmcUrl);
-        if (res.ok) {
-           const data = await res.json();
-           const records = data.records || [];
-           return records.map((rec: any, i: number) => ({
-             id: `NEWS-BMC-${rec.identifier || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
-             title: rec.title,
-             source: rec.publicationName || "BioMed Central",
-             url: rec.url && rec.url.length > 0 ? rec.url[0].value : "https://www.biomedcentral.com",
-             image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100",
-             rawSnippet: rec.abstract || "",
-             isoDate: rec.publicationDate || new Date().toISOString()
-           }));
-        }
-      } catch (e) { console.error("BMC API Error:", e); }
-      return [];
-    })();
-
-    const [plosRaw, eLifeRaw, bmcRaw] = await Promise.all([plosPromise, eLifePromise, bmcPromise]);
-    let apiNews = [...plosRaw, ...eLifeRaw, ...bmcRaw];
-    
-    apiNews = apiNews.filter((item: any) => {
-        return item.isoDate ? (new Date(item.isoDate).getTime() > timeWindowLimit) : true;
-    });
-
-    for (let item of apiNews) {
-      if (item.image === "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100") {
-          try {
-              const searchKeyword = getProminentWord(item.title);
-              const KeywordQuery = searchKeyword + " science";
-              const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(KeywordQuery)}&per_page=30&size=large&orientation=landscape`, {
-                headers: { Authorization: "c5w6mctmy3dgyaA69iUsDjgccGUojIlKEa3Y8JtsLU2yJm2HUp2gjQy6" }
-              });
-              if (pexelsRes.ok) {
-                const pexelsData = await pexelsRes.json();
-                if (pexelsData.photos && pexelsData.photos.length > 0) {
-                  const availablePhotos = pexelsData.photos.filter((p: any) => !usedImages.has(p.src.original));
-                  if (availablePhotos.length > 0) {
-                    const randomIdx = Math.floor(Math.random() * availablePhotos.length);
-                    item.image = availablePhotos[randomIdx].src.original;
-                    usedImages.add(item.image);
-                  }
-                }
-              }
-          } catch(e) {}
-      }
-    }
-
-    allNews = allNews.concat(apiNews);
-
     results.news = allNews.sort((a, b) => new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime());
   } catch (e) { console.error("Top-level News Fetch Error:", e); }
 
@@ -430,7 +311,7 @@ async function fetchLiveData(topicsMap: any = {}) {
       if (filtered.length < 5) filtered = papers;
 
       const uniquePapers = Array.from(new Map(filtered.map((p: any) => [p.doi, p])).values()) as any[];
-      let mappedBiorxiv = uniquePapers
+      results.literature = uniquePapers
         .map((p: any) => ({
           id: `LIT-${p.doi}`,
           title: p.title,
@@ -440,64 +321,7 @@ async function fetchLiveData(topicsMap: any = {}) {
           doi: p.doi,
           rawAbstract: p.abstract,
           isoDate: p.date ? new Date(p.date).toISOString() : new Date().toISOString()
-        }));
-
-      let mappedArxiv: any[] = [];
-      try {
-        const arxivCats = ['q-bio.GN', 'q-bio.MN', 'q-bio.BM', 'q-bio.PE'];
-        const catQuery = arxivCats.map((c: string) => `cat:${c}`).join('+OR+');
-        const arxivLitTerms = topicsMap.literature ? topicsMap.literature.split(',').map((s:string)=>s.trim()).filter(Boolean) : ["CRISPR", "Cas9", "RNA", "DNA", "synthetic biology"];
-        const keywordQuery = arxivLitTerms.slice(0, 3).map((t: string) => `all:"${t}"`).join('+OR+');
-        const arxivQuery = `(%28${catQuery}%29+AND+%28${keywordQuery}%29)`;
-        const arxivUrl = `http://export.arxiv.org/api/query?search_query=${arxivQuery}&start=0&max_results=15&sortBy=submittedDate&sortOrder=descending`;
-        
-        const arxivRes = await fetch(arxivUrl);
-        if (arxivRes.ok) {
-           const arxivXml = await arxivRes.text();
-
-           const affilDict: Record<string, string> = {};
-           const entries = arxivXml.split('<entry>');
-           for (let i = 1; i < entries.length; i++) {
-               const entry = entries[i];
-               const idMatch = entry.match(/<id>(.*?)<\/id>/);
-               if (idMatch) {
-                   const affilMatch = entry.match(/<arxiv:affiliation[^>]*>([\s\S]*?)<\/arxiv:affiliation>/);
-                   if (affilMatch) {
-                       affilDict[idMatch[1].trim()] = affilMatch[1].trim();
-                   }
-               }
-           }
-
-           const arxivFeed = await parser.parseString(arxivXml);
-           mappedArxiv = arxivFeed.items.map((item: any, i: number) => {
-               let authorStr = "Various Authors";
-               if (item.creator) {
-                   authorStr = item.creator;
-               } else if (item.author) {
-                   authorStr = item.author;
-               }
-
-               let inst = "arXiv.org";
-               const itemId = item.id || item.guid || "";
-               if (itemId && affilDict[itemId]) {
-                   inst = affilDict[itemId];
-               }
-
-               return {
-                  id: `ARXIV-${item.guid || item.id || i}`.replace(/[^a-zA-Z0-9-]/g, ''),
-                  title: item.title,
-                  authors: authorStr,
-                  institution: inst,
-                  journal: "arXiv q-bio",
-                  doi: item.link || item.id || "",
-                  rawAbstract: item.contentSnippet || item.summary || item.content || "",
-                  isoDate: item.isoDate || new Date().toISOString()
-               };
-           });
-        }
-      } catch (e) { console.error("arXiv Fetch Error:", e); }
-
-      results.literature = [...mappedBiorxiv, ...mappedArxiv]
+        }))
         .sort((a, b) => {
           // Tier 1: top-40 institution papers come first
           const aTop = isTopInstitution(a.institution) ? 0 : 1;
@@ -516,11 +340,6 @@ async function fetchLiveData(topicsMap: any = {}) {
       : null;
       
     const searchParam = userTopics && userTopics.length > 0 ? userTopics[0] : "biology";
-    
-    // Create a strict regex for career relevance (same as news/literature)
-    const careerTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|DNA|pathology|zoology|microbiology|molecular|biotech";
-    const biologicalCareerTerms = new RegExp(careerTermsSafe, 'i');
-
     let federalJobs: any[] = [];
     let rapidJobs: any[] = [];
     let rssJobs: any[] = [];
@@ -540,7 +359,7 @@ async function fetchLiveData(topicsMap: any = {}) {
       'experienced', 'mid-senior',
       'head ', 'dean', 'provost',
       ' ii', ' iii', ' iv',
-      'specialist ii', 'specialist iii', 'specialist', 'consultant',
+      'specialist ii', 'specialist iii',
       'scientist ii', 'scientist iii', 'engineer ii', 'engineer iii',
       'established investigator', 'group leader',
       'attending', 'physician',
@@ -555,16 +374,9 @@ async function fetchLiveData(topicsMap: any = {}) {
       'co-op', 'coop', 'fellowship', 'rotational'
     ];
 
-    /** Returns true if a job should be KEPT (i.e. is NOT a senior-level position AND is relevant to topics). */
-    const isValidJob = (title: string, rawText: string): boolean => {
+    /** Returns true if a job should be KEPT (i.e. is NOT a senior-level position). */
+    const passesEntryLevelFilter = (title: string, rawText: string): boolean => {
       const titleLower = title.toLowerCase();
-      
-      // Hard reject: generic non-science roles that might slip through search queries
-      const NON_SCIENCE_ROLES = ['police', 'firefighter', 'publisher', 'sales', 'marketing', 'accountant', 'hr ', 'human resources', 'recruiter', 'driver', 'custodian', 'security', 'law enforcement'];
-      for (const non of NON_SCIENCE_ROLES) {
-        if (titleLower.includes(non)) return false;
-      }
-
       // Hard reject: any negative keyword in the title alone is an immediate disqualify
       for (const neg of NEGATIVE_TITLE_KEYWORDS) {
         if (titleLower.includes(neg)) return false;
@@ -572,11 +384,6 @@ async function fetchLiveData(topicsMap: any = {}) {
       // Soft reject: senior-level signals in description body
       const seniorDescPatterns = /\b(10\+|8\+|7\+|6\+|5\+)\s*years?\b|\bsenior\b|\bpostdoc|\bph\.?d\s*(required|preferred|only)|\bmanag(e|ing)\s+(a\s+)?team/i;
       if (seniorDescPatterns.test(rawText)) return false;
-      
-      // Strict Relevance Filter: Must match at least one biological/news topic in title or description
-      const fullText = `${title} ${rawText}`;
-      if (!biologicalCareerTerms.test(fullText)) return false;
-      
       return true;
     };
 
@@ -595,7 +402,7 @@ async function fetchLiveData(topicsMap: any = {}) {
     const usajobsPromise = (async () => {
       try {
         if (process.env.USAJOBS_API_KEY && process.env.USAJOBS_USER_EMAIL) {
-            const usajobsRes = await fetch(`https://data.usajobs.gov/api/search?Keyword=${encodeURIComponent(searchParam)}&ResultsPerPage=50`, {
+            const usajobsRes = await fetch(`https://data.usajobs.gov/api/search?Keyword=${encodeURIComponent(searchParam)}`, {
                 headers: {
                     'Host': 'data.usajobs.gov',
                     'User-Agent': process.env.USAJOBS_USER_EMAIL,
@@ -638,50 +445,57 @@ async function fetchLiveData(topicsMap: any = {}) {
         };
         
         // All 6 Fantastic.jobs endpoints fire simultaneously
+        const [activeRes, startupRes, internshipsRes, ycombinatorRes, workdayRes, jobPostingsRes] = await Promise.allSettled([
+            fetch(`https://active-jobs-db.p.rapidapi.com/active-ats-1h?offset=0&include_ai=true&title_filter=%22${encodeURIComponent(searchParam)}%22&location_filter=%22United%20States%22%20OR%20%22United%20Kingdom%22&description_type=text`, {
+                headers: { ...rapidHeaders, 'x-rapidapi-host': 'active-jobs-db.p.rapidapi.com' }
+            }),
+            fetch(`https://startup-jobs-api.p.rapidapi.com/active-jb-7d?source=ycombinator`, {
+                headers: { ...rapidHeaders, 'x-rapidapi-host': 'startup-jobs-api.p.rapidapi.com' }
+            }),
+            fetch(`https://internships-api.p.rapidapi.com/active-jb-7d`, {
+                headers: { ...rapidHeaders, 'x-rapidapi-host': 'internships-api.p.rapidapi.com' }
+            }),
+            fetch(`https://free-y-combinator-jobs-api.p.rapidapi.com/active-jb-7d`, {
+                headers: { ...rapidHeaders, 'x-rapidapi-host': 'free-y-combinator-jobs-api.p.rapidapi.com' }
+            }),
+            fetch(`https://workday-jobs-api.p.rapidapi.com/active-ats-24h?include_ai=true&title_filter=%22${encodeURIComponent(searchParam)}%22&location_filter=%22United%20States%22`, {
+                headers: { ...rapidHeaders, 'x-rapidapi-host': 'workday-jobs-api.p.rapidapi.com' }
+            }),
+            fetch(`https://job-posting-feed-api.p.rapidapi.com/active-ats-6m?include_ai=true&description_type=text`, {
+                headers: { ...rapidHeaders, 'x-rapidapi-host': 'job-posting-feed-api.p.rapidapi.com' }
+            })
+        ]);
+        
         const extractJobs = (data: any): any[] => {
             if (Array.isArray(data)) return data;
             return data.jobs || data.data || data.results || [];
         };
-
-        const fetchDefinitions = [
-            { label: 'Active Jobs DB', url: `https://active-jobs-db.p.rapidapi.com/active-ats-24h?offset=0&include_ai=true&title_filter=%22${encodeURIComponent(searchParam)}%22&location_filter=%22United%20States%22%20OR%20%22United%20Kingdom%22&description_type=text`, host: 'active-jobs-db.p.rapidapi.com' },
-            { label: 'Startup Jobs', url: `https://startup-jobs-api.p.rapidapi.com/active-jb-7d?source=ycombinator`, host: 'startup-jobs-api.p.rapidapi.com' },
-            { label: 'Internships', url: `https://internships-api.p.rapidapi.com/active-jb-7d`, host: 'internships-api.p.rapidapi.com' },
-            { label: 'YC Free Jobs', url: `https://free-y-combinator-jobs-api.p.rapidapi.com/active-jb-7d`, host: 'free-y-combinator-jobs-api.p.rapidapi.com' },
-            { label: 'Workday Jobs', url: `https://workday-jobs-api.p.rapidapi.com/active-ats-24h?include_ai=true&title_filter=%22${encodeURIComponent(searchParam)}%22&location_filter=%22United%20States%22`, host: 'workday-jobs-api.p.rapidapi.com' },
-            { label: 'Job Postings Feed', url: `https://job-posting-feed-api.p.rapidapi.com/active-ats-6m?include_ai=true&description_type=text`, host: 'job-posting-feed-api.p.rapidapi.com' }
-        ];
-
-        let fjItems: any[] = [];
         
-        for (const def of fetchDefinitions) {
-            let retries = 3;
-            for (let i = 0; i < retries; i++) {
-                try {
-                    const res = await fetch(def.url, {
-                        headers: { ...rapidHeaders, 'x-rapidapi-host': def.host }
-                    });
-                    
-                    if (res.ok) {
-                        const body = await res.json();
-                        const items = extractJobs(body);
-                        console.log(`[FantasticJobs] ${def.label}: ${items.length} jobs ingested`);
-                        fjItems = fjItems.concat(items);
-                        break;
-                    } else if (res.status === 429) {
-                        await new Promise(r => setTimeout(r, 5000));
-                        continue;
-                    } else if (res.status === 401 || res.status === 403) {
-                        break;
-                    } else {
-                        break;
-                    }
-                } catch (err) {
-                    break;
+        let fjItems: any[] = [];
+        const apiResults = [
+            { res: activeRes, label: 'Active Jobs DB' },
+            { res: startupRes, label: 'Startup Jobs' },
+            { res: internshipsRes, label: 'Internships' },
+            { res: ycombinatorRes, label: 'YC Free Jobs' },
+            { res: workdayRes, label: 'Workday Jobs' },
+            { res: jobPostingsRes, label: 'Job Postings Feed' }
+        ];
+        
+        for (const { res, label } of apiResults) {
+            try {
+                if (res.status === 'fulfilled' && res.value.ok) {
+                    const body = await res.value.json();
+                    const items = extractJobs(body);
+                    console.log(`[FantasticJobs] ${label}: ${items.length} jobs ingested`);
+                    fjItems = fjItems.concat(items);
+                } else if (res.status === 'fulfilled') {
+                    console.warn(`[FantasticJobs] ${label}: HTTP ${res.value.status}`);
+                } else {
+                    console.warn(`[FantasticJobs] ${label}: Network error — ${(res as PromiseRejectedResult).reason}`);
                 }
+            } catch (parseErr) {
+                console.error(`[FantasticJobs] ${label} parse error:`, parseErr);
             }
-            // Sequential delay to protect against RapidAPI rate limit spikes
-            await new Promise(r => setTimeout(r, 2500));
         }
         
         return fjItems.map((job: any, i: number) => ({
@@ -700,8 +514,7 @@ async function fetchLiveData(topicsMap: any = {}) {
     const rssPromise = (async () => {
       const jobFeeds = [
          { url: 'https://jobs.sciencecareers.org/jobsrss/?countrycode=US', flag: 'science' },
-         { url: 'https://www.nature.com/naturecareers/jobsrss/?countrycode=US', flag: 'nature' },
-         { url: 'https://jobs.biospace.com/jobsrss/?countrycode=US', flag: 'biospace' }
+         { url: 'https://www.nature.com/naturecareers/jobsrss/?countrycode=US', flag: 'nature' }
       ];
       let collected: any[] = [];
       for (const feedConfig of jobFeeds) {
@@ -737,9 +550,7 @@ async function fetchLiveData(topicsMap: any = {}) {
                    };
                });
                collected = collected.concat(mapped);
-           } catch (e) { 
-               // Silently skip on 403 or parsing errors to prevent noisy console logs
-           }
+           } catch (e) { console.error("Jobs RSS Fetch Error:", e); }
       }
       return collected;
     })();
@@ -750,9 +561,9 @@ async function fetchLiveData(topicsMap: any = {}) {
     // ──────────────────────────────────────────────────────────────────────
     // PRE-MERGE ENTRY-LEVEL FILTER — strip senior/PhD/postdoc from ALL pools
     // ──────────────────────────────────────────────────────────────────────
-    federalJobs = boostEntryLevel(shuffleArray(usajobsRaw.filter((j: any) => isValidJob(j.title, j.rawText))));
-    rapidJobs   = boostEntryLevel(shuffleArray(rapidRaw.filter((j: any) => isValidJob(j.title, j.rawText))));
-    rssJobs     = boostEntryLevel(shuffleArray(rssRaw.filter((j: any) => isValidJob(j.title, j.rawText))));
+    federalJobs = boostEntryLevel(shuffleArray(usajobsRaw.filter((j: any) => passesEntryLevelFilter(j.title, j.rawText))));
+    rapidJobs   = boostEntryLevel(shuffleArray(rapidRaw.filter((j: any) => passesEntryLevelFilter(j.title, j.rawText))));
+    rssJobs     = boostEntryLevel(shuffleArray(rssRaw.filter((j: any) => passesEntryLevelFilter(j.title, j.rawText))));
 
     console.log(`[Careers] Source breakdown — Federal: ${usajobsRaw.length} raw → ${federalJobs.length} filtered | RapidAPI: ${rapidRaw.length} raw → ${rapidJobs.length} filtered | RSS: ${rssRaw.length} raw → ${rssJobs.length} filtered`);
     console.log(`[Careers] Post-filter counts — Federal: ${federalJobs.length}, RapidAPI(6): ${rapidJobs.length}, RSS: ${rssJobs.length}`);
@@ -814,27 +625,17 @@ CRITICAL RULES:
 Return ONLY a strict JSON object mapping each job 'id' to: { institution: string, experienceLevel: string, location: string }.
 Jobs: ${JSON.stringify(aiPayload)}`;
             
-            let gRes;
-            let retries = 3;
-            for (let i = 0; i < retries; i++) {
-                didCallCareersGemini = true;
-                gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: { responseMimeType: "application/json" }
-                  })
-                });
-                if (gRes.ok) break;
-                if (gRes.status === 429) {
-                    await new Promise(r => setTimeout(r, 6000));
-                } else {
-                    break;
-                }
-            }
+            const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: "application/json" }
+              })
+            });
             
-            if (gRes && gRes.ok) {
+            if (gRes.ok) {
+               didCallCareersGemini = true;
                const gData = await gRes.json();
                const parsedAI = JSON.parse(gData.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
                results.positions = results.positions.map((p: any) => {
@@ -860,48 +661,6 @@ Jobs: ${JSON.stringify(aiPayload)}`;
         const level = (p.experienceLevel || '').toLowerCase();
         return !REJECTED_LEVELS.some(rej => level.includes(rej));
     });
-
-    // ──────────────────────────────────────────────────────────────────────
-    // DEDUPLICATE SPAM / BULK POSTINGS
-    // ──────────────────────────────────────────────────────────────────────
-    const uniqueJobs = new Map();
-    results.positions.forEach((p: any) => {
-        const inst = (p.institution || "unknown").toLowerCase().trim();
-        // Extract base title to group identical jobs across different cities
-        let baseTitle = (p.title || "").toLowerCase();
-        if (baseTitle.includes('-')) baseTitle = baseTitle.split('-')[0].trim();
-        if (baseTitle.includes('(')) baseTitle = baseTitle.split('(')[0].trim();
-        const key = `${inst}::${baseTitle}`;
-        
-        if (!uniqueJobs.has(key)) {
-            uniqueJobs.set(key, []);
-        }
-        uniqueJobs.get(key).push(p);
-    });
-    
-    // Flatten and limit to max 2 similar jobs per institution
-    let deduplicatedPositions: any[] = [];
-    uniqueJobs.forEach((jobs) => {
-        deduplicatedPositions = deduplicatedPositions.concat(jobs.slice(0, 2));
-    });
-    results.positions = deduplicatedPositions;
-
-    // ──────────────────────────────────────────────────────────────────────
-    // SORT BY EXPERIENCE LEVEL
-    // ──────────────────────────────────────────────────────────────────────
-    const EXP_ORDER: Record<string, number> = {
-        "internship": 1,
-        "undergraduate / entry level": 2,
-        "junior": 3,
-        "mid-level": 4,
-    };
-    
-    results.positions.sort((a: any, b: any) => {
-        const aVal = EXP_ORDER[(a.experienceLevel || "").toLowerCase()] || 99;
-        const bVal = EXP_ORDER[(b.experienceLevel || "").toLowerCase()] || 99;
-        return aVal - bVal;
-    });
-
     console.log(`[Careers] Post-Gemini filter: ${beforeCount} → ${results.positions.length} positions (removed ${beforeCount - results.positions.length} senior/PhD/faculty roles)`);
   } catch (e) { console.error("Evergreen Careers Error:", e); }
 
@@ -960,7 +719,7 @@ Jobs: ${JSON.stringify(aiPayload)}`;
                 break;
             }
         }
-
+        
         if (!gRes || !gRes.ok) throw new Error(`Gemini API Error: ${gRes ? gRes.status : 'No response'}`);
         const gData = await gRes.json();
         const rawText = gData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
@@ -968,7 +727,7 @@ Jobs: ${JSON.stringify(aiPayload)}`;
         Object.assign(masterSummaryDict, parsed);
 
       } catch (e) {
-        console.warn(`[Gemini] Batch summarization failed: ${e instanceof Error ? e.message : 'Unknown error'}`);
+        console.error("Gemini batch failure:", e);
       } finally {
         // Gently throttle seq calls to protect Free Tier (15 RPM max)
         // Move to finally block to ensure throttling runs even if the current batch failed.
@@ -1083,7 +842,7 @@ Jobs: ${JSON.stringify(aiPayload)}`;
   return results;
 }
 
-export async function POST(req: Request) {
+async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
     const liveData = await fetchLiveData(body.topics);
