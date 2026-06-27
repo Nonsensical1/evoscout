@@ -6,7 +6,24 @@ import { useAuth } from '@/app/providers';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc, query, orderBy, limit as firestoreLimit, getDocs } from 'firebase/firestore';
 import { LiteratureCard } from './LiteratureCard';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend, Sector } from 'recharts';
+
+const renderActiveShape = (props: any) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+  return (
+    <g>
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius + 12}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+      />
+    </g>
+  );
+};
 
 export default function Home() {
   const { user } = useAuth();
@@ -15,6 +32,15 @@ export default function Home() {
   const [actionMessage, setActionMessage] = useState("");
   const [quotaNotice, setQuotaNotice] = useState<string | null>(null);
   const [monthlyTrends, setMonthlyTrends] = useState<{ name: string, value: number }[]>([]);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  
+  const onPieEnter = useCallback((_: any, index: number) => {
+    setActiveIndex(index);
+  }, []);
+  const onPieLeave = useCallback(() => {
+    setActiveIndex(-1);
+  }, []);
+
   const trendsFetched = useRef(false);
   const scrapeInProgress = useRef(false);
   // Ensures the on-demand history fetch fires at most once per session load
@@ -675,6 +701,10 @@ export default function Home() {
                         outerRadius={160}
                         paddingAngle={5}
                         dataKey="value"
+                        {...({ activeIndex: activeIndex === -1 ? undefined : activeIndex } as any)}
+                        activeShape={renderActiveShape}
+                        onMouseEnter={onPieEnter}
+                        onMouseLeave={onPieLeave}
                       >
                         {monthlyTrends.map((entry, index) => {
                           const colors = ['#005587', '#0099cc', '#f59e0b', '#10b981', '#6366f1'];
