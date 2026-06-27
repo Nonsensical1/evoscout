@@ -319,31 +319,40 @@ export default function Home() {
           )
         );
 
-        const textCorpus: string[] = [];
-        ledgerSnap.forEach(doc => {
-          const data = doc.data();
-          if (data.date >= dateLimit) {
-            (data.news || []).forEach((item: any) => {
-              textCorpus.push((item.title || "").toLowerCase());
-              textCorpus.push((item.summary || item.rawSnippet || "").toLowerCase());
-            });
-            (data.literature || []).forEach((item: any) => {
-              textCorpus.push((item.title || "").toLowerCase());
-              textCorpus.push((item.summary || item.rawSnippet || "").toLowerCase());
-            });
-          }
-        });
+        // Dynamic NLP Stop Words Dictionary
+        const STOP_WORDS = new Set([
+          // Pronouns & Prepositions & Common English
+          "that", "with", "this", "from", "they", "will", "would", "there",
+          "their", "what", "about", "which", "when", "make", "can", "like",
+          "time", "just", "know", "take", "people", "into", "year", "your",
+          "good", "some", "could", "them", "other", "than", "then", "now",
+          "look", "only", "come", "over", "think", "also", "back", "after",
+          "use", "two", "how", "our", "work", "first", "well", "way", "even",
+          "new", "want", "because", "any", "these", "give", "day", "most", "us",
+          "are", "was", "were", "been", "being", "have", "has", "had", "does", "did",
+          "who", "where", "why", "all", "its", "may", "many", "such", "through",
+          "between", "while", "during", "both", "each", "those", "down", "out",
+          "more", "much", "very", "every", "should", "might", "must",
+          "the", "and", "for", "not", "but", "within", "without", "against", "into",
+          
+          // Scientific Jargon
+          "study", "research", "paper", "analysis", "data", "results", "published",
+          "using", "used", "method", "methods", "showed", "found", "finding", "findings",
+          "model", "system", "development", "developed", "approach", "based", "significant",
+          "role", "effect", "effects", "different", "important", "specific", "function",
+          "mechanism", "mechanisms", "provide", "provides", "understanding",
+          "insight", "insights", "journal", "review", "article", "report", "reported",
+          "experiment", "experiments", "experimental", "trial", "trials", "clinical",
+          "patient", "patients", "disease", "diseases", "treatment", "treatments",
+          "author", "authors", "university", "institute", "laboratory", "science", "scientists",
+          "nature", "cell", "cells", "biology", "biological", "medical", "medicine", "health",
+          "human", "humans", "animal", "animals", "mouse", "mice", "discovery",
+          "potential", "identified", "show", "shows", "could", "can", "demonstrate", "suggest",
+          "researchers", "team", "novel", "associated", "pathway", "target"
+        ]);
 
-        const fullText = textCorpus.join(" ");
-        
-        const settingsSnap = await getDoc(doc(db, 'users', user.uid, 'settings', 'config'));
-        const settings = settingsSnap.exists() ? settingsSnap.data() : {};
-        
-        const topicsStr = settings.topics?.news || settings.topics?.literature || "CRISPR, Prime Editing, Base Editing, Gene Drive, CAR-T, mRNA Vaccines, Epigenetics, Methylation, Optogenetics, Cryo-EM, AlphaFold, Proteomics, Single-cell Sequencing, Multi-omics, Spatial Transcriptomics, Microbiome, Metagenomics, Synthetic Biology, Metabolic Engineering, Bioinformatics, Deep Learning, Oncogenes, Tumor Microenvironment, Checkpoint Inhibitors, Neurodegeneration, Alzheimer's, Pluripotent Stem Cells, Organoids, Aging, Senescence, Directed Evolution, Recombinant DNA, Gene Therapy";
-        const topicList = topicsStr.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
-
-        const dailyDataMap: Record<string, Record<string, number>> = {};
-        const overallCounts: Record<string, number> = {};
+        const dailyRawTextMap: Record<string, string> = {};
+        const globalTermCounts: Record<string, number> = {};
 
         ledgerSnap.forEach(doc => {
           const data = doc.data();
@@ -358,30 +367,35 @@ export default function Home() {
               dailyText += " " + (item.summary || item.rawSnippet || "").toLowerCase();
             });
 
-            dailyDataMap[data.date] = {};
-            topicList.forEach((topic: string) => {
-               const regex = new RegExp(`\\b${topic}\\b`, 'gi');
-               const matches = dailyText.match(regex);
-               const count = matches ? matches.length : 0;
-               dailyDataMap[data.date][topic] = count;
-               overallCounts[topic] = (overallCounts[topic] || 0) + count;
+            dailyRawTextMap[data.date] = dailyText;
+
+            // Tokenize text into words (length >= 4 to avoid generic filler)
+            const words = dailyText.match(/\b[a-z]{4,}\b/g) || [];
+            words.forEach(word => {
+              if (!STOP_WORDS.has(word)) {
+                globalTermCounts[word] = (globalTermCounts[word] || 0) + 1;
+              }
             });
           }
         });
 
-        const topTopics = Object.entries(overallCounts)
-          .sort((a: any, b: any) => b[1] - a[1])
+        // Get top 5 dynamically discovered organic trends
+        const topTopics = Object.entries(globalTermCounts)
+          .sort((a, b) => b[1] - a[1])
           .slice(0, 5)
           .map(entry => entry[0]);
 
         if (topTopics.length === 0) return;
 
-        const timeSeriesData = Object.keys(dailyDataMap)
+        const timeSeriesData = Object.keys(dailyRawTextMap)
           .sort()
           .map(dateStr => {
             const row: any = { date: dateStr.slice(5) }; // Format MM-DD
-            topTopics.forEach(t => {
-              row[t] = dailyDataMap[dateStr][t] || 0;
+            const textForDay = dailyRawTextMap[dateStr];
+            topTopics.forEach(topic => {
+              const regex = new RegExp(`\\b${topic}\\b`, 'gi');
+              const matches = textForDay.match(regex);
+              row[topic] = matches ? matches.length : 0;
             });
             return row;
           });
