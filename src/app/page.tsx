@@ -664,15 +664,15 @@ export default function Home() {
                     Past 30 Days
                   </span>
                 </div>
-                <div className="w-full h-[400px] bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex justify-center items-center">
+                <div className="w-full h-[500px] bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex justify-center items-center">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={monthlyTrends}
                         cx="50%"
                         cy="50%"
-                        innerRadius={80}
-                        outerRadius={120}
+                        innerRadius={110}
+                        outerRadius={160}
                         paddingAngle={5}
                         dataKey="value"
                       >
