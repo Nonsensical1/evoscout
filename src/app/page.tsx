@@ -6,7 +6,7 @@ import { useAuth } from '@/app/providers';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc, query, orderBy, limit as firestoreLimit, getDocs } from 'firebase/firestore';
 import { LiteratureCard } from './LiteratureCard';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Home() {
   const { user } = useAuth();
@@ -14,7 +14,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
   const [quotaNotice, setQuotaNotice] = useState<string | null>(null);
-  const [monthlyTrends, setMonthlyTrends] = useState<{ topTopics: string[], data: any[] }>({ topTopics: [], data: [] });
+  const [monthlyTrends, setMonthlyTrends] = useState<{ name: string, value: number }[]>([]);
   const trendsFetched = useRef(false);
   const scrapeInProgress = useRef(false);
   // Ensures the on-demand history fetch fires at most once per session load
@@ -379,24 +379,11 @@ export default function Home() {
         const topTopics = Object.entries(globalTermCounts)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 5)
-          .map(entry => entry[0]);
+          .map(entry => ({ name: entry[0], value: entry[1] }));
 
         if (topTopics.length === 0) return;
 
-        const timeSeriesData = Object.keys(dailyRawTextMap)
-          .sort()
-          .map(dateStr => {
-            const row: any = { date: dateStr.slice(5) }; // Format MM-DD
-            const textForDay = dailyRawTextMap[dateStr];
-            topTopics.forEach(topic => {
-              const regex = new RegExp(`\\b${topic}\\b`, 'gi');
-              const matches = textForDay.match(regex);
-              row[topic] = matches ? matches.length : 0;
-            });
-            return row;
-          });
-
-        setMonthlyTrends({ topTopics, data: timeSeriesData });
+        setMonthlyTrends(topTopics);
       } catch (e) {
         console.error("Failed to fetch trends", e);
       }
@@ -667,42 +654,40 @@ export default function Home() {
             )}
           </section>
 
-          {monthlyTrends.data.length > 0 && (
+          {monthlyTrends.length > 0 && (
             <>
               <hr className="border-t-4 border-editorial-border-dark my-10" />
               <section id="section-trends">
                 <div className="flex items-baseline justify-between mb-6 border-b border-editorial-border pb-2">
-                  <h3 className="text-2xl font-serif font-black uppercase tracking-tight">Persistent Monthly Trends</h3>
+                  <h3 className="text-2xl font-serif font-black uppercase tracking-tight">Monthly Concept Share</h3>
                   <span className="text-xs font-sans font-bold text-editorial-muted uppercase tracking-wider">
                     Past 30 Days
                   </span>
                 </div>
-                <div className="w-full h-[400px] bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333]">
+                <div className="w-full h-[400px] bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex justify-center items-center">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={monthlyTrends.data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-700" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                    <PieChart>
+                      <Pie
+                        data={monthlyTrends}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={80}
+                        outerRadius={120}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {monthlyTrends.map((entry, index) => {
+                          const colors = ['#005587', '#0099cc', '#f59e0b', '#10b981', '#6366f1'];
+                          return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                        })}
+                      </Pie>
                       <Tooltip 
                         contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.95)', color: '#000' }}
                         itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
+                        formatter={(value, name) => [`${value} mentions`, name]}
                       />
-                      <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                      {monthlyTrends.topTopics.map((topic, idx) => {
-                        const colors = ['#005587', '#0099cc', '#f59e0b', '#10b981', '#6366f1'];
-                        return (
-                          <Line 
-                            key={topic} 
-                            type="monotone" 
-                            dataKey={topic} 
-                            stroke={colors[idx % colors.length]} 
-                            strokeWidth={3}
-                            dot={{ r: 3, strokeWidth: 0, fill: colors[idx % colors.length] }}
-                            activeDot={{ r: 6, strokeWidth: 0 }}
-                          />
-                        );
-                      })}
-                    </LineChart>
+                      <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: '500', paddingTop: '20px' }} />
+                    </PieChart>
                   </ResponsiveContainer>
                 </div>
               </section>
