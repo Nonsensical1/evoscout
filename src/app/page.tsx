@@ -338,7 +338,7 @@ export default function Home() {
         const settingsSnap = await getDoc(doc(db, 'users', user.uid, 'settings', 'config'));
         const settings = settingsSnap.exists() ? settingsSnap.data() : {};
         
-        const topicsStr = settings.topics?.news || settings.topics?.literature || "CRISPR, Cas9, Cas12, gene, cell, RNA, proteomics, synthetic biology, epigenetic, microbiome, cancer, DNA, pathology, zoology, oncology, metabolism, computational, genomics";
+        const topicsStr = settings.topics?.news || settings.topics?.literature || "CRISPR, Prime Editing, Base Editing, Gene Drive, CAR-T, mRNA Vaccines, Epigenetics, Methylation, Optogenetics, Cryo-EM, AlphaFold, Proteomics, Single-cell Sequencing, Multi-omics, Spatial Transcriptomics, Microbiome, Metagenomics, Synthetic Biology, Metabolic Engineering, Bioinformatics, Deep Learning, Oncogenes, Tumor Microenvironment, Checkpoint Inhibitors, Neurodegeneration, Alzheimer's, Pluripotent Stem Cells, Organoids, Aging, Senescence, Directed Evolution, Recombinant DNA, Gene Therapy";
         const topicList = topicsStr.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
 
         const counts = topicList.map((topic: string) => {
@@ -629,19 +629,19 @@ export default function Home() {
                     Past 30 Days
                   </span>
                 </div>
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-6">
                   {monthlyTrends.map((trend, idx) => {
                     const maxCount = monthlyTrends[0].count;
                     const percent = Math.max(5, Math.min(100, (trend.count / maxCount) * 100));
                     return (
-                      <div key={idx} className="flex flex-col gap-1">
-                        <div className="flex justify-between items-end">
-                          <span className="font-serif font-bold text-lg capitalize">{trend.topic}</span>
-                          <span className="font-sans text-xs font-bold text-editorial-muted uppercase tracking-tight">{trend.count} occurrences</span>
+                      <div key={idx} className="relative group">
+                        <div className="flex justify-between items-baseline mb-2">
+                          <span className="font-serif font-black text-xl md:text-2xl tracking-tight capitalize group-hover:text-[#005587] dark:group-hover:text-[#60a5fa] transition-colors">{trend.topic}</span>
+                          <span className="font-sans text-xs md:text-sm font-bold text-gray-500 uppercase tracking-widest">{trend.count} mentions</span>
                         </div>
-                        <div className="w-full bg-gray-200 dark:bg-[#333333] h-2 rounded-full overflow-hidden">
+                        <div className="w-full bg-gray-200 dark:bg-[#333333] h-2.5 rounded-full overflow-hidden shadow-inner">
                           <div 
-                            className="bg-[#005587] dark:bg-[#2563eb] h-full transition-all duration-1000 ease-out"
+                            className="h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-[#005587] to-[#0099cc] dark:from-[#2563eb] dark:to-[#60a5fa]"
                             style={{ width: `${percent}%` }}
                           ></div>
                         </div>
