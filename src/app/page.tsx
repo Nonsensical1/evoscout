@@ -374,17 +374,27 @@ export default function Home() {
         ];
 
         let userTopics: string[] = [];
-        if (settings.topics?.news) {
-          userTopics = userTopics.concat(settings.topics.news.split(','));
-        }
-        if (settings.topics?.literature) {
-          userTopics = userTopics.concat(settings.topics.literature.split(','));
-        }
+        const allFields = ['news', 'literature', 'grants', 'openGovGrants', 'careerInstitutions', 'careerTitles'];
+        allFields.forEach(field => {
+          if (settings.topics?.[field]) {
+            userTopics = userTopics.concat(settings.topics[field].split(','));
+          }
+        });
+        
         const userTopicsSet = new Set(userTopics.map(t => t.toLowerCase().trim()).filter(Boolean));
         
         const combinedTopics = Array.from(new Set(
           ADVANCED_CONCEPTS.map(t => t.toLowerCase().trim())
-        )).filter(t => Boolean(t) && !userTopicsSet.has(t));
+        )).filter(t => {
+          if (!t) return false;
+          // Bidirectional substring exclusion to catch partials like "CRISPR" vs "CRISPR-Cas9"
+          for (const ut of userTopicsSet) {
+            if (ut.includes(t) || t.includes(ut)) {
+              return false;
+            }
+          }
+          return true;
+        });
 
         const globalNewsTermCounts: Record<string, number> = {};
         const globalLitTermCounts: Record<string, number> = {};
