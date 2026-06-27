@@ -319,37 +319,33 @@ export default function Home() {
           )
         );
 
-        // Dynamic NLP Stop Words Dictionary
-        const STOP_WORDS = new Set([
-          // Pronouns & Prepositions & Common English
-          "that", "with", "this", "from", "they", "will", "would", "there",
-          "their", "what", "about", "which", "when", "make", "can", "like",
-          "time", "just", "know", "take", "people", "into", "year", "your",
-          "good", "some", "could", "them", "other", "than", "then", "now",
-          "look", "only", "come", "over", "think", "also", "back", "after",
-          "use", "two", "how", "our", "work", "first", "well", "way", "even",
-          "new", "want", "because", "any", "these", "give", "day", "most", "us",
-          "are", "was", "were", "been", "being", "have", "has", "had", "does", "did",
-          "who", "where", "why", "all", "its", "may", "many", "such", "through",
-          "between", "while", "during", "both", "each", "those", "down", "out",
-          "more", "much", "very", "every", "should", "might", "must",
-          "the", "and", "for", "not", "but", "within", "without", "against", "into",
-          
-          // Scientific Jargon
-          "study", "research", "paper", "analysis", "data", "results", "published",
-          "using", "used", "method", "methods", "showed", "found", "finding", "findings",
-          "model", "system", "development", "developed", "approach", "based", "significant",
-          "role", "effect", "effects", "different", "important", "specific", "function",
-          "mechanism", "mechanisms", "provide", "provides", "understanding",
-          "insight", "insights", "journal", "review", "article", "report", "reported",
-          "experiment", "experiments", "experimental", "trial", "trials", "clinical",
-          "patient", "patients", "disease", "diseases", "treatment", "treatments",
-          "author", "authors", "university", "institute", "laboratory", "science", "scientists",
-          "nature", "cell", "cells", "biology", "biological", "medical", "medicine", "health",
-          "human", "humans", "animal", "animals", "mouse", "mice", "discovery",
-          "potential", "identified", "show", "shows", "could", "can", "demonstrate", "suggest",
-          "researchers", "team", "novel", "associated", "pathway", "target"
-        ]);
+        const settingsSnap = await getDoc(doc(db, 'users', user.uid, 'settings', 'config'));
+        const settings = settingsSnap.exists() ? settingsSnap.data() : {};
+        
+        const ADVANCED_CONCEPTS = [
+          "CRISPR-Cas9", "CRISPR", "Prime Editing", "Base Editing", "Gene Drive", "CAR-T", 
+          "mRNA Vaccines", "Epigenetics", "Methylation", "Optogenetics", "Cryo-EM", 
+          "AlphaFold", "Proteomics", "Single-cell Sequencing", "Multi-omics", 
+          "Spatial Transcriptomics", "Microbiome", "Metagenomics", "Synthetic Biology", 
+          "Metabolic Engineering", "Bioinformatics", "Deep Learning", "Oncogenes", 
+          "Tumor Microenvironment", "Checkpoint Inhibitors", "Neurodegeneration", 
+          "Alzheimer's", "Pluripotent Stem Cells", "Organoids", "Aging", "Senescence", 
+          "Directed Evolution", "Recombinant DNA", "Gene Therapy", "Machine Learning", 
+          "Artificial Intelligence", "Nanoparticles", "Biomarkers", "Immunotherapy"
+        ];
+
+        let userTopics: string[] = [];
+        if (settings.topics?.news) {
+          userTopics = userTopics.concat(settings.topics.news.split(','));
+        }
+        if (settings.topics?.literature) {
+          userTopics = userTopics.concat(settings.topics.literature.split(','));
+        }
+        
+        const combinedTopics = Array.from(new Set([
+          ...ADVANCED_CONCEPTS.map(t => t.toLowerCase().trim()),
+          ...userTopics.map(t => t.toLowerCase().trim())
+        ])).filter(Boolean);
 
         const dailyRawTextMap: Record<string, string> = {};
         const globalTermCounts: Record<string, number> = {};
@@ -369,17 +365,17 @@ export default function Home() {
 
             dailyRawTextMap[data.date] = dailyText;
 
-            // Tokenize text into words (length >= 4 to avoid generic filler)
-            const words = dailyText.match(/\b[a-z]{4,}\b/g) || [];
-            words.forEach(word => {
-              if (!STOP_WORDS.has(word)) {
-                globalTermCounts[word] = (globalTermCounts[word] || 0) + 1;
+            combinedTopics.forEach(topic => {
+              const regex = new RegExp(`\\b${topic.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+              const matches = dailyText.match(regex);
+              if (matches && matches.length > 0) {
+                globalTermCounts[topic] = (globalTermCounts[topic] || 0) + matches.length;
               }
             });
           }
         });
 
-        // Get top 5 dynamically discovered organic trends
+        // Get top 5 highly specific concepts
         const topTopics = Object.entries(globalTermCounts)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 5)
