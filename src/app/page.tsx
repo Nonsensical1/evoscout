@@ -13,6 +13,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
   const [quotaNotice, setQuotaNotice] = useState<string | null>(null);
+  const [monthlyTrends, setMonthlyTrends] = useState<{ topic: string, count: number }[]>([]);
+  const trendsFetched = useRef(false);
   const scrapeInProgress = useRef(false);
   // Ensures the on-demand history fetch fires at most once per session load
   const historyFetchFired = useRef(false);
@@ -299,6 +301,63 @@ export default function Home() {
   }, [user]);
 
   useEffect(() => {
+    if (!user || trendsFetched.current) return;
+    trendsFetched.current = true;
+    
+    const fetchMonthlyTrends = async () => {
+      try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const dateLimit = thirtyDaysAgo.toISOString().split('T')[0];
+
+        const ledgerSnap = await getDocs(
+          query(
+            collection(db, 'users', user.uid, 'ledger'), 
+            orderBy('date', 'desc'), 
+            firestoreLimit(30)
+          )
+        );
+
+        const textCorpus: string[] = [];
+        ledgerSnap.forEach(doc => {
+          const data = doc.data();
+          if (data.date >= dateLimit) {
+            (data.news || []).forEach((item: any) => {
+              textCorpus.push((item.title || "").toLowerCase());
+              textCorpus.push((item.summary || item.rawSnippet || "").toLowerCase());
+            });
+            (data.literature || []).forEach((item: any) => {
+              textCorpus.push((item.title || "").toLowerCase());
+              textCorpus.push((item.summary || item.rawSnippet || "").toLowerCase());
+            });
+          }
+        });
+
+        const fullText = textCorpus.join(" ");
+        
+        const settingsSnap = await getDoc(doc(db, 'users', user.uid, 'settings', 'config'));
+        const settings = settingsSnap.exists() ? settingsSnap.data() : {};
+        
+        const topicsStr = settings.topics?.news || settings.topics?.literature || "CRISPR, Cas9, Cas12, gene, cell, RNA, proteomics, synthetic biology, epigenetic, microbiome, cancer, DNA, pathology, zoology, oncology, metabolism, computational, genomics";
+        const topicList = topicsStr.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+
+        const counts = topicList.map((topic: string) => {
+          const regex = new RegExp(`\\b${topic}\\b`, 'gi');
+          const matches = fullText.match(regex);
+          return { topic, count: matches ? matches.length : 0 };
+        }).filter((t: any) => t.count > 0);
+
+        counts.sort((a: any, b: any) => b.count - a.count);
+        setMonthlyTrends(counts.slice(0, 10));
+      } catch (e) {
+        console.error("Failed to fetch trends", e);
+      }
+    };
+    
+    fetchMonthlyTrends();
+  }, [user]);
+
+  useEffect(() => {
     if (!user) return;
     let hasFiredInitialScrapeCheck = false;
 
@@ -559,6 +618,40 @@ export default function Home() {
               </div>
             )}
           </section>
+
+          {monthlyTrends.length > 0 && (
+            <>
+              <hr className="border-t-4 border-editorial-border-dark my-10" />
+              <section id="section-trends">
+                <div className="flex items-baseline justify-between mb-6 border-b border-editorial-border pb-2">
+                  <h3 className="text-2xl font-serif font-black uppercase tracking-tight">Persistent Monthly Trends</h3>
+                  <span className="text-xs font-sans font-bold text-editorial-muted uppercase tracking-wider">
+                    Past 30 Days
+                  </span>
+                </div>
+                <div className="flex flex-col gap-4">
+                  {monthlyTrends.map((trend, idx) => {
+                    const maxCount = monthlyTrends[0].count;
+                    const percent = Math.max(5, Math.min(100, (trend.count / maxCount) * 100));
+                    return (
+                      <div key={idx} className="flex flex-col gap-1">
+                        <div className="flex justify-between items-end">
+                          <span className="font-serif font-bold text-lg capitalize">{trend.topic}</span>
+                          <span className="font-sans text-xs font-bold text-editorial-muted uppercase tracking-tight">{trend.count} occurrences</span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-[#333333] h-2 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-[#005587] dark:bg-[#2563eb] h-full transition-all duration-1000 ease-out"
+                            style={{ width: `${percent}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            </>
+          )}
         </div>
 
         {/* Separator Line */}
