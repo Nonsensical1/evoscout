@@ -227,7 +227,13 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
       { url: 'https://www.cell.com/cell-systems/current.rss', source: 'Cell Systems' },
       { url: 'https://www.cell.com/cell/current.rss', source: 'Cell' },
       { url: 'https://www.cell.com/molecular-cell/current.rss', source: 'Molecular Cell' },
-      { url: 'https://www.pnas.org/action/showFeed?type=etoc&feed=rss&jc=pnas', source: 'PNAS' }
+      { url: 'https://www.pnas.org/action/showFeed?type=etoc&feed=rss&jc=pnas', source: 'PNAS' },
+      { url: 'https://www.nature.com/nmeth.rss', source: 'Nature Methods' },
+      { url: 'https://www.nature.com/nm.rss', source: 'Nature Medicine' },
+      { url: 'https://www.cell.com/cell-stem-cell/current.rss', source: 'Cell Stem Cell' },
+      { url: 'https://www.science.org/rss/stm.xml', source: 'Science Translational Medicine' },
+      { url: 'https://www.nejm.org/action/showFeed?type=etoc&feed=rss', source: 'NEJM' },
+      { url: 'https://www.science.org/rss/sciimmunol.xml', source: 'Science Immunology' }
     ];
     let allNews: any[] = [];
     const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|DNA|pathology|zoology";
