@@ -61,7 +61,7 @@ function isTopInstitution(institution: string): boolean {
   return TOP_40_UNIVERSITY_KEYWORDS.some(kw => lower.includes(kw));
 }
 
-async function fetchLiveData(topicsMap: any = {}) {
+async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
   const parseTopics = (str: string | undefined, fallback: string[]) => str ? str.split(',').map((s: string) => s.trim()).filter(Boolean) : fallback;
   const parser = new Parser({ customFields: { item: [['media:thumbnail', 'mediaThumbnail']] } });
   const results: any = { grants: [], openGovGrants: [], news: [], literature: [], positions: [] };
@@ -221,16 +221,7 @@ async function fetchLiveData(topicsMap: any = {}) {
       { url: 'https://www.cell.com/cell-systems/current.rss', source: 'Cell Systems' },
       { url: 'https://www.cell.com/cell/current.rss', source: 'Cell' },
       { url: 'https://www.cell.com/molecular-cell/current.rss', source: 'Molecular Cell' },
-      { url: 'https://www.pnas.org/action/showFeed?type=etoc&feed=rss&jc=pnas', source: 'PNAS' },
-      { url: 'https://www.nejm.org/action/showFeed?type=etoc&feed=rss', source: 'NEJM' },
-      { url: 'https://www.thelancet.com/rssfeed/lancet_current.xml', source: 'The Lancet' },
-      { url: 'https://jamanetwork.com/rss/journals/jama/current.xml', source: 'JAMA' },
-      { url: 'https://www.nature.com/nm.rss', source: 'Nature Medicine' },
-      { url: 'https://www.nature.com/nmeth.rss', source: 'Nature Methods' },
-      { url: 'https://www.nature.com/ncomms.rss', source: 'Nature Communications' },
-      { url: 'https://www.cell.com/cell-stem-cell/current.rss', source: 'Cell Stem Cell' },
-      { url: 'https://www.science.org/rss/sciimmunol.xml', source: 'Science Immunology' },
-      { url: 'https://www.science.org/rss/stm.xml', source: 'Science Translational Medicine' }
+      { url: 'https://www.pnas.org/action/showFeed?type=etoc&feed=rss&jc=pnas', source: 'PNAS' }
     ];
     let allNews: any[] = [];
     const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|pathology|zoology";
@@ -299,56 +290,63 @@ async function fetchLiveData(topicsMap: any = {}) {
       } catch (e) { console.error(`News Fetch Error for ${feedConfig.source}:`, e); }
     }
 
-    try {
-      const queryTerms = newsTermsSafe.split('|').slice(0, 5).map((t: string) => `(${t}[Title/Abstract])`).join(' OR ');
-      const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(queryTerms)}&retmode=json&retmax=15`;
-      const searchRes = await fetch(esearchUrl);
-      if (searchRes.ok) {
-        const searchData = await searchRes.json();
-        const pmids = searchData.esearchresult?.idlist || [];
-        if (pmids.length > 0) {
-          const esummaryUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${pmids.join(',')}&retmode=json`;
-          const summaryRes = await fetch(esummaryUrl);
-          if (summaryRes.ok) {
-            const summaryData = await summaryRes.json();
-            const uids = summaryData.result?.uids || [];
-            const pubmedNews = uids.map((uid: string) => {
-              const article = summaryData.result[uid];
-              if (!article) return null;
-              const authorStr = article.authors && Array.isArray(article.authors)
-                ? article.authors.slice(0, 3).map((a: any) => a.name).join(', ') + (article.authors.length > 3 ? ' et al.' : '')
-                : 'Various Authors';
-              const journal = article.source || 'PubMed';
-              const doiObj = article.articleids?.find((id: any) => id.idtype === 'doi');
-              const doi = doiObj ? doiObj.value : '';
-              const url = doi ? `https://doi.org/${doi}` : `https://pubmed.ncbi.nlm.nih.gov/${uid}`;
-              
-              let snippet = `Authors: ${authorStr}. Source: ${journal}.`;
-              if (article.pubdate) snippet += ` Published: ${article.pubdate}.`;
-              
-              let pubDate = new Date();
-              if (article.sortpubdate || article.pubdate) {
-                const parsedDate = new Date(article.sortpubdate || article.pubdate);
-                if (!isNaN(parsedDate.getTime())) {
-                  pubDate = parsedDate;
-                }
-              }
+    const freshNewsCount = allNews.filter((item: any) => {
+      return item.isoDate ? (new Date(item.isoDate).getTime() > timeWindowLimit) : true;
+    }).length;
 
-              return {
-                id: `NEWS-PUBMED-${uid}`.replace(/[^a-zA-Z0-9-]/g, ''),
-                title: (article.title || 'PubMed Publication').replace(/\.$/, ''),
-                source: `PubMed / ${journal}`,
-                url: url,
-                image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100",
-                rawSnippet: snippet,
-                isoDate: pubDate.toISOString()
-              };
-            }).filter(Boolean);
-            allNews = allNews.concat(pubmedNews);
+    if (freshNewsCount < newsLimit) {
+      console.log(`[News Pipeline] Quota uncompleted (${freshNewsCount}/${newsLimit}). Fetching PubMed fallback...`);
+      try {
+        const queryTerms = newsTermsSafe.split('|').slice(0, 5).map((t: string) => `(${t}[Title/Abstract])`).join(' OR ');
+        const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(queryTerms)}&retmode=json&retmax=15`;
+        const searchRes = await fetch(esearchUrl);
+        if (searchRes.ok) {
+          const searchData = await searchRes.json();
+          const pmids = searchData.esearchresult?.idlist || [];
+          if (pmids.length > 0) {
+            const esummaryUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${pmids.join(',')}&retmode=json`;
+            const summaryRes = await fetch(esummaryUrl);
+            if (summaryRes.ok) {
+              const summaryData = await summaryRes.json();
+              const uids = summaryData.result?.uids || [];
+              const pubmedNews = uids.map((uid: string) => {
+                const article = summaryData.result[uid];
+                if (!article) return null;
+                const authorStr = article.authors && Array.isArray(article.authors)
+                  ? article.authors.slice(0, 3).map((a: any) => a.name).join(', ') + (article.authors.length > 3 ? ' et al.' : '')
+                  : 'Various Authors';
+                const journal = article.source || 'PubMed';
+                const doiObj = article.articleids?.find((id: any) => id.idtype === 'doi');
+                const doi = doiObj ? doiObj.value : '';
+                const url = doi ? `https://doi.org/${doi}` : `https://pubmed.ncbi.nlm.nih.gov/${uid}`;
+                
+                let snippet = `Authors: ${authorStr}. Source: ${journal}.`;
+                if (article.pubdate) snippet += ` Published: ${article.pubdate}.`;
+                
+                let pubDate = new Date();
+                if (article.sortpubdate || article.pubdate) {
+                  const parsedDate = new Date(article.sortpubdate || article.pubdate);
+                  if (!isNaN(parsedDate.getTime())) {
+                    pubDate = parsedDate;
+                  }
+                }
+
+                return {
+                  id: `NEWS-PUBMED-${uid}`.replace(/[^a-zA-Z0-9-]/g, ''),
+                  title: (article.title || 'PubMed Publication').replace(/\.$/, ''),
+                  source: `PubMed / ${journal}`,
+                  url: url,
+                  image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100",
+                  rawSnippet: snippet,
+                  isoDate: pubDate.toISOString()
+                };
+              }).filter(Boolean);
+              allNews = allNews.concat(pubmedNews);
+            }
           }
         }
-      }
-    } catch (e) { console.error("PubMed API Error:", e); }
+      } catch (e) { console.error("PubMed API Error:", e); }
+    }
 
     results.news = allNews.sort((a, b) => new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime());
   } catch (e) { console.error("Top-level News Fetch Error:", e); }

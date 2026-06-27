@@ -157,7 +157,10 @@ export default function Home() {
       const res = await fetch('/api/aggregate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topics: settings.topics || {} })
+        body: JSON.stringify({ 
+          topics: settings.topics || {},
+          newsLimit: settings.newsLimit || 12
+        })
       });
       const scrapRes = await res.json();
 

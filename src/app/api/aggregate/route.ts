@@ -61,7 +61,7 @@ function isTopInstitution(institution: string): boolean {
   return TOP_40_UNIVERSITY_KEYWORDS.some(kw => lower.includes(kw));
 }
 
-async function fetchLiveData(topicsMap: any = {}) {
+async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
   const parseTopics = (str: string | undefined, fallback: string[]) => str ? str.split(',').map((s: string) => s.trim()).filter(Boolean) : fallback;
   const parser = new Parser({ 
     customFields: { item: [['media:thumbnail', 'mediaThumbnail']] },
@@ -227,16 +227,7 @@ async function fetchLiveData(topicsMap: any = {}) {
       { url: 'https://www.cell.com/cell-systems/current.rss', source: 'Cell Systems' },
       { url: 'https://www.cell.com/cell/current.rss', source: 'Cell' },
       { url: 'https://www.cell.com/molecular-cell/current.rss', source: 'Molecular Cell' },
-      { url: 'https://www.pnas.org/action/showFeed?type=etoc&feed=rss&jc=pnas', source: 'PNAS' },
-      { url: 'https://www.nejm.org/action/showFeed?type=etoc&feed=rss', source: 'NEJM' },
-      { url: 'https://www.thelancet.com/rssfeed/lancet_current.xml', source: 'The Lancet' },
-      { url: 'https://jamanetwork.com/rss/journals/jama/current.xml', source: 'JAMA' },
-      { url: 'https://www.nature.com/nm.rss', source: 'Nature Medicine' },
-      { url: 'https://www.nature.com/nmeth.rss', source: 'Nature Methods' },
-      { url: 'https://www.nature.com/ncomms.rss', source: 'Nature Communications' },
-      { url: 'https://www.cell.com/cell-stem-cell/current.rss', source: 'Cell Stem Cell' },
-      { url: 'https://www.science.org/rss/sciimmunol.xml', source: 'Science Immunology' },
-      { url: 'https://www.science.org/rss/stm.xml', source: 'Science Translational Medicine' }
+      { url: 'https://www.pnas.org/action/showFeed?type=etoc&feed=rss&jc=pnas', source: 'PNAS' }
     ];
     let allNews: any[] = [];
     const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|DNA|pathology|zoology";
@@ -379,7 +370,44 @@ async function fetchLiveData(topicsMap: any = {}) {
       return [];
     })();
 
-    const pubmedPromise = (async () => {
+    const [plosRaw, eLifeRaw, bmcRaw] = await Promise.all([plosPromise, eLifePromise, bmcPromise]);
+    let apiNews = [...plosRaw, ...eLifeRaw, ...bmcRaw];
+    
+    apiNews = apiNews.filter((item: any) => {
+        return item.isoDate ? (new Date(item.isoDate).getTime() > timeWindowLimit) : true;
+    });
+
+    for (let item of apiNews) {
+      if (item.image === "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100") {
+          try {
+              const searchKeyword = getProminentWord(item.title);
+              const KeywordQuery = searchKeyword + " science";
+              const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(KeywordQuery)}&per_page=30&size=large&orientation=landscape`, {
+                headers: { Authorization: "c5w6mctmy3dgyaA69iUsDjgccGUojIlKEa3Y8JtsLU2yJm2HUp2gjQy6" }
+              });
+              if (pexelsRes.ok) {
+                const pexelsData = await pexelsRes.json();
+                if (pexelsData.photos && pexelsData.photos.length > 0) {
+                  const availablePhotos = pexelsData.photos.filter((p: any) => !usedImages.has(p.src.original));
+                  if (availablePhotos.length > 0) {
+                    const randomIdx = Math.floor(Math.random() * availablePhotos.length);
+                    item.image = availablePhotos[randomIdx].src.original;
+                    usedImages.add(item.image);
+                  }
+                }
+              }
+          } catch(e) {}
+      }
+    }
+
+    allNews = allNews.concat(apiNews);
+
+    const freshNewsCount = allNews.filter((item: any) => {
+      return item.isoDate ? (new Date(item.isoDate).getTime() > timeWindowLimit) : true;
+    }).length;
+
+    if (freshNewsCount < newsLimit) {
+      console.log(`[News Pipeline] Quota uncompleted (${freshNewsCount}/${newsLimit}). Fetching PubMed fallback articles...`);
       try {
         const queryTerms = newsTermsSafe.split('|').slice(0, 5).map((t: string) => `(${t}[Title/Abstract])`).join(' OR ');
         const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(queryTerms)}&retmode=json&retmax=15`;
@@ -393,7 +421,7 @@ async function fetchLiveData(topicsMap: any = {}) {
             if (summaryRes.ok) {
               const summaryData = await summaryRes.json();
               const uids = summaryData.result?.uids || [];
-              return uids.map((uid: string) => {
+              const pubmedNews = uids.map((uid: string) => {
                 const article = summaryData.result[uid];
                 if (!article) return null;
                 const authorStr = article.authors && Array.isArray(article.authors)
@@ -425,44 +453,36 @@ async function fetchLiveData(topicsMap: any = {}) {
                   isoDate: pubDate.toISOString()
                 };
               }).filter(Boolean);
+
+              for (let item of pubmedNews) {
+                if (item && item.image === "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100") {
+                  try {
+                    const searchKeyword = getProminentWord(item.title);
+                    const KeywordQuery = searchKeyword + " science";
+                    const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(KeywordQuery)}&per_page=30&size=large&orientation=landscape`, {
+                      headers: { Authorization: "c5w6mctmy3dgyaA69iUsDjgccGUojIlKEa3Y8JtsLU2yJm2HUp2gjQy6" }
+                    });
+                    if (pexelsRes.ok) {
+                      const pexelsData = await pexelsRes.json();
+                      if (pexelsData.photos && pexelsData.photos.length > 0) {
+                        const availablePhotos = pexelsData.photos.filter((p: any) => !usedImages.has(p.src.original));
+                        if (availablePhotos.length > 0) {
+                          const randomIdx = Math.floor(Math.random() * availablePhotos.length);
+                          item.image = availablePhotos[randomIdx].src.original;
+                          usedImages.add(item.image);
+                        }
+                      }
+                    }
+                  } catch (e) {}
+                }
+              }
+
+              allNews = allNews.concat(pubmedNews.filter(Boolean));
             }
           }
         }
       } catch (e) { console.error("PubMed API Error:", e); }
-      return [];
-    })();
-
-    const [plosRaw, eLifeRaw, bmcRaw, pubmedRaw] = await Promise.all([plosPromise, eLifePromise, bmcPromise, pubmedPromise]);
-    let apiNews = [...plosRaw, ...eLifeRaw, ...bmcRaw, ...pubmedRaw];
-    
-    apiNews = apiNews.filter((item: any) => {
-        return item.isoDate ? (new Date(item.isoDate).getTime() > timeWindowLimit) : true;
-    });
-
-    for (let item of apiNews) {
-      if (item.image === "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100") {
-          try {
-              const searchKeyword = getProminentWord(item.title);
-              const KeywordQuery = searchKeyword + " science";
-              const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(KeywordQuery)}&per_page=30&size=large&orientation=landscape`, {
-                headers: { Authorization: "c5w6mctmy3dgyaA69iUsDjgccGUojIlKEa3Y8JtsLU2yJm2HUp2gjQy6" }
-              });
-              if (pexelsRes.ok) {
-                const pexelsData = await pexelsRes.json();
-                if (pexelsData.photos && pexelsData.photos.length > 0) {
-                  const availablePhotos = pexelsData.photos.filter((p: any) => !usedImages.has(p.src.original));
-                  if (availablePhotos.length > 0) {
-                    const randomIdx = Math.floor(Math.random() * availablePhotos.length);
-                    item.image = availablePhotos[randomIdx].src.original;
-                    usedImages.add(item.image);
-                  }
-                }
-              }
-          } catch(e) {}
-      }
     }
-
-    allNews = allNews.concat(apiNews);
 
     results.news = allNews.sort((a, b) => new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime());
   } catch (e) { console.error("Top-level News Fetch Error:", e); }
@@ -1148,7 +1168,7 @@ Jobs: ${JSON.stringify(aiPayload)}`;
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const liveData = await fetchLiveData(body.topics);
+    const liveData = await fetchLiveData(body.topics, body.newsLimit || 12);
 
     let dispatchStatus = "Not attempted (Automated run)";
     let dispatchError = null;
