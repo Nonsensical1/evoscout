@@ -43,6 +43,7 @@ export default function RootLayout({
             <nav className="max-w-[1600px] mx-auto px-6 h-12 flex items-center justify-center gap-10 text-[11px] md:text-xs font-sans font-bold text-editorial-text uppercase tracking-widest relative">
                <DashboardDropdown />
                <Link href="/history" className="hover-underline">Ledger</Link>
+               <Link href="/leaderboard" className="hover-underline text-[#005587] dark:text-[#60a5fa]">Leaderboard</Link>
                <Link href="/settings" className="hover-underline">Settings</Link>
                <UserMenu />
             </nav>
