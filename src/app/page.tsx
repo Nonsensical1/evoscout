@@ -387,9 +387,12 @@ export default function Home() {
           ADVANCED_CONCEPTS.map(t => t.toLowerCase().trim())
         )).filter(t => {
           if (!t) return false;
-          // Bidirectional substring exclusion to catch partials like "CRISPR" vs "CRISPR-Cas9"
+          
           for (const ut of userTopicsSet) {
-            if (ut.includes(t) || t.includes(ut)) {
+            // EXCLUDE if the trend is exactly the scraped keyword,
+            // OR if the trend is merely a sub-component of the keyword (e.g. ut="CRISPR-Cas9", t="CRISPR")
+            // BUT INCLUDE if the trend is MORE specific than the keyword (e.g. ut="CRISPR", t="CRISPR-Cas9")
+            if (ut.includes(t)) {
               return false;
             }
           }
