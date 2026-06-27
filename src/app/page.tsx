@@ -376,8 +376,16 @@ export default function Home() {
         let userTopics: string[] = [];
         const allFields = ['news', 'literature', 'grants', 'openGovGrants', 'careerInstitutions', 'careerTitles'];
         allFields.forEach(field => {
-          if (settings.topics?.[field]) {
+          if (settings.topics?.[field] && settings.topics[field].trim() !== '') {
             userTopics = userTopics.concat(settings.topics[field].split(','));
+          } else {
+            // Inject the scraper's hardcoded fallbacks into the filter so they don't pollute the graph if user settings are empty
+            if (field === 'news' || field === 'careerInstitutions' || field === 'careerTitles') {
+              userTopics = userTopics.concat("CRISPR, Cas9, Cas12, gene, cell, RNA, proteomics, synthetic biology, epigenetic, microbiome, cancer, DNA, pathology, zoology, microbiology, molecular, biotech".split(','));
+            }
+            if (field === 'literature') {
+              userTopics = userTopics.concat("CRISPR, Cas9, RNA, DNA, synthetic biology, gene editing, cancer, oncology, metabolism, computational, epigenetic, genomics, SunTag, prime edit, prime editing, base edit".split(','));
+            }
           }
         });
         
