@@ -380,11 +380,11 @@ export default function Home() {
         if (settings.topics?.literature) {
           userTopics = userTopics.concat(settings.topics.literature.split(','));
         }
+        const userTopicsSet = new Set(userTopics.map(t => t.toLowerCase().trim()).filter(Boolean));
         
-        const combinedTopics = Array.from(new Set([
-          ...ADVANCED_CONCEPTS.map(t => t.toLowerCase().trim()),
-          ...userTopics.map(t => t.toLowerCase().trim())
-        ])).filter(Boolean);
+        const combinedTopics = Array.from(new Set(
+          ADVANCED_CONCEPTS.map(t => t.toLowerCase().trim())
+        )).filter(t => Boolean(t) && !userTopicsSet.has(t));
 
         const globalNewsTermCounts: Record<string, number> = {};
         const globalLitTermCounts: Record<string, number> = {};
