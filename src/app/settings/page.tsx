@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Settings, Save, RefreshCw, Cloud } from 'lucide-react';
 import { useAuth } from '@/app/providers';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -18,6 +18,8 @@ export default function SettingsPage() {
     careerInstitutions: "",
     careerTitles: ""
   });
+  const originalTopics = useRef<any>({});
+  const [replaceMode, setReplaceMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -45,13 +47,22 @@ export default function SettingsPage() {
             grantsLimit: snap.data().grantsLimit || 12
           });
           const tops = snap.data().topics || {};
-          setTopics({
+          originalTopics.current = {
             grants: tops.grants || "",
             openGovGrants: tops.openGovGrants || "",
             news: tops.news || "",
             literature: tops.literature || "",
             careerInstitutions: tops.careerInstitutions || "",
             careerTitles: tops.careerTitles || ""
+          };
+          // Append mode default, leave inputs blank initially
+          setTopics({
+            grants: "",
+            openGovGrants: "",
+            news: "",
+            literature: "",
+            careerInstitutions: "",
+            careerTitles: ""
           });
           if (snap.data().ttsEngine) {
             setTtsEngine(snap.data().ttsEngine);
@@ -78,18 +89,46 @@ export default function SettingsPage() {
     loadSettings();
   }, [user]);
 
+  useEffect(() => {
+    if (replaceMode) {
+      setTopics({ ...originalTopics.current });
+    } else {
+      setTopics({ grants: "", openGovGrants: "", news: "", literature: "", careerInstitutions: "", careerTitles: "" });
+    }
+  }, [replaceMode]);
+
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
     try {
+      let finalTopics = { ...topics };
+      if (!replaceMode) {
+        // Append mode logic
+        Object.keys(topics).forEach(key => {
+          const newVal = topics[key as keyof typeof topics].trim();
+          const oldVal = originalTopics.current[key];
+          if (newVal) {
+            finalTopics[key as keyof typeof topics] = oldVal ? `${oldVal}, ${newVal}` : newVal;
+          } else {
+            finalTopics[key as keyof typeof topics] = oldVal || "";
+          }
+        });
+      }
+
       await setDoc(doc(db, 'users', user.uid, 'settings', 'config'), {
         ...limits,
-        topics,
+        topics: finalTopics,
         ttsEngine,
         customModalUrl,
         theme,
         podcastEnabled
       }, { merge: true });
+
+      originalTopics.current = { ...finalTopics };
+      if (!replaceMode) {
+        setTopics({ grants: "", openGovGrants: "", news: "", literature: "", careerInstitutions: "", careerTitles: "" });
+      }
+
       setSuccessMsg("Configuration committed successfully.");
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (e) {
@@ -207,10 +246,24 @@ export default function SettingsPage() {
 
         {/* ALGORITHMIC SETTINGS */}
         <div className="mt-16 pt-10 border-t-2 border-editorial-border-dark">
-            <h2 className="text-2xl font-bold uppercase tracking-widest mb-2 inline-block pb-1">Algorithmic Routing Parameters</h2>
-            <p className="text-sm font-sans text-editorial-muted mt-2 mb-8">Override the core scraping AI. Input comma-separated keywords or leave exactly blank to inherit default parameters.</p>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-2xl font-bold uppercase tracking-widest mb-2 inline-block pb-1">Algorithmic Routing Parameters</h2>
+              <p className="text-sm font-sans text-editorial-muted mt-2">
+                {replaceMode 
+                  ? "Replace Mode: ON. Modifying inputs will completely overwrite your existing configuration." 
+                  : "Replace Mode: OFF. Your inputs will seamlessly append to your existing configuration behind the scenes."}
+              </p>
+            </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+              <input type="checkbox" className="sr-only peer" checked={replaceMode} onChange={(e) => setReplaceMode(e.target.checked)} />
+              <div className="w-14 h-7 bg-gray-200 peer-focus:outline-none dark:bg-[#333] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-[#005587] dark:peer-checked:bg-[#2563eb]"></div>
+              <span className="ml-3 text-sm font-bold font-sans uppercase tracking-wider text-editorial-text">{replaceMode ? 'Replace' : 'Append'}</span>
+            </label>
+          </div>
+            
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="flex flex-col gap-2">
                  <label className="font-bold font-sans uppercase tracking-wider text-sm">NSF / NIH Grants</label>
                  <input name="grants" value={topics.grants} onChange={handleTopicChange} placeholder="e.g. genomics, pathology, epigenetics" className="p-3 border border-editorial-border font-sans text-sm focus:outline-editorial-text w-full" />
