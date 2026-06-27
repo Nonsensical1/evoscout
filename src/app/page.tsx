@@ -43,15 +43,16 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
   const [quotaNotice, setQuotaNotice] = useState<string | null>(null);
-  const [monthlyTrends, setMonthlyTrends] = useState<{ name: string, value: number }[]>([]);
-  const [activeIndex, setActiveIndex] = useState(-1);
+  const [monthlyTrends, setMonthlyTrends] = useState<{ news: { name: string, value: number }[], literature: { name: string, value: number }[] }>({ news: [], literature: [] });
   
-  const onPieEnter = useCallback((_: any, index: number) => {
-    setActiveIndex(index);
-  }, []);
-  const onPieLeave = useCallback(() => {
-    setActiveIndex(-1);
-  }, []);
+  const [activeNewsIndex, setActiveNewsIndex] = useState(-1);
+  const [activeLitIndex, setActiveLitIndex] = useState(-1);
+  
+  const onNewsPieEnter = useCallback((_: any, index: number) => { setActiveNewsIndex(index); }, []);
+  const onNewsPieLeave = useCallback(() => { setActiveNewsIndex(-1); }, []);
+  
+  const onLitPieEnter = useCallback((_: any, index: number) => { setActiveLitIndex(index); }, []);
+  const onLitPieLeave = useCallback(() => { setActiveLitIndex(-1); }, []);
 
   const trendsFetched = useRef(false);
   const scrapeInProgress = useRef(false);
@@ -385,43 +386,52 @@ export default function Home() {
           ...userTopics.map(t => t.toLowerCase().trim())
         ])).filter(Boolean);
 
-        const dailyRawTextMap: Record<string, string> = {};
-        const globalTermCounts: Record<string, number> = {};
+        const globalNewsTermCounts: Record<string, number> = {};
+        const globalLitTermCounts: Record<string, number> = {};
 
         ledgerSnap.forEach(doc => {
           const data = doc.data();
           if (data.date >= dateLimit) {
-            let dailyText = "";
+            let dailyNewsText = "";
+            let dailyLitText = "";
             (data.news || []).forEach((item: any) => {
-              dailyText += " " + (item.title || "").toLowerCase();
-              dailyText += " " + (item.summary || item.rawSnippet || "").toLowerCase();
+              dailyNewsText += " " + (item.title || "").toLowerCase();
+              dailyNewsText += " " + (item.summary || item.rawSnippet || "").toLowerCase();
             });
             (data.literature || []).forEach((item: any) => {
-              dailyText += " " + (item.title || "").toLowerCase();
-              dailyText += " " + (item.summary || item.rawSnippet || "").toLowerCase();
+              dailyLitText += " " + (item.title || "").toLowerCase();
+              dailyLitText += " " + (item.summary || item.rawSnippet || "").toLowerCase();
             });
-
-            dailyRawTextMap[data.date] = dailyText;
 
             combinedTopics.forEach(topic => {
               const regex = new RegExp(`\\b${topic.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-              const matches = dailyText.match(regex);
-              if (matches && matches.length > 0) {
-                globalTermCounts[topic] = (globalTermCounts[topic] || 0) + matches.length;
+              
+              const newsMatches = dailyNewsText.match(regex);
+              if (newsMatches && newsMatches.length > 0) {
+                globalNewsTermCounts[topic] = (globalNewsTermCounts[topic] || 0) + newsMatches.length;
+              }
+
+              const litMatches = dailyLitText.match(regex);
+              if (litMatches && litMatches.length > 0) {
+                globalLitTermCounts[topic] = (globalLitTermCounts[topic] || 0) + litMatches.length;
               }
             });
           }
         });
 
-        // Get top 5 highly specific concepts
-        const topTopics = Object.entries(globalTermCounts)
+        const topNewsTopics = Object.entries(globalNewsTermCounts)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 5)
           .map(entry => ({ name: entry[0], value: entry[1] }));
 
-        if (topTopics.length === 0) return;
+        const topLitTopics = Object.entries(globalLitTermCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(entry => ({ name: entry[0], value: entry[1] }));
 
-        setMonthlyTrends(topTopics);
+        if (topNewsTopics.length === 0 && topLitTopics.length === 0) return;
+
+        setMonthlyTrends({ news: topNewsTopics, literature: topLitTopics });
       } catch (e) {
         console.error("Failed to fetch trends", e);
       }
@@ -692,7 +702,7 @@ export default function Home() {
             )}
           </section>
 
-          {monthlyTrends.length > 0 && (
+          {(monthlyTrends.news.length > 0 || monthlyTrends.literature.length > 0) && (
             <>
               <hr className="border-t-4 border-editorial-border-dark my-10" />
               <section id="section-trends">
@@ -702,35 +712,79 @@ export default function Home() {
                     Past 30 Days
                   </span>
                 </div>
-                <div className="w-full h-[500px] bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex justify-center items-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={monthlyTrends}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={110}
-                        outerRadius={160}
-                        paddingAngle={5}
-                        dataKey="value"
-                        {...({ activeIndex: activeIndex === -1 ? undefined : activeIndex } as any)}
-                        activeShape={renderActiveShape}
-                        onMouseEnter={onPieEnter}
-                        onMouseLeave={onPieLeave}
-                      >
-                        {monthlyTrends.map((entry, index) => {
-                          const colors = ['#005587', '#0099cc', '#f59e0b', '#10b981', '#6366f1'];
-                          return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                        })}
-                      </Pie>
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.95)', color: '#000' }}
-                        itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
-                        formatter={(value, name) => [`${value} mentions`, name]}
-                      />
-                      <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: '500', paddingTop: '20px' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                  {monthlyTrends.news.length > 0 && (
+                    <div className="w-full bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex flex-col justify-center items-center">
+                      <h4 className="font-serif font-bold text-lg mb-2 text-center text-[#005587] dark:text-[#60a5fa] uppercase tracking-widest">Web News Velocity</h4>
+                      <div className="w-full h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={monthlyTrends.news}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={80}
+                              outerRadius={120}
+                              paddingAngle={5}
+                              dataKey="value"
+                              {...({ activeIndex: activeNewsIndex === -1 ? undefined : activeNewsIndex } as any)}
+                              activeShape={renderActiveShape}
+                              onMouseEnter={onNewsPieEnter}
+                              onMouseLeave={onNewsPieLeave}
+                            >
+                              {monthlyTrends.news.map((entry, index) => {
+                                const colors = ['#005587', '#0099cc', '#f59e0b', '#10b981', '#6366f1'];
+                                return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                              })}
+                            </Pie>
+                            <Tooltip 
+                              contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.95)', color: '#000' }}
+                              itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
+                              formatter={(value, name) => [`${value} mentions`, name]}
+                            />
+                            <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: '500', paddingTop: '20px' }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+
+                  {monthlyTrends.literature.length > 0 && (
+                    <div className="w-full bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex flex-col justify-center items-center">
+                      <h4 className="font-serif font-bold text-lg mb-2 text-center text-[#005587] dark:text-[#60a5fa] uppercase tracking-widest">Pre-Print Velocity</h4>
+                      <div className="w-full h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={monthlyTrends.literature}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={80}
+                              outerRadius={120}
+                              paddingAngle={5}
+                              dataKey="value"
+                              {...({ activeIndex: activeLitIndex === -1 ? undefined : activeLitIndex } as any)}
+                              activeShape={renderActiveShape}
+                              onMouseEnter={onLitPieEnter}
+                              onMouseLeave={onLitPieLeave}
+                            >
+                              {monthlyTrends.literature.map((entry, index) => {
+                                const colors = ['#005587', '#0099cc', '#f59e0b', '#10b981', '#6366f1'];
+                                return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                              })}
+                            </Pie>
+                            <Tooltip 
+                              contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.95)', color: '#000' }}
+                              itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
+                              formatter={(value, name) => [`${value} mentions`, name]}
+                            />
+                            <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: '500', paddingTop: '20px' }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
             </>
