@@ -227,7 +227,8 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
       { url: 'https://www.cell.com/cell-stem-cell/current.rss', source: 'Cell Stem Cell' },
       { url: 'https://www.science.org/rss/stm.xml', source: 'Science Translational Medicine' },
       { url: 'https://www.nejm.org/action/showFeed?type=etoc&feed=rss', source: 'NEJM' },
-      { url: 'https://www.science.org/rss/sciimmunol.xml', source: 'Science Immunology' }
+      { url: 'https://www.science.org/rss/sciimmunol.xml', source: 'Science Immunology' },
+      { url: 'https://journals.plos.org/plosbiology/feed/atom', source: 'PLOS Biology' }
     ];
     let allNews: any[] = [];
     const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|pathology|zoology";
