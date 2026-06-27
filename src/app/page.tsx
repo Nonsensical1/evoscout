@@ -6,6 +6,7 @@ import { useAuth } from '@/app/providers';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc, query, orderBy, limit as firestoreLimit, getDocs } from 'firebase/firestore';
 import { LiteratureCard } from './LiteratureCard';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Home() {
   const { user } = useAuth();
@@ -13,7 +14,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
   const [quotaNotice, setQuotaNotice] = useState<string | null>(null);
-  const [monthlyTrends, setMonthlyTrends] = useState<{ topic: string, count: number }[]>([]);
+  const [monthlyTrends, setMonthlyTrends] = useState<{ topTopics: string[], data: any[] }>({ topTopics: [], data: [] });
   const trendsFetched = useRef(false);
   const scrapeInProgress = useRef(false);
   // Ensures the on-demand history fetch fires at most once per session load
@@ -341,14 +342,51 @@ export default function Home() {
         const topicsStr = settings.topics?.news || settings.topics?.literature || "CRISPR, Prime Editing, Base Editing, Gene Drive, CAR-T, mRNA Vaccines, Epigenetics, Methylation, Optogenetics, Cryo-EM, AlphaFold, Proteomics, Single-cell Sequencing, Multi-omics, Spatial Transcriptomics, Microbiome, Metagenomics, Synthetic Biology, Metabolic Engineering, Bioinformatics, Deep Learning, Oncogenes, Tumor Microenvironment, Checkpoint Inhibitors, Neurodegeneration, Alzheimer's, Pluripotent Stem Cells, Organoids, Aging, Senescence, Directed Evolution, Recombinant DNA, Gene Therapy";
         const topicList = topicsStr.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
 
-        const counts = topicList.map((topic: string) => {
-          const regex = new RegExp(`\\b${topic}\\b`, 'gi');
-          const matches = fullText.match(regex);
-          return { topic, count: matches ? matches.length : 0 };
-        }).filter((t: any) => t.count > 0);
+        const dailyDataMap: Record<string, Record<string, number>> = {};
+        const overallCounts: Record<string, number> = {};
 
-        counts.sort((a: any, b: any) => b.count - a.count);
-        setMonthlyTrends(counts.slice(0, 10));
+        ledgerSnap.forEach(doc => {
+          const data = doc.data();
+          if (data.date >= dateLimit) {
+            let dailyText = "";
+            (data.news || []).forEach((item: any) => {
+              dailyText += " " + (item.title || "").toLowerCase();
+              dailyText += " " + (item.summary || item.rawSnippet || "").toLowerCase();
+            });
+            (data.literature || []).forEach((item: any) => {
+              dailyText += " " + (item.title || "").toLowerCase();
+              dailyText += " " + (item.summary || item.rawSnippet || "").toLowerCase();
+            });
+
+            dailyDataMap[data.date] = {};
+            topicList.forEach((topic: string) => {
+               const regex = new RegExp(`\\b${topic}\\b`, 'gi');
+               const matches = dailyText.match(regex);
+               const count = matches ? matches.length : 0;
+               dailyDataMap[data.date][topic] = count;
+               overallCounts[topic] = (overallCounts[topic] || 0) + count;
+            });
+          }
+        });
+
+        const topTopics = Object.entries(overallCounts)
+          .sort((a: any, b: any) => b[1] - a[1])
+          .slice(0, 5)
+          .map(entry => entry[0]);
+
+        if (topTopics.length === 0) return;
+
+        const timeSeriesData = Object.keys(dailyDataMap)
+          .sort()
+          .map(dateStr => {
+            const row: any = { date: dateStr.slice(5) }; // Format MM-DD
+            topTopics.forEach(t => {
+              row[t] = dailyDataMap[dateStr][t] || 0;
+            });
+            return row;
+          });
+
+        setMonthlyTrends({ topTopics, data: timeSeriesData });
       } catch (e) {
         console.error("Failed to fetch trends", e);
       }
@@ -619,7 +657,7 @@ export default function Home() {
             )}
           </section>
 
-          {monthlyTrends.length > 0 && (
+          {monthlyTrends.data.length > 0 && (
             <>
               <hr className="border-t-4 border-editorial-border-dark my-10" />
               <section id="section-trends">
@@ -629,25 +667,33 @@ export default function Home() {
                     Past 30 Days
                   </span>
                 </div>
-                <div className="flex flex-col gap-6">
-                  {monthlyTrends.map((trend, idx) => {
-                    const maxCount = monthlyTrends[0].count;
-                    const percent = Math.max(5, Math.min(100, (trend.count / maxCount) * 100));
-                    return (
-                      <div key={idx} className="relative group">
-                        <div className="flex justify-between items-baseline mb-2">
-                          <span className="font-serif font-black text-xl md:text-2xl tracking-tight capitalize group-hover:text-[#005587] dark:group-hover:text-[#60a5fa] transition-colors">{trend.topic}</span>
-                          <span className="font-sans text-xs md:text-sm font-bold text-gray-500 uppercase tracking-widest">{trend.count} mentions</span>
-                        </div>
-                        <div className="w-full bg-gray-200 dark:bg-[#333333] h-2.5 rounded-full overflow-hidden shadow-inner">
-                          <div 
-                            className="h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r from-[#005587] to-[#0099cc] dark:from-[#2563eb] dark:to-[#60a5fa]"
-                            style={{ width: `${percent}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="w-full h-[400px] bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={monthlyTrends.data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-700" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.95)', color: '#000' }}
+                        itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
+                      />
+                      <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                      {monthlyTrends.topTopics.map((topic, idx) => {
+                        const colors = ['#005587', '#0099cc', '#f59e0b', '#10b981', '#6366f1'];
+                        return (
+                          <Line 
+                            key={topic} 
+                            type="monotone" 
+                            dataKey={topic} 
+                            stroke={colors[idx % colors.length]} 
+                            strokeWidth={3}
+                            dot={{ r: 3, strokeWidth: 0, fill: colors[idx % colors.length] }}
+                            activeDot={{ r: 6, strokeWidth: 0 }}
+                          />
+                        );
+                      })}
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
               </section>
             </>
