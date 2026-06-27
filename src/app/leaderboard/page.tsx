@@ -84,7 +84,7 @@ export default function LeaderboardPage() {
         for (let i = 0; i < ssIds.length; i += CHUNK_SIZE) {
           const chunk = ssIds.slice(i, i + CHUNK_SIZE);
           try {
-            const res = await fetch("https://api.semanticscholar.org/graph/v1/paper/batch?fields=citationCount,influentialCitationCount", {
+            const res = await fetch("/api/leaderboard-batch", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ ids: chunk })
