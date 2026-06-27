@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { BookOpen } from 'lucide-react';
 
-export function LiteratureCard({ paper }: { paper: any }) {
+export function LiteratureCard({ paper, rank, citationCount, influentialCitationCount }: { paper: any, rank?: number, citationCount?: number, influentialCitationCount?: number }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [recommendedPapers, setRecommendedPapers] = useState<any[] | null>(null);
@@ -31,11 +31,11 @@ export function LiteratureCard({ paper }: { paper: any }) {
   return (
     <article className="group grid grid-cols-1 md:grid-cols-4 gap-4 border-b border-gray-100 dark:border-[#262626] pb-8 last:border-0 last:pb-0">
       <div className="md:col-span-3 space-y-2 pr-0 md:pr-4">
-        <a href={`https://doi.org/${paper.doi}`} target="_blank" rel="noopener noreferrer" className="block outline-none cursor-pointer">
+        <a href={paper.doi?.startsWith('http') ? paper.doi : (paper.doi ? `https://doi.org/${paper.doi}` : '#')} target="_blank" rel="noopener noreferrer" className="block outline-none cursor-pointer">
           <h4 className="font-serif font-bold text-2xl leading-tight group-hover:text-blue-800 dark:group-hover:text-blue-400 transition-colors group-hover:underline decoration-[1.5px] underline-offset-4">{paper.title}</h4>
         </a>
         <p className="font-serif text-editorial-muted italic text-base">{paper.authors}</p>
-        <p className="font-sans text-sm text-editorial-text leading-relaxed mt-2">{paper.summary}</p>
+        <p className="font-sans text-sm text-editorial-text leading-relaxed mt-2">{paper.summary || paper.rawAbstract}</p>
         
         {paper.doi && (
           <div className="mt-4 pt-2">
@@ -100,6 +100,16 @@ export function LiteratureCard({ paper }: { paper: any }) {
           <span className="text-xs font-serif font-medium text-editorial-text text-left md:text-right opacity-80 leading-snug">
             {paper.institution}
           </span>
+        )}
+        
+        {rank !== undefined && (
+          <div className="mt-auto flex flex-col items-start md:items-end gap-1 pt-4 w-full border-t border-gray-100 dark:border-[#262626]">
+            <span className="text-sm font-serif font-black text-editorial-text">#{rank} Ranked</span>
+            <div className="flex flex-col md:text-right w-full">
+              <span className="text-[10px] font-sans uppercase tracking-widest text-editorial-muted">{citationCount} Total Citations</span>
+              <span className="text-[10px] font-sans uppercase tracking-widest text-[#005587] dark:text-[#60a5fa]">{influentialCitationCount} Influential</span>
+            </div>
+          </div>
         )}
       </div>
     </article>

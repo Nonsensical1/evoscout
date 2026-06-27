@@ -5,6 +5,7 @@ import { useAuth } from '@/app/providers';
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Trophy, Star, TrendingUp, Search } from 'lucide-react';
+import { LiteratureCard } from '@/app/LiteratureCard';
 
 export default function LeaderboardPage() {
   const { user } = useAuth();
@@ -66,7 +67,10 @@ export default function LeaderboardPage() {
           } else if (p.id.startsWith("BIORXIV-")) {
             ssId = `DOI:${p.id.replace("BIORXIV-", "")}`;
           } else if (p.doi) {
-            ssId = `DOI:${p.doi}`;
+            let rawDoi = p.doi.replace("https://doi.org/", "").replace("http://doi.org/", "");
+            if (rawDoi.startsWith("10.")) {
+              ssId = `DOI:${rawDoi}`;
+            }
           }
           
           if (ssId) {
@@ -178,84 +182,16 @@ export default function LeaderboardPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  {leaderboardData[topic].map((paper, idx) => {
-                    const isGold = idx === 0;
-                    const isSilver = idx === 1;
-                    const isBronze = idx === 2;
-                    
-                    let badgeColor = "bg-gray-100 dark:bg-[#1a1a1a] text-editorial-muted";
-                    let borderGlow = "border-editorial-border";
-                    
-                    if (isGold) {
-                      badgeColor = "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
-                      borderGlow = "border-amber-300 dark:border-amber-700/50 shadow-[0_0_15px_rgba(251,191,36,0.1)]";
-                    } else if (isSilver) {
-                      badgeColor = "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
-                      borderGlow = "border-slate-300 dark:border-slate-600 shadow-[0_0_15px_rgba(148,163,184,0.1)]";
-                    } else if (isBronze) {
-                      badgeColor = "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
-                      borderGlow = "border-orange-300 dark:border-orange-700/50 shadow-[0_0_15px_rgba(251,146,60,0.1)]";
-                    }
-
-                    return (
-                      <div key={paper.id} className={`flex flex-col md:flex-row gap-6 p-6 border bg-white dark:bg-[#111111] transition-all hover:shadow-lg ${borderGlow}`}>
-                        
-                        <div className="flex-shrink-0 flex md:flex-col items-center justify-between md:justify-start gap-4 w-full md:w-32">
-                          <div className={`flex items-center justify-center w-12 h-12 rounded-full font-serif font-black text-xl ${badgeColor}`}>
-                            #{idx + 1}
-                          </div>
-                          <div className="flex flex-row md:flex-col gap-4 text-center">
-                            <div className="flex flex-col items-center">
-                              <span className="text-2xl font-black font-sans text-editorial-text">{paper.influentialCitationCount}</span>
-                              <span className="text-[9px] font-sans font-bold text-[#005587] dark:text-[#60a5fa] uppercase tracking-widest flex items-center gap-1">
-                                <Star className="w-3 h-3" /> Influential
-                              </span>
-                            </div>
-                            <div className="w-px h-8 bg-editorial-border md:w-8 md:h-px mx-auto"></div>
-                            <div className="flex flex-col items-center">
-                              <span className="text-xl font-black font-sans text-editorial-muted">{paper.citationCount}</span>
-                              <span className="text-[9px] font-sans font-bold text-editorial-muted uppercase tracking-widest flex items-center gap-1">
-                                <TrendingUp className="w-3 h-3" /> Total
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex-grow flex flex-col justify-between">
-                          <div>
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="px-2 py-0.5 bg-gray-100 dark:bg-[#1a1a1a] border border-editorial-border text-[9px] font-bold font-sans uppercase tracking-widest text-editorial-muted">
-                                {paper.journal}
-                              </span>
-                              <span className="text-xs font-sans font-bold text-editorial-muted">
-                                {new Date(paper.isoDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                              </span>
-                            </div>
-                            
-                            <a href={paper.doi?.startsWith('http') ? paper.doi : (paper.doi ? `https://doi.org/${paper.doi}` : '#')} target="_blank" rel="noopener noreferrer" className="group block mb-3">
-                              <h3 className="text-lg md:text-xl font-serif font-bold text-editorial-text group-hover:text-[#005587] dark:group-hover:text-[#60a5fa] leading-snug transition-colors">
-                                {paper.title}
-                              </h3>
-                            </a>
-                            
-                            <p className="text-xs font-sans text-editorial-muted line-clamp-3 mb-4 leading-relaxed">
-                              {paper.rawAbstract}
-                            </p>
-                          </div>
-                          
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-auto">
-                            <span className="text-[10px] font-sans font-bold text-editorial-text uppercase tracking-wider bg-gray-50 dark:bg-[#1a1a1a] px-2 py-1">
-                              {paper.institution}
-                            </span>
-                            <span className="text-[10px] font-sans text-editorial-muted uppercase tracking-widest truncate max-w-xs">
-                              {paper.authors}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="flex flex-col space-y-8">
+                  {leaderboardData[topic].map((paper, idx) => (
+                    <LiteratureCard
+                      key={paper.id}
+                      paper={paper}
+                      rank={idx + 1}
+                      citationCount={paper.citationCount}
+                      influentialCitationCount={paper.influentialCitationCount}
+                    />
+                  ))}
                 </div>
               </section>
             ))}
