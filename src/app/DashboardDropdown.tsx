@@ -21,7 +21,7 @@ export function DashboardDropdown() {
   const handleToggle = (e: React.MouseEvent) => {
     if (window.innerWidth <= 768) {
       if (!isOpen) {
-        e.preventDefault(); 
+        e.preventDefault();
         setIsOpen(true);
       } else {
         // Allow navigation to "/" if already open
@@ -34,19 +34,19 @@ export function DashboardDropdown() {
   };
 
   return (
-    <div 
+    <div
       className="relative flex items-center h-full"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <Link 
-        href="/" 
+      <Link
+        href="/"
         className="hover-underline py-2"
         onClick={handleToggle}
       >
         Dashboard
       </Link>
-      
+
       {isOpen && (
         <div className="absolute left-0 top-[100%] pt-2 w-40 z-[60]">
           <div className="flex flex-col bg-white dark:bg-[#121212] border border-editorial-border shadow-[4px_4px_0px_#e5e5e5] dark:shadow-[4px_4px_0px_#111111] text-left text-[10px] animate-in fade-in duration-200 uppercase tracking-widest font-sans font-bold">
