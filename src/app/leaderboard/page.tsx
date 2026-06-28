@@ -11,6 +11,7 @@ export default function LeaderboardPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [leaderboardData, setLeaderboardData] = useState<Record<string, any[]>>({});
+  const [topicScores, setTopicScores] = useState<Record<string, number>>({});
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -56,13 +57,36 @@ export default function LeaderboardPage() {
           }
         });
 
-        // 3. Chronological sorting and aggressive slicing (Fix for infinite loading)
-        // Sort by recency to prioritize the absolute freshest breaking news
-        allPapers.sort((a, b) => new Date(b.isoDate || b.dateAdded || 0).getTime() - new Date(a.isoDate || a.dateAdded || 0).getTime());
-        const recentNews = allPapers.slice(0, 100);
+        // 3. Group by topics BEFORE slicing to guarantee articles per topic!
+        const preGrouped: Record<string, any[]> = {};
+        topics.forEach(t => preGrouped[t] = []);
+
+        allPapers.forEach(paper => {
+          const content = `${paper.title || ''} ${paper.summary || ''}`.toLowerCase();
+          topics.forEach(topic => {
+            if (content.includes(topic)) {
+              preGrouped[topic].push(paper);
+            }
+          });
+        });
+
+        // 4. Extract the top 15 most recent articles FOR EACH TOPIC
+        const payloadItems: any[] = [];
+        const payloadIds = new Set();
+
+        topics.forEach(topic => {
+          preGrouped[topic].sort((a, b) => new Date(b.isoDate || b.dateAdded || 0).getTime() - new Date(a.isoDate || a.dateAdded || 0).getTime());
+          const top15 = preGrouped[topic].slice(0, 15);
+          top15.forEach(p => {
+             if (!payloadIds.has(p.id)) {
+                payloadIds.add(p.id);
+                payloadItems.push(p);
+             }
+          });
+        });
 
         // Format payload for Reverse Mapping API
-        const newsPayload = recentNews.map(p => ({
+        const newsPayload = payloadItems.map(p => ({
           id: p.id,
           title: p.title,
           doi: p.doi || "",
@@ -72,8 +96,8 @@ export default function LeaderboardPage() {
 
         const paperMap: Record<string, any> = {};
 
-        // 4. Batch query Semantic Scholar proxy for Reverse Mapping
-        const CHUNK_SIZE = 15; // API caps at 15 items per batch
+        // 5. Batch query Semantic Scholar proxy for Reverse Mapping
+        const CHUNK_SIZE = 15; 
         for (let i = 0; i < newsPayload.length; i += CHUNK_SIZE) {
           const chunk = newsPayload.slice(i, i + CHUNK_SIZE);
           try {
@@ -87,7 +111,7 @@ export default function LeaderboardPage() {
               data.forEach((mappedPaper: any) => {
                 if (mappedPaper && mappedPaper.paperId) {
                   // Find the original item to retrieve the scraped date
-                  const originalNews = recentNews.find(n => n.id === mappedPaper.originalId);
+                  const originalNews = payloadItems.find(n => n.id === mappedPaper.originalId);
                   
                   paperMap[mappedPaper.paperId] = {
                     id: mappedPaper.originalId,
@@ -110,28 +134,34 @@ export default function LeaderboardPage() {
           }
         }
 
-        // 5. Group by topics
-        const grouped: Record<string, any[]> = {};
-        topics.forEach(t => grouped[t] = []);
+        // 6. Map the resolved semantic scholar papers back into their topics
+        const finalGrouped: Record<string, any[]> = {};
+        topics.forEach(t => finalGrouped[t] = []);
 
         Object.values(paperMap).forEach(paper => {
           const content = `${paper.title || ''} ${paper.rawAbstract || ''}`.toLowerCase();
           topics.forEach(topic => {
             if (content.includes(topic)) {
-              grouped[topic].push(paper);
+              finalGrouped[topic].push(paper);
             }
           });
         });
 
-        // 6. Sort and slice top 10
+        // 7. Sort papers within topics, and tally up the total citations per topic
         const finalData: Record<string, any[]> = {};
+        const newScores: Record<string, number> = {};
+
         topics.forEach(t => {
-          finalData[t] = grouped[t]
+          finalData[t] = finalGrouped[t]
             .sort((a, b) => b.influentialCitationCount - a.influentialCitationCount || b.citationCount - a.citationCount)
-            .slice(0, 10);
+            .slice(0, 10); // Ensure max 10 rendered per topic
+
+          // Sum citations for this topic to determine section rendering order
+          newScores[t] = finalData[t].reduce((sum, paper) => sum + (paper.citationCount || 0) + (paper.influentialCitationCount || 0), 0);
         });
 
         setLeaderboardData(finalData);
+        setTopicScores(newScores);
       } catch (err) {
         console.error("Failed to load leaderboard:", err);
       } finally {
@@ -151,7 +181,7 @@ export default function LeaderboardPage() {
     );
   }
 
-  const topicKeys = Object.keys(leaderboardData).sort();
+  const topicKeys = Object.keys(leaderboardData).sort((a, b) => (topicScores[b] || 0) - (topicScores[a] || 0));
 
   return (
     <div className="min-h-screen bg-[#f8f7f5] dark:bg-[#0f0f0f] pt-16 pb-32 transition-colors duration-500">
