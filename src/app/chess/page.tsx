@@ -5,6 +5,15 @@ import { Chess, Move } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/app/providers';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+
+interface ChessHistoryRecord {
+  date: string;
+  id: string;
+  rating: number;
+}
 
 export default function ChessPage() {
   const [game, setGame] = useState<Chess | null>(null);
@@ -13,6 +22,29 @@ export default function ChessPage() {
   const [status, setStatus] = useState<"loading" | "playing" | "solved" | "failed">("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [orientation, setOrientation] = useState<"white" | "black">("white");
+  const [puzzleData, setPuzzleData] = useState<any>(null);
+  const [history, setHistory] = useState<ChessHistoryRecord[]>([]);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      const fetchHistory = async () => {
+        try {
+          const docRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.chess_history) {
+              setHistory(data.chess_history);
+            }
+          }
+        } catch (e) {
+          console.error("Error fetching chess history:", e);
+        }
+      };
+      fetchHistory();
+    }
+  }, [user]);
 
   useEffect(() => {
     fetch('https://lichess.org/api/puzzle/daily')
@@ -22,6 +54,7 @@ export default function ChessPage() {
         setGame(c);
         setSolution(data.puzzle.solution);
         setOrientation(c.turn() === 'w' ? 'white' : 'black');
+        setPuzzleData(data.puzzle);
         setStatus("playing");
       })
       .catch(err => {
@@ -62,6 +95,7 @@ export default function ChessPage() {
       
       if (nextIdx === solution.length) {
         setStatus("solved");
+        saveHistory();
       } else {
         // Opponent's automatic response
         setMoveIndex(nextIdx + 1);
@@ -76,6 +110,7 @@ export default function ChessPage() {
           
           if (nextIdx + 1 === solution.length) {
              setStatus("solved");
+             saveHistory();
           }
         }, 500);
       }
@@ -85,6 +120,30 @@ export default function ChessPage() {
       setStatus("failed");
       setErrorMsg("Incorrect move! Try again tomorrow.");
       return false; // reject the piece drop on the board
+    }
+  }
+
+  async function saveHistory() {
+    if (!user || !puzzleData) return;
+    
+    const today = new Date().toDateString();
+    // Check if already solved today to prevent duplicates
+    if (history.some(h => h.id === puzzleData.id && h.date === today)) return;
+
+    const newRecord: ChessHistoryRecord = {
+      date: today,
+      id: puzzleData.id,
+      rating: puzzleData.rating
+    };
+
+    const newHistory = [newRecord, ...history];
+    setHistory(newHistory);
+
+    try {
+      const docRef = doc(db, 'users', user.uid);
+      await setDoc(docRef, { chess_history: newHistory }, { merge: true });
+    } catch (e) {
+      console.error("Error saving chess history:", e);
     }
   }
 
@@ -148,6 +207,22 @@ export default function ChessPage() {
             )}
          </div>
       </div>
+
+      {history.length > 0 && (
+        <div className="mt-12 bg-white border border-editorial-border p-6 shadow-sm">
+          <h3 className="text-xl font-serif font-bold uppercase border-b border-editorial-border pb-2 mb-4 text-editorial-text">
+            Your Solved Puzzles
+          </h3>
+          <ul className="space-y-2">
+            {history.map((record, idx) => (
+              <li key={idx} className="flex justify-between font-mono text-sm border-b border-editorial-border-dark pb-2">
+                <span>{record.date}</span>
+                <span className="text-editorial-muted">ID: {record.id} | Rating: {record.rating}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
