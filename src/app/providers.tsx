@@ -3,7 +3,7 @@
 import { ThemeProvider } from "next-themes";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from "firebase/auth";
+import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, updatePassword, signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
@@ -28,6 +28,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [emailInput, setEmailInput] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const [showEmailLogin, setShowEmailLogin] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [showSetPassword, setShowSetPassword] = useState(false);
+  const [pendingUser, setPendingUser] = useState<User | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined" && isSignInWithEmailLink(auth, window.location.href)) {
@@ -40,6 +43,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .then((result) => {
             window.localStorage.removeItem('emailForSignIn');
             window.history.replaceState(null, '', '/');
+            const hasPassword = result.user.providerData.some(p => p.providerId === 'password');
+            if (!hasPassword) {
+              setPendingUser(result.user);
+              setShowSetPassword(true);
+            }
           })
           .catch((err) => {
             setAuthError(err.message);
@@ -47,6 +55,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, []);
+
+  const handlePasswordSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError("");
+    try {
+      await signInWithEmailAndPassword(auth, emailInput, passwordInput);
+    } catch (err: any) {
+      setAuthError(err.message || String(err));
+    }
+  };
+
+  const handleSetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError("");
+    if (!pendingUser) return;
+    try {
+      await updatePassword(pendingUser, passwordInput);
+      setShowSetPassword(false);
+      setPendingUser(null);
+    } catch (err: any) {
+      setAuthError(err.message || String(err));
+    }
+  };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,8 +182,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 <strong>Check your email!</strong><br/>
                 We sent a confirmation link to <strong>{emailInput}</strong>. Click the link in the email to instantly sign in. You can safely close this window.
               </div>
+            ) : showSetPassword ? (
+              <form onSubmit={handleSetPassword} className="text-left font-sans">
+                <h2 className="text-xl font-serif font-bold mb-4 text-editorial-text">Set a Permanent Password</h2>
+                <p className="text-xs text-editorial-muted mb-4">You've successfully verified your institutional email! Set a password now so you can log in instantly next time without waiting for an email link.</p>
+                <label className="block text-xs uppercase tracking-wider font-bold mb-2 text-editorial-text">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  className="w-full border-2 border-editorial-border p-3 mb-4 bg-transparent text-editorial-text focus:outline-none focus:border-black dark:focus:border-white"
+                />
+                <button 
+                  type="submit"
+                  className="w-full bg-green-700 hover:bg-green-800 text-white py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm transition-colors mb-2"
+                >
+                  Save Password & Continue
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => { setShowSetPassword(false); setPendingUser(null); }}
+                  className="w-full text-xs underline text-editorial-muted hover:text-editorial-text uppercase tracking-widest text-center"
+                >
+                  Skip for now
+                </button>
+              </form>
             ) : (
-              <form onSubmit={handleEmailSignIn} className="text-left font-sans">
+              <form onSubmit={handlePasswordSignIn} className="text-left font-sans">
                 <label className="block text-xs uppercase tracking-wider font-bold mb-2 text-editorial-text">
                   Institutional Email (.edu or .gov)
                 </label>
@@ -164,12 +225,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   required
                   className="w-full border-2 border-editorial-border p-3 mb-4 bg-transparent text-editorial-text focus:outline-none focus:border-black dark:focus:border-white"
                 />
-                <button 
-                  type="submit"
-                  className="w-full bg-[#171717] dark:bg-black hover:bg-[#333] dark:hover:bg-[#262626] text-white py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm transition-colors mb-4"
-                >
-                  Send Login Link
-                </button>
+                <label className="block text-xs uppercase tracking-wider font-bold mb-2 text-editorial-text">
+                  Password (Leave blank if you don't have one)
+                </label>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full border-2 border-editorial-border p-3 mb-4 bg-transparent text-editorial-text focus:outline-none focus:border-black dark:focus:border-white"
+                />
+                
+                <div className="flex gap-2 mb-4">
+                  <button 
+                    type="submit"
+                    className="flex-1 bg-[#171717] dark:bg-black hover:bg-[#333] dark:hover:bg-[#262626] text-white py-3 px-2 font-bold font-sans uppercase tracking-widest text-xs transition-colors"
+                  >
+                    Sign In
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleEmailSignIn}
+                    className="flex-1 bg-white dark:bg-[#222] border-2 border-[#171717] dark:border-white text-[#171717] dark:text-white hover:bg-gray-100 dark:hover:bg-[#333] py-3 px-2 font-bold font-sans uppercase tracking-widest text-[10px] sm:text-xs transition-colors"
+                  >
+                    Send Magic Link
+                  </button>
+                </div>
                 <button 
                   type="button"
                   onClick={() => setShowEmailLogin(false)}
