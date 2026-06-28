@@ -240,7 +240,7 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
   try {
     const rssFeeds = [
       { url: 'https://www.nature.com/nature.rss', source: 'Nature' },
-      { url: 'https://www.science.org/rss/express.xml', source: 'Science (Journal)' },
+      { url: 'https://feeds.science.org/rss/science-aop.xml', source: 'Science (Journal)' },
       { url: 'https://www.cell.com/cell/inpress.rss', source: 'Cell Press' },
       { url: 'https://www.nature.com/nmicrobiol.rss', source: 'Nature Microbiology' },
       { url: 'https://www.nature.com/nbt.rss', source: 'Nature Biotechnology' },
@@ -252,9 +252,6 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
       { url: 'https://www.nature.com/nmeth.rss', source: 'Nature Methods' },
       { url: 'https://www.nature.com/nm.rss', source: 'Nature Medicine' },
       { url: 'https://www.cell.com/cell-stem-cell/current.rss', source: 'Cell Stem Cell' },
-      { url: 'https://www.science.org/rss/stm.xml', source: 'Science Translational Medicine' },
-      { url: 'https://www.nejm.org/action/showFeed?type=etoc&feed=rss', source: 'NEJM' },
-      { url: 'https://www.science.org/rss/sciimmunol.xml', source: 'Science Immunology' },
       { url: 'https://journals.plos.org/plosbiology/feed/atom', source: 'PLOS Biology' }
     ];
     let allNews: any[] = [];
