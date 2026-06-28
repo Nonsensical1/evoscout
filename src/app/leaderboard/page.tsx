@@ -75,27 +75,33 @@ export default function LeaderboardPage() {
           
           if (ssId) {
             ssIds.push(ssId);
-            paperMap[ssId] = { ...p, altmetricScore: 0 };
+            paperMap[ssId] = { ...p, citationCount: 0, influentialCitationCount: 0 };
           }
         });
 
-        // 4. Batch query Altmetric proxy
-        try {
-          const res = await fetch("/api/leaderboard-batch", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ids: ssIds })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            data.forEach((item: any) => {
-              if (item && item.id && paperMap[item.id]) {
-                paperMap[item.id].altmetricScore = item.score;
-              }
+        // 4. Batch query Semantic Scholar proxy
+        const CHUNK_SIZE = 500;
+        for (let i = 0; i < ssIds.length; i += CHUNK_SIZE) {
+          const chunk = ssIds.slice(i, i + CHUNK_SIZE);
+          try {
+            const res = await fetch("/api/leaderboard-batch", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ids: chunk })
             });
+            if (res.ok) {
+              const data = await res.json();
+              data.forEach((item: any, idx: number) => {
+                const requestedId = chunk[idx];
+                if (item) {
+                  paperMap[requestedId].citationCount = item.citationCount || 0;
+                  paperMap[requestedId].influentialCitationCount = item.influentialCitationCount || 0;
+                }
+              });
+            }
+          } catch (e) {
+            console.error("Semantic Scholar batch failed:", e);
           }
-        } catch (e) {
-          console.error("Altmetric batch failed:", e);
         }
 
         // 5. Group by topics
@@ -116,7 +122,7 @@ export default function LeaderboardPage() {
         topics.forEach(t => {
           if (grouped[t].length > 0) {
             finalData[t] = grouped[t]
-              .sort((a, b) => b.altmetricScore - a.altmetricScore)
+              .sort((a, b) => b.influentialCitationCount - a.influentialCitationCount || b.citationCount - a.citationCount)
               .slice(0, 10);
           }
         });
@@ -154,7 +160,7 @@ export default function LeaderboardPage() {
             </h1>
           </div>
           <p className="text-sm font-sans font-medium text-editorial-muted uppercase tracking-widest max-w-3xl mx-auto md:mx-0">
-            Live velocity rankings for literature scraped over the past 30 days. Metrics are dynamically synced with the Altmetric API, tracking real-time attention and global access engagement.
+            Live velocity rankings for literature scraped over the past 30 days. Metrics are dynamically synced with the Semantic Scholar Open Graph API, emphasizing highly influential citations.
           </p>
         </header>
 
@@ -182,7 +188,8 @@ export default function LeaderboardPage() {
                       key={paper.id}
                       paper={paper}
                       rank={idx + 1}
-                      altmetricScore={paper.altmetricScore}
+                      citationCount={paper.citationCount}
+                      influentialCitationCount={paper.influentialCitationCount}
                     />
                   ))}
                 </div>

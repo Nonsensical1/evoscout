@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { BookOpen } from 'lucide-react';
 
-export function LiteratureCard({ paper, rank, altmetricScore }: { paper: any, rank?: number, altmetricScore?: number }) {
+export function LiteratureCard({ paper, rank, citationCount, influentialCitationCount }: { paper: any, rank?: number, citationCount?: number, influentialCitationCount?: number }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [recommendedPapers, setRecommendedPapers] = useState<any[] | null>(null);
@@ -106,8 +106,8 @@ export function LiteratureCard({ paper, rank, altmetricScore }: { paper: any, ra
           <div className="mt-auto flex flex-col items-start md:items-end gap-1 pt-4 w-full border-t border-gray-100 dark:border-[#262626]">
             <span className="text-sm font-serif font-black text-editorial-text">#{rank} Ranked</span>
             <div className="flex flex-col md:text-right w-full">
-              <span className="text-[10px] font-sans uppercase tracking-widest text-[#005587] dark:text-[#60a5fa]">{Math.round(altmetricScore || 0)} Engagement</span>
-              <span className="text-[10px] font-sans uppercase tracking-widest text-editorial-muted">Altmetric Score</span>
+              <span className="text-[10px] font-sans uppercase tracking-widest text-editorial-muted">{citationCount} Total Citations</span>
+              <span className="text-[10px] font-sans uppercase tracking-widest text-[#005587] dark:text-[#60a5fa]">{influentialCitationCount} Influential</span>
             </div>
           </div>
         )}
