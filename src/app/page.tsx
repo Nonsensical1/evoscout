@@ -857,12 +857,12 @@ export default function Home() {
                   )}
 
                   <div className="w-full bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex flex-col justify-center items-center relative">
-                    <div className="absolute top-4 right-4 flex space-x-2 z-10 bg-gray-100 dark:bg-black rounded-lg p-1">
+                    <h4 className="font-serif font-bold text-lg text-center text-[#005587] dark:text-[#60a5fa] uppercase tracking-widest mt-2 mb-3">Allocated Grants</h4>
+                    <div className="flex space-x-2 z-10 bg-gray-100 dark:bg-black rounded-lg p-1 mb-2 border border-gray-200 dark:border-[#333]">
                       <button onClick={() => setGrantsMetric('mentions')} className={`px-3 py-1 text-xs font-bold rounded uppercase transition-colors ${grantsMetric === 'mentions' ? 'bg-[#005587] text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Counts</button>
                       <button onClick={() => setGrantsMetric('funding')} className={`px-3 py-1 text-xs font-bold rounded uppercase transition-colors ${grantsMetric === 'funding' ? 'bg-[#005587] text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Funding</button>
                     </div>
-                    <h4 className="font-serif font-bold text-lg mb-2 text-center text-[#005587] dark:text-[#60a5fa] uppercase tracking-widest mt-4">Allocated Grants</h4>
-                    <div className="w-full h-[400px] flex items-center justify-center">
+                    <div className="w-full h-[370px] flex items-center justify-center">
                       {(monthlyTrends.grantsMentions.length === 0 && monthlyTrends.grantsFunding.length === 0) ? (
                         <p className="text-sm font-serif italic text-gray-400 text-center px-8">No allocated grants matched advanced concepts this month.</p>
                       ) : (
