@@ -349,6 +349,74 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
       } catch (e) { console.error(`News Fetch Error for ${feedConfig.source}:`, e); }
     }
 
+    // --- CrossRef Fallback APIs for Deprecated RSS Feeds ---
+    const crossRefPromise = (async () => {
+      try {
+        const targetJournals = ["Science Immunology", "Science Translational Medicine", "New England Journal of Medicine"];
+        const yesterday = new Date(Date.now() - newsLookbackHours * 60 * 60 * 1000); 
+        const pubDateFilter = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+        
+        const fetchPromises = targetJournals.map(async (journal) => {
+           const url = `https://api.crossref.org/works?query.container-title=${encodeURIComponent(journal)}&filter=from-pub-date:${pubDateFilter}&select=title,author,URL,abstract,published,container-title,issued&rows=15`;
+           try {
+             const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EvoScoutBot/1.0)' }});
+             if (res.ok) {
+               const data = await res.json();
+               return data.message?.items || [];
+             }
+           } catch(e) { console.error("CrossRef Error:", e); }
+           return [];
+        });
+
+        const results = await Promise.all(fetchPromises);
+        const flattened = results.flat();
+
+        return flattened.map((item: any, i: number) => {
+            const rawDate = item.issued?.['date-parts']?.[0] || item.published?.['date-parts']?.[0];
+            let isoDate = new Date().toISOString();
+            if (rawDate && rawDate.length >= 3) {
+               isoDate = new Date(rawDate[0], rawDate[1]-1, rawDate[2]).toISOString();
+            }
+
+            const title = item.title && item.title.length > 0 ? item.title[0] : "Science Update";
+            const abstract = item.abstract || "";
+            const content = `${title} ${abstract}`.toLowerCase();
+            let matchedKeyword = "";
+            for (const kw of newsKeywords) {
+               const regex = new RegExp(`\\b${kw.replace(/[-\\/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&')}\\b`, 'i');
+               if (regex.test(content)) {
+                  matchedKeyword = kw;
+                  break;
+               }
+            }
+            if (!matchedKeyword) {
+               for (const kw of newsKeywords) {
+                  if (content.includes(kw.toLowerCase())) {
+                     matchedKeyword = kw;
+                     break;
+                  }
+               }
+            }
+
+            if (!matchedKeyword) return null; // Drop if no keywords match
+            
+            let source = item['container-title'] ? item['container-title'][0] : "Crossref Journal";
+            if (source === "New England Journal of Medicine") source = "NEJM";
+
+            return {
+             id: `NEWS-CROSSREF-${i}`.replace(/[^a-zA-Z0-9-]/g, ''),
+             title: title,
+             source: source,
+             url: item.URL || "",
+             image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100",
+             rawSnippet: abstract.replace(/<[^>]+>/g, ''), // strip simple XML/HTML tags often present in abstract
+             isoDate: isoDate,
+             matchedTopic: matchedKeyword
+            };
+        }).filter(Boolean);
+      } catch (e) { console.error("CrossRef Batch Error:", e); return []; }
+    })();
+
     // --- REST APIs for Open Access Publishers ---
     const plosPromise = (async () => {
       try {
@@ -417,8 +485,8 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
       return [];
     })();
 
-    const [plosRaw, eLifeRaw, bmcRaw] = await Promise.all([plosPromise, eLifePromise, bmcPromise]);
-    let apiNews = [...plosRaw, ...eLifeRaw, ...bmcRaw];
+    const [plosNews, eLifeNews, crossRefNews, bmcRaw] = await Promise.all([plosPromise, eLifePromise, crossRefPromise, bmcPromise]);
+    let apiNews = [...plosNews, ...eLifeNews, ...crossRefNews, ...bmcRaw];
     
     apiNews = apiNews.filter((item: any) => {
         return item.isoDate ? (new Date(item.isoDate).getTime() > timeWindowLimit) : true;
