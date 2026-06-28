@@ -43,8 +43,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
   const [quotaNotice, setQuotaNotice] = useState<string | null>(null);
-  const [monthlyTrends, setMonthlyTrends] = useState<{ news: { name: string, value: number }[], literature: { name: string, value: number }[], grantsMentions: { name: string, value: number }[], grantsFunding: { name: string, value: number }[], openGrantsMentions: { name: string, value: number }[] }>({ news: [], literature: [], grantsMentions: [], grantsFunding: [], openGrantsMentions: [] });
+  const [monthlyTrends, setMonthlyTrends] = useState<{ news: { name: string, value: number }[], literature: { name: string, value: number }[], grantsMentions: { name: string, value: number }[], grantsFunding: { name: string, value: number }[], openGrantsMentions: { name: string, value: number }[], openGrantsFunding: { name: string, value: number }[] }>({ news: [], literature: [], grantsMentions: [], grantsFunding: [], openGrantsMentions: [], openGrantsFunding: [] });
   const [grantsMetric, setGrantsMetric] = useState<'mentions' | 'funding'>('mentions');
+  const [openGrantsMetric, setOpenGrantsMetric] = useState<'mentions' | 'funding'>('mentions');
   
   const [activeNewsIndex, setActiveNewsIndex] = useState(-1);
   const [activeLitIndex, setActiveLitIndex] = useState(-1);
@@ -421,6 +422,7 @@ export default function Home() {
         const globalGrantsTermCounts: Record<string, number> = {};
         const globalGrantsTermFunding: Record<string, number> = {};
         const globalOpenGrantsTermCounts: Record<string, number> = {};
+        const globalOpenGrantsTermFunding: Record<string, number> = {};
 
         ledgerSnap.forEach(doc => {
           const data = doc.data();
@@ -472,6 +474,11 @@ export default function Home() {
                  const matchCount = (content.match(regex) || []).length;
                  if (matchCount > 0) {
                    globalOpenGrantsTermCounts[topic] = (globalOpenGrantsTermCounts[topic] || 0) + matchCount;
+                   const amountStr = item.amount ? String(item.amount).replace(/[^0-9.-]+/g,"") : "";
+                   const amount = parseInt(amountStr, 10);
+                   if (!isNaN(amount)) {
+                     globalOpenGrantsTermFunding[topic] = (globalOpenGrantsTermFunding[topic] || 0) + amount;
+                   }
                  }
               });
             });
@@ -493,6 +500,9 @@ export default function Home() {
         const topOpenGrantsMentions = Object.entries(globalOpenGrantsTermCounts)
           .sort((a, b) => b[1] - a[1]).slice(0, 5).map(entry => ({ name: entry[0], value: entry[1] }));
 
+        const topOpenGrantsFunding = Object.entries(globalOpenGrantsTermFunding)
+          .sort((a, b) => b[1] - a[1]).slice(0, 5).map(entry => ({ name: entry[0], value: entry[1] }));
+
         if (topNewsTopics.length === 0 && topLitTopics.length === 0 && topGrantsMentions.length === 0 && topOpenGrantsMentions.length === 0) return;
 
         setMonthlyTrends({ 
@@ -500,7 +510,8 @@ export default function Home() {
           literature: topLitTopics,
           grantsMentions: topGrantsMentions,
           grantsFunding: topGrantsFunding,
-          openGrantsMentions: topOpenGrantsMentions
+          openGrantsMentions: topOpenGrantsMentions,
+          openGrantsFunding: topOpenGrantsFunding
         });
       } catch (e) {
         console.error("Failed to fetch trends", e);
@@ -903,16 +914,20 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="w-full bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex flex-col justify-center items-center">
-                    <h4 className="font-serif font-bold text-lg mb-2 text-center text-[#005587] dark:text-[#60a5fa] uppercase tracking-widest">Open Grants</h4>
-                    <div className="w-full h-[400px] flex items-center justify-center">
-                      {monthlyTrends.openGrantsMentions.length === 0 ? (
+                  <div className="w-full bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex flex-col justify-center items-center relative">
+                    <h4 className="font-serif font-bold text-lg mb-2 text-center text-[#005587] dark:text-[#60a5fa] uppercase tracking-widest mt-2 mb-3">Open Grants</h4>
+                    <div className="flex space-x-2 z-10 bg-gray-100 dark:bg-black rounded-lg p-1 mb-2 border border-gray-200 dark:border-[#333]">
+                      <button onClick={() => setOpenGrantsMetric('mentions')} className={`px-3 py-1 text-xs font-bold rounded uppercase transition-colors ${openGrantsMetric === 'mentions' ? 'bg-[#005587] text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Counts</button>
+                      <button onClick={() => setOpenGrantsMetric('funding')} className={`px-3 py-1 text-xs font-bold rounded uppercase transition-colors ${openGrantsMetric === 'funding' ? 'bg-[#005587] text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Funding</button>
+                    </div>
+                    <div className="w-full h-[370px] flex items-center justify-center">
+                      {(monthlyTrends.openGrantsMentions.length === 0 && monthlyTrends.openGrantsFunding.length === 0) ? (
                         <p className="text-sm font-serif italic text-gray-400 text-center px-8">No open grants matched advanced concepts this month.</p>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
-                              data={monthlyTrends.openGrantsMentions}
+                              data={openGrantsMetric === 'funding' ? monthlyTrends.openGrantsFunding : monthlyTrends.openGrantsMentions}
                               cx="50%"
                               cy="50%"
                               innerRadius={80}
@@ -924,7 +939,7 @@ export default function Home() {
                               onMouseEnter={onOpenGrantsPieEnter}
                               onMouseLeave={onOpenGrantsPieLeave}
                             >
-                              {monthlyTrends.openGrantsMentions.map((entry, index) => {
+                              {(openGrantsMetric === 'funding' ? monthlyTrends.openGrantsFunding : monthlyTrends.openGrantsMentions).map((entry, index) => {
                                 const colors = ['#005587', '#0099cc', '#f59e0b', '#10b981', '#6366f1'];
                                 return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
                               })}
@@ -932,7 +947,12 @@ export default function Home() {
                             <Tooltip 
                               contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.95)', color: '#000' }}
                               itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
-                              formatter={(value: any, name: any) => [`${value} mentions`, name]}
+                              formatter={(value: any, name: any) => {
+                                if (openGrantsMetric === 'funding') {
+                                  return [`$${Number(value).toLocaleString()}`, name];
+                                }
+                                return [`${value} mentions`, name];
+                              }}
                             />
                             <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: '500', paddingTop: '20px' }} />
                           </PieChart>

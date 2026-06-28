@@ -199,12 +199,34 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
           });
           
           if (recentOpen.length > 0) {
-            activeGovGrants = recentOpen.map((h: any) => ({
-              id: `GOV-${h.id}`,
-              title: h.title,
-              agency: h.agencyCode || h.agency || "Grants.gov",
-              amount: "Details at Registry", // GovGrants search doesn't natively expose discrete obligation totals
-              url: `https://www.grants.gov/search-results-detail/${h.id}`
+            activeGovGrants = await Promise.all(recentOpen.map(async (h: any) => {
+              let amount = "Details at Registry";
+              try {
+                const detailRes = await fetch("https://apply07.grants.gov/grantsws/rest/opportunity/details", {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                  body: `oppId=${h.id}`
+                });
+                if (detailRes.ok) {
+                  const detailData = await detailRes.json();
+                  if (detailData.synopsis && detailData.synopsis.estimatedFunding) {
+                    const parsedAmount = parseInt(detailData.synopsis.estimatedFunding, 10);
+                    if (!isNaN(parsedAmount) && parsedAmount > 0) {
+                      amount = `$${parsedAmount.toLocaleString()}`;
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error(`GovGrants Detail Fetch Error for oppId ${h.id}:`, e);
+              }
+
+              return {
+                id: `GOV-${h.id}`,
+                title: h.title,
+                agency: h.agencyCode || h.agency || "Grants.gov",
+                amount: amount,
+                url: `https://www.grants.gov/search-results-detail/${h.id}`
+              };
             }));
             break; // Stop expanding window
           }

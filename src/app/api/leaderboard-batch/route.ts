@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import * as cheerio from 'cheerio';
 
 export async function POST(request: Request) {
   try {
@@ -94,14 +95,62 @@ export async function POST(request: Request) {
            }
         }
 
-        // --- PHASE 4: Reconstruct Results ---
+        // --- PHASE 4: Cheerio Scraping Fallback ---
+        // For items that still don't have a paper match, try scraping their original URL
         for (const item of targetItems) {
            let paper = null;
            
            if (item.queryId && paperMap[item.queryId]) {
               paper = paperMap[item.queryId];
            } else {
-              // Try to find if it was resolved by paperId
+              paper = Object.values(paperMap).find(p => p.paperId === item.queryId);
+           }
+
+           if (!paper && item.url) {
+             try {
+               const pageRes = await fetch(item.url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EvoScoutBot/1.0)' }});
+               if (pageRes.ok) {
+                 const html = await pageRes.text();
+                 const $ = cheerio.load(html);
+                 let scrapedCount = 0;
+                 
+                 const accessesMatch = html.match(/([\d,]+)\s+(?:Accesses|Views)/i) || html.match(/(?:Views|Accesses):\s*([\d,]+)/i);
+                 if (accessesMatch) {
+                    scrapedCount = parseInt(accessesMatch[1].replace(/,/g, ''), 10);
+                 } else {
+                    // Try to scrape typical metric spans
+                    const metricText = $('.c-article-metrics__views, .metrics, .article-metrics, .js-metrics').text();
+                    const textMatch = metricText.match(/([\d,]+)/);
+                    if (textMatch) scrapedCount = parseInt(textMatch[1].replace(/,/g, ''), 10);
+                 }
+
+                 if (scrapedCount > 0) {
+                    const fallbackId = `SCRAPED-${item.id}`;
+                    paperMap[fallbackId] = {
+                      paperId: fallbackId,
+                      title: item.title,
+                      authors: [{ name: "Authors (Data from Journal)" }],
+                      citationCount: scrapedCount, // Use accesses/views as substitute for impact rank
+                      influentialCitationCount: 0,
+                      abstract: item.snippet || item.rawSnippet || "",
+                      url: item.url
+                    };
+                    item.queryId = fallbackId;
+                 }
+               }
+             } catch (e) {
+               console.error("Cheerio fallback failed for", item.url, e);
+             }
+           }
+        }
+
+        // --- PHASE 5: Reconstruct Results ---
+        for (const item of targetItems) {
+           let paper = null;
+           
+           if (item.queryId && paperMap[item.queryId]) {
+              paper = paperMap[item.queryId];
+           } else {
               paper = Object.values(paperMap).find(p => p.paperId === item.queryId);
            }
 
