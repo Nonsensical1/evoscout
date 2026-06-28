@@ -163,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         <div className="min-h-screen bg-[#fafafa] dark:bg-[#1e1e1e] flex items-center justify-center font-serif text-editorial-text">
           Initializing secure database connection...
         </div>
-      ) : !user ? (
+      ) : (!user || showSetPassword) ? (
         <div className="min-h-screen bg-[#fafafa] dark:bg-[#1e1e1e] bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] flex items-center justify-center p-4">
           <div className="max-w-md w-full border-2 border-editorial-border p-8 text-center bg-white dark:bg-[#121212] shadow-sm">
             <h1 className="text-3xl font-serif font-black mb-2 uppercase tracking-tight text-editorial-text">EvoScout Auth</h1>
@@ -172,27 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               Sign in to access your secure, personalized research aggregation pipeline.
             </p>
             
-            {!showEmailLogin ? (
-              <>
-                <button 
-                  onClick={signIn}
-                  className="w-full bg-[#171717] dark:bg-black hover:bg-[#333] dark:hover:bg-[#262626] text-white py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm transition-colors mb-4"
-                >
-                  Sign In with Google
-                </button>
-                <button 
-                  onClick={() => setShowEmailLogin(true)}
-                  className="w-full border-2 border-[#171717] dark:border-white text-[#171717] dark:text-white hover:bg-[#f0f0f0] dark:hover:bg-[#333] py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm transition-colors"
-                >
-                  Sign In via Institutional Email
-                </button>
-              </>
-            ) : emailSent ? (
-              <div className="bg-green-50 border border-green-200 text-green-800 p-4 mb-4 text-sm font-sans text-left">
-                <strong>Check your email!</strong><br/>
-                We sent a confirmation link to <strong>{emailInput}</strong>. Click the link in the email to instantly sign in. You can safely close this window.
-              </div>
-            ) : showSetPassword ? (
+            {showSetPassword ? (
               <form onSubmit={handleSetPassword} className="text-left font-sans">
                 <h2 className="text-xl font-serif font-bold mb-4 text-editorial-text">Set a Permanent Password</h2>
                 <p className="text-xs text-editorial-muted mb-4">You've successfully verified your institutional email! Set a password now so you can log in instantly next time without waiting for an email link.</p>
@@ -222,6 +202,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   Skip for now
                 </button>
               </form>
+            ) : !showEmailLogin ? (
+              <>
+                <button 
+                  onClick={signIn}
+                  className="w-full bg-[#171717] dark:bg-black hover:bg-[#333] dark:hover:bg-[#262626] text-white py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm transition-colors mb-4"
+                >
+                  Sign In with Google
+                </button>
+                <button 
+                  onClick={() => setShowEmailLogin(true)}
+                  className="w-full border-2 border-[#171717] dark:border-white text-[#171717] dark:text-white hover:bg-[#f0f0f0] dark:hover:bg-[#333] py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm transition-colors"
+                >
+                  Sign In via Institutional Email
+                </button>
+              </>
+            ) : emailSent ? (
+              <div className="bg-green-50 border border-green-200 text-green-800 p-4 mb-4 text-sm font-sans text-left">
+                <strong>Check your email!</strong><br/>
+                We sent a confirmation link to <strong>{emailInput}</strong>. Click the link in the email to instantly sign in. You can safely close this window.
+              </div>
             ) : (
               <form onSubmit={handlePasswordSignIn} className="text-left font-sans">
                 <label className="block text-xs uppercase tracking-wider font-bold mb-2 text-editorial-text">
