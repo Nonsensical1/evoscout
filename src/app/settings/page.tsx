@@ -27,6 +27,8 @@ export default function SettingsPage() {
   const [customModalUrl, setCustomModalUrl] = useState('');
   const [modalQuotaExceededMonth, setModalQuotaExceededMonth] = useState<number | null>(null);
   const [podcastEnabled, setPodcastEnabled] = useState(false);
+  const [autoScrapeEnabled, setAutoScrapeEnabled] = useState(false);
+  const [autoScrapeHours, setAutoScrapeHours] = useState<number[]>([]);
 
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -79,6 +81,12 @@ export default function SettingsPage() {
           if (snap.data().podcastEnabled !== undefined) {
             setPodcastEnabled(snap.data().podcastEnabled);
           }
+          if (snap.data().autoScrapeEnabled !== undefined) {
+            setAutoScrapeEnabled(snap.data().autoScrapeEnabled);
+          }
+          if (snap.data().autoScrapeHours !== undefined) {
+            setAutoScrapeHours(snap.data().autoScrapeHours);
+          }
         }
       } catch (e) {
         console.error("Error loading settings", e);
@@ -121,7 +129,17 @@ export default function SettingsPage() {
         ttsEngine,
         customModalUrl,
         theme,
-        podcastEnabled
+        podcastEnabled,
+        autoScrapeEnabled,
+        autoScrapeHours
+      }, { merge: true });
+
+      // Save to root collection for cron job
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      await setDoc(doc(db, 'autoScrapeSchedules', user.uid), {
+        enabled: autoScrapeEnabled,
+        localHours: autoScrapeHours,
+        timezone: timezone
       }, { merge: true });
 
       originalTopics.current = { ...finalTopics };

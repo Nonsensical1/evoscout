@@ -61,7 +61,7 @@ function isTopInstitution(institution: string): boolean {
   return TOP_40_UNIVERSITY_KEYWORDS.some(kw => lower.includes(kw));
 }
 
-async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
+export async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
   const parseTopics = (str: string | undefined, fallback: string[]) => str ? str.split(',').map((s: string) => s.trim()).filter(Boolean) : fallback;
   const parser = new Parser({ 
     customFields: { item: [['media:thumbnail', 'mediaThumbnail']] },
@@ -199,7 +199,8 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
           });
           
           if (recentOpen.length > 0) {
-            activeGovGrants = await Promise.all(recentOpen.map(async (h: any) => {
+            activeGovGrants = [];
+            for (const h of recentOpen) {
               let amount = "Details at Registry";
               try {
                 const detailRes = await fetch("https://apply07.grants.gov/grantsws/rest/opportunity/details", {
@@ -220,14 +221,14 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
                 console.error(`GovGrants Detail Fetch Error for oppId ${h.id}:`, e);
               }
 
-              return {
+              activeGovGrants.push({
                 id: `GOV-${h.id}`,
                 title: h.title,
                 agency: h.agencyCode || h.agency || "Grants.gov",
                 amount: amount,
                 url: `https://www.grants.gov/search-results-detail/${h.id}`
-              };
-            }));
+              });
+            }
             break; // Stop expanding window
           }
         }
