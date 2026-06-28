@@ -426,35 +426,33 @@ export default function Home() {
         const ledgerDocs = ledgerSnap.docs.map(d => d.data());
 
         // Backfill missing funding amounts for the ledger before processing trends
-        const backfillPromises: Promise<void>[] = [];
         const checkedOpps = new Set<string>();
-
-        ledgerDocs.forEach(day => {
-          (day.openGovGrants || []).forEach((item: any) => {
+        // Process sequentially to avoid Grants.gov rate limits dropping connections
+        for (const day of ledgerDocs) {
+          for (const item of (day.openGovGrants || [])) {
             if (item.amount === "Details at Registry" && item.id.startsWith("GOV-")) {
               const oppId = item.id.replace("GOV-", "");
-              if (checkedOpps.has(oppId)) return;
+              if (checkedOpps.has(oppId)) continue;
               checkedOpps.add(oppId);
-              
-              backfillPromises.push(
-                fetch("https://apply07.grants.gov/grantsws/rest/opportunity/details", {
+              try {
+                const detailRes = await fetch("https://apply07.grants.gov/grantsws/rest/opportunity/details", {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                   body: `oppId=${oppId}`
-                }).then(res => res.json()).then(detailData => {
+                });
+                if (detailRes.ok) {
+                  const detailData = await detailRes.json();
                   if (detailData.synopsis && detailData.synopsis.estimatedFunding) {
                     const parsedAmount = parseInt(detailData.synopsis.estimatedFunding, 10);
                     if (!isNaN(parsedAmount) && parsedAmount > 0) {
-                      item.amount = `$${parsedAmount.toLocaleString()}`;
+                      item.amount = `${parsedAmount.toLocaleString()}`;
                     }
                   }
-                }).catch(() => {})
-              );
+                }
+              } catch (e) {}
             }
-          });
-        });
-
-        await Promise.all(backfillPromises);
+          }
+        }
 
         const globalNewsTermCounts: Record<string, number> = {};
         const globalLitTermCounts: Record<string, number> = {};
