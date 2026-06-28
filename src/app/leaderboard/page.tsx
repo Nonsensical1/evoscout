@@ -206,7 +206,7 @@ export default function LeaderboardPage() {
               {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </span>
           </div>
-          <p className="font-serif text-lg md:text-xl text-editorial-text mt-8 max-w-4xl mx-auto leading-relaxed">
+          <p className="font-sans text-base text-editorial-muted mt-8 max-w-2xl mx-auto leading-relaxed">
             An algorithmic aggregation of all global science journalism from the past thirty days, strictly reverse-mapped to their underlying primary academic publications to measure real-world velocity.
           </p>
         </header>
@@ -221,9 +221,9 @@ export default function LeaderboardPage() {
               <section key={topic} className="border-t-[4px] border-black dark:border-white pt-8">
                 {/* Classic Section Header */}
                 <div className="flex flex-col md:flex-row justify-between items-baseline mb-12 border-b-[1.5px] border-black dark:border-white pb-4">
-                  <h2 className="text-3xl md:text-4xl font-serif font-black uppercase tracking-tight text-black dark:text-white">
+                  <h3 className="text-2xl font-serif font-black uppercase tracking-tight text-black dark:text-white">
                     {topic}
-                  </h2>
+                  </h3>
                   <span className="text-xs font-sans font-bold uppercase tracking-[0.25em] text-[#005587] dark:text-[#60a5fa]">
                     Top {leaderboardData[topic].length} Papers
                   </span>
@@ -235,7 +235,7 @@ export default function LeaderboardPage() {
                       <div key={paper.id} className="flex flex-col lg:flex-row gap-6 lg:gap-12 border-b border-gray-300 dark:border-[#333] pb-10 mb-10 last:border-0 last:pb-0 last:mb-0">
                         {/* Newspaper NO. 01 style Typography */}
                         <div className="lg:w-32 shrink-0 flex items-start pt-2">
-                          <span className="font-sans font-black text-4xl md:text-5xl tracking-tighter text-black dark:text-white opacity-90">
+                          <span className="font-sans font-black text-2xl md:text-3xl tracking-tighter text-black dark:text-white opacity-90">
                             NO. {(idx + 1).toString().padStart(2, '0')}
                           </span>
                         </div>
