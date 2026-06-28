@@ -126,11 +126,9 @@ export default function LeaderboardPage() {
         // 6. Sort and slice top 10
         const finalData: Record<string, any[]> = {};
         topics.forEach(t => {
-          if (grouped[t].length > 0) {
-            finalData[t] = grouped[t]
-              .sort((a, b) => b.influentialCitationCount - a.influentialCitationCount || b.citationCount - a.citationCount)
-              .slice(0, 10);
-          }
+          finalData[t] = grouped[t]
+            .sort((a, b) => b.influentialCitationCount - a.influentialCitationCount || b.citationCount - a.citationCount)
+            .slice(0, 10);
         });
 
         setLeaderboardData(finalData);
@@ -189,16 +187,24 @@ export default function LeaderboardPage() {
                 </div>
 
                 <div className="flex flex-col space-y-8">
-                  {leaderboardData[topic].map((paper, idx) => (
-                    <LiteratureCard
-                      key={paper.id}
-                      paper={paper}
-                      rank={idx + 1}
-                      citationCount={paper.citationCount}
-                      influentialCitationCount={paper.influentialCitationCount}
-                      hideAbstract={true}
-                    />
-                  ))}
+                  {leaderboardData[topic].length > 0 ? (
+                    leaderboardData[topic].map((paper, idx) => (
+                      <LiteratureCard
+                        key={paper.id}
+                        paper={paper}
+                        rank={idx + 1}
+                        citationCount={paper.citationCount}
+                        influentialCitationCount={paper.influentialCitationCount}
+                        hideAbstract={true}
+                      />
+                    ))
+                  ) : (
+                    <div className="p-8 border border-dashed border-gray-300 dark:border-[#333333] text-center bg-gray-50/50 dark:bg-black/20">
+                      <p className="text-sm font-serif italic text-editorial-muted">
+                        No high-impact news coverage was found reversing to primary literature for this topic in the past 30 days.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </section>
             ))}
