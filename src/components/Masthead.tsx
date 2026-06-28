@@ -14,8 +14,9 @@ export default function Masthead() {
   const [isUnlocked, setIsUnlocked] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem('evoscout_secret_chess');
-    if (stored === 'true') {
+    const today = new Date().toDateString();
+    const stored = localStorage.getItem('evoscout_secret_chess_date');
+    if (stored === today) {
       setIsUnlocked(true);
     }
   }, []);
@@ -24,8 +25,8 @@ export default function Masthead() {
     if (firstOClicked && secondOClicked) {
       if (!isUnlocked) {
         setIsUnlocked(true);
-        localStorage.setItem('evoscout_secret_chess', 'true');
-        alert("♟️ Secret Unlocked: Daily Chess Puzzle enabled!");
+        const today = new Date().toDateString();
+        localStorage.setItem('evoscout_secret_chess_date', today);
       }
     }
   }, [firstOClicked, secondOClicked, isUnlocked]);
