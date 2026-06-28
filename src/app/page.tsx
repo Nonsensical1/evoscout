@@ -6,6 +6,7 @@ import { useAuth } from '@/app/providers';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot, writeBatch, collection, addDoc, query, orderBy, limit as firestoreLimit, getDocs } from 'firebase/firestore';
 import { LiteratureCard } from './LiteratureCard';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend, Sector } from 'recharts';
 
 const renderActiveShape = (props: any) => {
@@ -38,7 +39,8 @@ const renderActiveShape = (props: any) => {
 };
 
 export default function Home() {
-  const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<any>({ grants: [], openGovGrants: [], news: [], literature: [], positions: [], podcastUrl: null, podcastScript: null, historyEvents: null, podcastEnabled: false });
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
@@ -799,7 +801,7 @@ export default function Home() {
               <p className="font-serif italic text-editorial-muted px-4 border-l-2 border-gray-200 dark:border-[#333333]">The wire is quiet.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-10 md:grid-flow-dense">
-                {data.news.map((n: any, i: number) => {
+                {(isMobile ? data.news.slice(0, 4) : data.news).map((n: any, i: number) => {
                   const isHero = i === 0;
                   const hasImage = imageIndices.has(i);
                   const isTall = hasImage && !isHero;
@@ -842,7 +844,7 @@ export default function Home() {
               <p className="font-serif italic text-editorial-muted px-4 border-l-2 border-gray-200 dark:border-[#333333]">No scholarly literature integrated today.</p>
             ) : (
               <div className="flex flex-col gap-8">
-                {data.literature.map((paper: any) => (
+                {(isMobile ? data.literature.slice(0, 4) : data.literature).map((paper: any) => (
                   <LiteratureCard key={paper.id} paper={paper} />
                 ))}
               </div>
@@ -1091,7 +1093,7 @@ export default function Home() {
               <p className="font-serif text-sm italic text-editorial-muted text-center border border-dashed border-gray-200 dark:border-[#333333] py-4 bg-gray-50 dark:bg-[#1e1e1e]">No funding updates.</p>
             ) : (
               <div className="flex flex-col gap-6">
-                {data.grants.map((grant: any) => (
+                {(isMobile ? data.grants.slice(0, 4) : data.grants).map((grant: any) => (
                   <a href={grant.url} target="_blank" rel="noopener noreferrer" key={grant.id} className="block outline-none group cursor-pointer border-b border-editorial-border pb-6 last:border-0">
                     <article>
                       <div className="flex items-center justify-center gap-2 mb-2">
@@ -1120,7 +1122,7 @@ export default function Home() {
               <p className="font-serif text-sm italic text-editorial-muted text-center border border-dashed border-gray-200 dark:border-[#333333] py-4 bg-gray-50 dark:bg-[#1e1e1e]">No urgent postings detected.</p>
             ) : (
               <div className="flex flex-col gap-6">
-                {data.openGovGrants.map((grant: any) => (
+                {(isMobile ? data.openGovGrants.slice(0, 4) : data.openGovGrants).map((grant: any) => (
                   <a href={grant.url} target="_blank" rel="noopener noreferrer" key={grant.id} className="block outline-none group cursor-pointer border-b border-editorial-border pb-6 last:border-0">
                     <article>
                       <div className="flex items-center justify-center gap-2 mb-2">
@@ -1148,7 +1150,7 @@ export default function Home() {
               <p className="font-serif text-sm italic text-editorial-muted text-center border border-dashed border-gray-200 dark:border-[#333333] py-4 bg-gray-50 dark:bg-[#1e1e1e]">No listings.</p>
             ) : (
               <ul className="flex flex-col gap-6 mt-4">
-                {data.positions.map((job: any) => (
+                {(isMobile ? data.positions.slice(0, 4) : data.positions).map((job: any) => (
                   <li key={job.id} className="block outline-none group cursor-pointer border-b border-editorial-border pb-6 last:border-0">
                     <a href={job.url} target="_blank" className="flex flex-col items-center text-center">
                       <h4 className="text-xl font-serif font-bold leading-snug group-hover:underline decoration-1 underline-offset-4 text-[#b02a2a] dark:text-[#f87171]">{job.title}</h4>

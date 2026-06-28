@@ -6,12 +6,16 @@ import { useRouter } from 'next/navigation';
 import { DashboardDropdown } from '@/app/DashboardDropdown';
 import { UserMenu } from '@/app/UserMenu';
 import { CurrentDate } from '@/app/CurrentDate';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { Menu, X } from 'lucide-react';
 
 export default function Masthead() {
   const router = useRouter();
   const [firstOClicked, setFirstOClicked] = useState(false);
   const [secondOClicked, setSecondOClicked] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const today = new Date().toDateString();
@@ -49,19 +53,48 @@ export default function Masthead() {
            </h1>
          </div>
       </div>
-      <nav className="max-w-[1600px] mx-auto px-6 h-12 flex items-center justify-center gap-10 text-[11px] md:text-xs font-sans font-bold text-editorial-text uppercase tracking-widest relative">
-         <DashboardDropdown />
-         <Link href="/history" className="hover-underline">Ledger</Link>
-         <Link href="/leaderboard" className="hover-underline">Leaderboard</Link>
-         {isUnlocked && (
-           <>
-             <Link href="/chess" className="hover-underline">Chess</Link>
-             <Link href="/surf" className="hover-underline">Surf</Link>
-           </>
-         )}
-         <Link href="/settings" className="hover-underline">Settings</Link>
-         <UserMenu />
-      </nav>
+      {isMobile ? (
+         <div className="max-w-[1600px] mx-auto px-6 h-14 flex items-center justify-between">
+           <div className="flex items-center gap-4">
+             <DashboardDropdown />
+           </div>
+           <div className="flex items-center gap-4">
+             <UserMenu />
+             <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 -mr-2 text-editorial-text focus:outline-none">
+               {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+             </button>
+           </div>
+         </div>
+      ) : (
+        <nav className="max-w-[1600px] mx-auto px-6 h-12 flex items-center justify-center gap-10 text-[11px] md:text-xs font-sans font-bold text-editorial-text uppercase tracking-widest relative">
+           <DashboardDropdown />
+           <Link href="/history" className="hover-underline">Ledger</Link>
+           <Link href="/leaderboard" className="hover-underline">Leaderboard</Link>
+           {isUnlocked && (
+             <>
+               <Link href="/chess" className="hover-underline">Chess</Link>
+               <Link href="/surf" className="hover-underline">Surf</Link>
+             </>
+           )}
+           <Link href="/settings" className="hover-underline">Settings</Link>
+           <UserMenu />
+        </nav>
+      )}
+
+      {/* Mobile Menu Dropdown */}
+      {isMobile && menuOpen && (
+        <nav className="bg-editorial-paper border-t border-editorial-border-dark flex flex-col items-center py-4 gap-4 text-sm font-sans font-bold text-editorial-text uppercase tracking-widest absolute w-full left-0 shadow-md">
+           <Link href="/history" onClick={() => setMenuOpen(false)} className="w-full text-center py-2 hover:bg-gray-100 dark:hover:bg-[#333]">Ledger</Link>
+           <Link href="/leaderboard" onClick={() => setMenuOpen(false)} className="w-full text-center py-2 hover:bg-gray-100 dark:hover:bg-[#333]">Leaderboard</Link>
+           {isUnlocked && (
+             <>
+               <Link href="/chess" onClick={() => setMenuOpen(false)} className="w-full text-center py-2 hover:bg-gray-100 dark:hover:bg-[#333]">Chess</Link>
+               <Link href="/surf" onClick={() => setMenuOpen(false)} className="w-full text-center py-2 hover:bg-gray-100 dark:hover:bg-[#333]">Surf</Link>
+             </>
+           )}
+           <Link href="/settings" onClick={() => setMenuOpen(false)} className="w-full text-center py-2 hover:bg-gray-100 dark:hover:bg-[#333]">Settings</Link>
+        </nav>
+      )}
     </header>
   );
 }
