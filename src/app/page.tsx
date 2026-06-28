@@ -772,7 +772,7 @@ export default function Home() {
             )}
           </section>
 
-          {(monthlyTrends.news.length > 0 || monthlyTrends.literature.length > 0) && (
+          {(monthlyTrends.news.length > 0 || monthlyTrends.literature.length > 0 || monthlyTrends.grantsMentions.length > 0 || monthlyTrends.openGrantsMentions.length > 0) && (
             <>
               <hr className="border-t-4 border-editorial-border-dark my-10" />
               <section id="section-trends">
@@ -856,14 +856,16 @@ export default function Home() {
                     </div>
                   )}
 
-                  {(monthlyTrends.grantsMentions.length > 0 || monthlyTrends.grantsFunding.length > 0) && (
-                    <div className="w-full bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex flex-col justify-center items-center relative">
-                      <div className="absolute top-4 right-4 flex space-x-2 z-10 bg-gray-100 dark:bg-black rounded-lg p-1">
-                        <button onClick={() => setGrantsMetric('mentions')} className={`px-3 py-1 text-xs font-bold rounded uppercase transition-colors ${grantsMetric === 'mentions' ? 'bg-[#005587] text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Counts</button>
-                        <button onClick={() => setGrantsMetric('funding')} className={`px-3 py-1 text-xs font-bold rounded uppercase transition-colors ${grantsMetric === 'funding' ? 'bg-[#005587] text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Funding</button>
-                      </div>
-                      <h4 className="font-serif font-bold text-lg mb-2 text-center text-[#005587] dark:text-[#60a5fa] uppercase tracking-widest mt-4">Allocated Grants</h4>
-                      <div className="w-full h-[400px]">
+                  <div className="w-full bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex flex-col justify-center items-center relative">
+                    <div className="absolute top-4 right-4 flex space-x-2 z-10 bg-gray-100 dark:bg-black rounded-lg p-1">
+                      <button onClick={() => setGrantsMetric('mentions')} className={`px-3 py-1 text-xs font-bold rounded uppercase transition-colors ${grantsMetric === 'mentions' ? 'bg-[#005587] text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Counts</button>
+                      <button onClick={() => setGrantsMetric('funding')} className={`px-3 py-1 text-xs font-bold rounded uppercase transition-colors ${grantsMetric === 'funding' ? 'bg-[#005587] text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Funding</button>
+                    </div>
+                    <h4 className="font-serif font-bold text-lg mb-2 text-center text-[#005587] dark:text-[#60a5fa] uppercase tracking-widest mt-4">Allocated Grants</h4>
+                    <div className="w-full h-[400px] flex items-center justify-center">
+                      {(monthlyTrends.grantsMentions.length === 0 && monthlyTrends.grantsFunding.length === 0) ? (
+                        <p className="text-sm font-serif italic text-gray-400 text-center px-8">No allocated grants matched advanced concepts this month.</p>
+                      ) : (
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
@@ -897,14 +899,16 @@ export default function Home() {
                             <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: '500', paddingTop: '20px' }} />
                           </PieChart>
                         </ResponsiveContainer>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
 
-                  {monthlyTrends.openGrantsMentions.length > 0 && (
-                    <div className="w-full bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex flex-col justify-center items-center">
-                      <h4 className="font-serif font-bold text-lg mb-2 text-center text-[#005587] dark:text-[#60a5fa] uppercase tracking-widest">Open Grants</h4>
-                      <div className="w-full h-[400px]">
+                  <div className="w-full bg-white dark:bg-[#1a1a1a] p-5 rounded-xl shadow-inner border border-gray-100 dark:border-[#333] flex flex-col justify-center items-center">
+                    <h4 className="font-serif font-bold text-lg mb-2 text-center text-[#005587] dark:text-[#60a5fa] uppercase tracking-widest">Open Grants</h4>
+                    <div className="w-full h-[400px] flex items-center justify-center">
+                      {monthlyTrends.openGrantsMentions.length === 0 ? (
+                        <p className="text-sm font-serif italic text-gray-400 text-center px-8">No open grants matched advanced concepts this month.</p>
+                      ) : (
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
@@ -933,9 +937,9 @@ export default function Home() {
                             <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: '500', paddingTop: '20px' }} />
                           </PieChart>
                         </ResponsiveContainer>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </section>
             </>
