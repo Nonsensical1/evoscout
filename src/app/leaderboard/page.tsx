@@ -60,12 +60,14 @@ export default function LeaderboardPage() {
 
         allPapers.forEach(p => {
           let ssId = null;
-          if (p.id.startsWith("ARXIV-")) {
-            ssId = `ARXIV:${p.id.replace("ARXIV-", "")}`;
-          } else if (p.id.startsWith("PUBMED-")) {
+          
+          // STRICT FILTER: Exclude all pre-prints to ensure only primary, peer-reviewed literature is ranked.
+          if (p.id.startsWith("ARXIV-") || p.id.startsWith("BIORXIV-")) {
+            return; // Skip pre-prints entirely
+          }
+
+          if (p.id.startsWith("PUBMED-")) {
             ssId = `PMID:${p.id.replace("PUBMED-", "")}`;
-          } else if (p.id.startsWith("BIORXIV-")) {
-            ssId = `DOI:${p.id.replace("BIORXIV-", "")}`;
           } else if (p.doi) {
             let rawDoi = p.doi.replace("https://doi.org/", "").replace("http://doi.org/", "");
             if (rawDoi.startsWith("10.")) {
@@ -160,7 +162,7 @@ export default function LeaderboardPage() {
             </h1>
           </div>
           <p className="text-sm font-sans font-medium text-editorial-muted uppercase tracking-widest max-w-3xl mx-auto md:mx-0">
-            Live velocity rankings for literature scraped over the past 30 days. Metrics are dynamically synced with the Semantic Scholar Open Graph API, emphasizing highly influential citations.
+            Live velocity rankings for primary literature scraped over the past 30 days. Pre-prints are strictly filtered out to prioritize peer-reviewed impact. Metrics are dynamically synced with the Semantic Scholar Open Graph API, emphasizing highly influential citations.
           </p>
         </header>
 
