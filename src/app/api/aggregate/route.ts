@@ -236,8 +236,7 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
       { url: 'https://journals.plos.org/plosbiology/feed/atom', source: 'PLOS Biology' }
     ];
     let allNews: any[] = [];
-    const newsTermsSafe = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean).join('|') : "CRISPR|Cas9|Cas12|gene|cell|RNA|proteomics|synthetic biology|epigenetic|microbiome|cancer|DNA|pathology|zoology";
-    const biologicalTerms = new RegExp(newsTermsSafe, 'i');
+    const newsKeywords = topicsMap.news ? topicsMap.news.split(',').map((s:string)=>s.trim()).filter(Boolean) : ["CRISPR", "Cas9", "Cas12", "gene", "cell", "RNA", "proteomics", "synthetic biology", "epigenetic", "microbiome", "cancer", "DNA", "pathology", "zoology"];
     let newsLookbackHours = 48; // Rolling 48-hour window (captures everything published 'yesterday' and 'today' globally)
     const dayOfWeek = new Date().getDay(); // 0 is Sunday, 1 is Monday ... 6 is Saturday
     // Expand window ONLY on Sundays when the primary wire is offline
@@ -255,9 +254,31 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
           } else if (item.categories) {
               itemCats = String(item.categories);
           }
-          const isBioMatch = biologicalTerms.test(item.title || '') || biologicalTerms.test(item.contentSnippet || '') || biologicalTerms.test(itemCats);
+          const content = `${item.title || ''} ${item.contentSnippet || ''} ${itemCats}`.toLowerCase();
+          
+          let matchedKeyword = "";
+          for (const kw of newsKeywords) {
+             const regex = new RegExp(`\\b${kw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i');
+             if (regex.test(content)) {
+                matchedKeyword = kw;
+                break;
+             }
+          }
+          if (!matchedKeyword) {
+             for (const kw of newsKeywords) {
+                if (content.includes(kw.toLowerCase())) {
+                   matchedKeyword = kw;
+                   break;
+                }
+             }
+          }
+
+          if (matchedKeyword) {
+             item.matchedTopic = matchedKeyword;
+          }
+
           const isRecent = item.isoDate ? (new Date(item.isoDate).getTime() > timeWindowLimit) : true;
-          return isBioMatch && isRecent;
+          return !!matchedKeyword && isRecent;
         });
 
         const mapped = await Promise.all(filteredNews.map(async (item: any, i: number) => {
@@ -301,7 +322,8 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
             url: item.link || "",
             image: image,
             rawSnippet: item.contentSnippet,
-            isoDate: item.isoDate || new Date().toISOString()
+            isoDate: item.isoDate || new Date().toISOString(),
+            matchedTopic: item.matchedTopic || ""
           };
         }));
         allNews = allNews.concat(mapped);
@@ -487,6 +509,24 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
                     }
                   }
 
+                  let matchedKeyword = "";
+                  const content = `${article.title || ''} ${snippet || ''}`.toLowerCase();
+                  for (const kw of newsKeywords) {
+                    const regex = new RegExp(`\\b${kw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}\\b`, 'i');
+                    if (regex.test(content)) {
+                        matchedKeyword = kw;
+                        break;
+                    }
+                  }
+                  if (!matchedKeyword) {
+                    for (const kw of newsKeywords) {
+                        if (content.includes(kw.toLowerCase())) {
+                          matchedKeyword = kw;
+                          break;
+                        }
+                    }
+                  }
+
                   validPubmedNews.push({
                     id: `NEWS-PUBMED-${uid}`.replace(/[^a-zA-Z0-9-]/g, ''),
                     title: (article.title || 'PubMed Publication').replace(/\.$/, ''),
@@ -494,7 +534,8 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
                     url: url,
                     image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100",
                     rawSnippet: snippet,
-                    isoDate: pubDate.toISOString()
+                    isoDate: pubDate.toISOString(),
+                    matchedTopic: matchedKeyword
                   });
                 }
 

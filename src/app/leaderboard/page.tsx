@@ -63,6 +63,16 @@ export default function LeaderboardPage() {
         const addedPre = new Set<string>();
 
         allPapers.forEach(paper => {
+          if (paper.matchedTopic) {
+             const topicMatched = topics.find(t => t.toLowerCase() === paper.matchedTopic.toLowerCase());
+             if (topicMatched) {
+                if (!addedPre.has(paper.id)) {
+                  preGrouped[topicMatched].push(paper);
+                  addedPre.add(paper.id);
+                }
+                return;
+             }
+          }
           const content = `${paper.title || ''} ${paper.summary || ''}`.toLowerCase();
           for (const topic of topics) {
             if (content.includes(topic)) {
@@ -130,7 +140,8 @@ export default function LeaderboardPage() {
                       influentialCitationCount: mappedPaper.influentialCitationCount || 0,
                       scrapedDate: originalNews?.scrapedDate,
                       isoDate: new Date().toISOString(),
-                      newsCoverageCount: 1 // Track collisions as native velocity
+                      newsCoverageCount: 1, // Track collisions as native velocity
+                      matchedTopic: originalNews?.matchedTopic || ""
                     };
                   } else {
                     // This specific DOI was reported on by multiple independent news outlets!
@@ -150,6 +161,16 @@ export default function LeaderboardPage() {
         const addedFinal = new Set<string>();
 
         Object.values(paperMap).forEach(paper => {
+          if (paper.matchedTopic) {
+             const topicMatched = topics.find(t => t.toLowerCase() === paper.matchedTopic.toLowerCase());
+             if (topicMatched) {
+                if (!addedFinal.has(paper.doi)) {
+                  finalGrouped[topicMatched].push(paper);
+                  addedFinal.add(paper.doi);
+                }
+                return;
+             }
+          }
           const content = `${paper.title || ''} ${paper.rawAbstract || ''}`.toLowerCase();
           for (const topic of topics) {
             if (content.includes(topic)) {
