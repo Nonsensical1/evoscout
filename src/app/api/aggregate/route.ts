@@ -333,7 +333,7 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
     // --- REST APIs for Open Access Publishers ---
     const plosPromise = (async () => {
       try {
-        const queryTerms = newsTermsSafe.split('|').slice(0, 3).map((t: string) => `title:"${t}" OR abstract:"${t}"`).join(' OR ');
+        const queryTerms = newsKeywords.slice(0, 3).map((t: string) => `title:"${t}" OR abstract:"${t}"`).join(' OR ');
         const plosUrl = `http://api.plos.org/search?q=${encodeURIComponent(queryTerms)}&fl=id,title_display,abstract,publication_date&wt=json&rows=15`;
         const res = await fetch(plosUrl);
         if (res.ok) {
@@ -355,7 +355,7 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
 
     const eLifePromise = (async () => {
       try {
-        const q = newsTermsSafe.split('|')[0] || "biology";
+        const q = newsKeywords[0] || "biology";
         const eLifeUrl = `https://api.elifesciences.org/search?for=${encodeURIComponent(q)}&per-page=15`;
         const res = await fetch(eLifeUrl);
         if (res.ok) {
@@ -378,7 +378,7 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
     const bmcPromise = (async () => {
       try {
         if (!process.env.SPRINGER_NATURE_API_KEY) return [];
-        const q = newsTermsSafe.split('|')[0] || "biology";
+        const q = newsKeywords[0] || "biology";
         const bmcUrl = `https://api.springernature.com/openaccess/json?q=keyword:"${encodeURIComponent(q)}"&p=15&api_key=${process.env.SPRINGER_NATURE_API_KEY}`;
         const res = await fetch(bmcUrl);
         if (res.ok) {
@@ -439,7 +439,7 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
       if (pubmedQuota > 0) {
         console.log(`[News Pipeline] Quota uncompleted (${freshNewsCount}/${newsLimit}). Fetching ${pubmedQuota} PubMed fallback articles...`);
         try {
-          const queryTerms = newsTermsSafe.split('|').slice(0, 5).map((t: string) => `(${t}[Title/Abstract])`).join(' OR ');
+          const queryTerms = newsKeywords.slice(0, 5).map((t: string) => `(${t}[Title/Abstract])`).join(' OR ');
           const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(queryTerms)}&retmode=json&retmax=50`;
           const searchRes = await fetch(esearchUrl);
           if (searchRes.ok) {

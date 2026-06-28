@@ -889,7 +889,7 @@ export default function Home() {
                             <Tooltip 
                               contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.95)', color: '#000' }}
                               itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
-                              formatter={(value: any, name: string) => {
+                              formatter={(value: any, name: any) => {
                                 if (grantsMetric === 'funding') {
                                   return [`$${Number(value).toLocaleString()}`, name];
                                 }
@@ -932,7 +932,7 @@ export default function Home() {
                             <Tooltip 
                               contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.95)', color: '#000' }}
                               itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
-                              formatter={(value: any, name: string) => [`${value} mentions`, name]}
+                              formatter={(value: any, name: any) => [`${value} mentions`, name]}
                             />
                             <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: '500', paddingTop: '20px' }} />
                           </PieChart>
