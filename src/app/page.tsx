@@ -244,6 +244,12 @@ export default function Home() {
               history.add(item.id);
               addedCount++;
             }
+          } else {
+            // Update existing entry with fresh fields (e.g. if amount or URL was enriched)
+            const idx = combined.findIndex((i: any) => i.id === item.id);
+            if (idx !== -1) {
+              combined[idx] = { ...combined[idx], ...item };
+            }
           }
         }
 
