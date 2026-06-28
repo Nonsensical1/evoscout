@@ -141,7 +141,7 @@ export default function SurfPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
          <div>
-            <SurfMap onLocationSelect={handleLocationSelect} />
+            <SurfMap onLocationSelect={handleLocationSelect} selectedCoords={coords} />
          </div>
 
          <div className="bg-editorial-paper border border-editorial-border shadow-sm min-h-[400px] p-6 font-mono text-sm">

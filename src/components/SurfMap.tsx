@@ -15,9 +15,10 @@ L.Icon.Default.mergeOptions({
 
 interface SurfMapProps {
   onLocationSelect: (lat: number, lng: number) => void;
+  selectedCoords?: { lat: number; lng: number } | null;
 }
 
-function LocationMarker({ onLocationSelect }: SurfMapProps) {
+function LocationMarker({ onLocationSelect, selectedCoords }: SurfMapProps) {
   const [position, setPosition] = useState<L.LatLng | null>(null);
 
   const map = useMapEvents({
@@ -28,6 +29,14 @@ function LocationMarker({ onLocationSelect }: SurfMapProps) {
     },
   });
 
+  useEffect(() => {
+    if (selectedCoords) {
+      const latlng = L.latLng(selectedCoords.lat, selectedCoords.lng);
+      setPosition(latlng);
+      map.flyTo(latlng, map.getZoom());
+    }
+  }, [selectedCoords, map]);
+
   return position === null ? null : (
     <Marker position={position}>
       <Popup>Selected Coordinate</Popup>
@@ -35,7 +44,7 @@ function LocationMarker({ onLocationSelect }: SurfMapProps) {
   );
 }
 
-export default function SurfMap({ onLocationSelect }: SurfMapProps) {
+export default function SurfMap({ onLocationSelect, selectedCoords }: SurfMapProps) {
   return (
     <div className="w-full h-[400px] border border-editorial-border shadow-sm">
       <MapContainer 
@@ -49,7 +58,7 @@ export default function SurfMap({ onLocationSelect }: SurfMapProps) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           noWrap={true}
         />
-        <LocationMarker onLocationSelect={onLocationSelect} />
+        <LocationMarker onLocationSelect={onLocationSelect} selectedCoords={selectedCoords} />
       </MapContainer>
     </div>
   );
