@@ -822,7 +822,11 @@ export default function Home() {
                             <Tooltip 
                               contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.95)', color: '#000' }}
                               itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
-                              formatter={(value, name) => [`${value} mentions`, name]}
+                              formatter={(value: any, name: any) => {
+                                const total = monthlyTrends.news.reduce((acc: number, curr: any) => acc + curr.value, 0);
+                                const percent = total > 0 ? ((Number(value) / total) * 100).toFixed(1) : 0;
+                                return [`${percent}%`, name];
+                              }}
                             />
                             <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: '500', paddingTop: '20px' }} />
                           </PieChart>
@@ -858,7 +862,11 @@ export default function Home() {
                             <Tooltip 
                               contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', backgroundColor: 'rgba(255, 255, 255, 0.95)', color: '#000' }}
                               itemStyle={{ fontSize: '13px', fontWeight: 'bold' }}
-                              formatter={(value, name) => [`${value} mentions`, name]}
+                              formatter={(value: any, name: any) => {
+                                const total = monthlyTrends.literature.reduce((acc: number, curr: any) => acc + curr.value, 0);
+                                const percent = total > 0 ? ((Number(value) / total) * 100).toFixed(1) : 0;
+                                return [`${percent}%`, name];
+                              }}
                             />
                             <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: '500', paddingTop: '20px' }} />
                           </PieChart>
@@ -904,7 +912,9 @@ export default function Home() {
                                 if (grantsMetric === 'funding') {
                                   return [`$${Number(value).toLocaleString()}`, name];
                                 }
-                                return [`${value} mentions`, name];
+                                const total = monthlyTrends.grantsMentions.reduce((acc: number, curr: any) => acc + curr.value, 0);
+                                const percent = total > 0 ? ((Number(value) / total) * 100).toFixed(1) : 0;
+                                return [`${percent}%`, name];
                               }}
                             />
                             <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: '500', paddingTop: '20px' }} />
@@ -951,7 +961,9 @@ export default function Home() {
                                 if (openGrantsMetric === 'funding') {
                                   return [`$${Number(value).toLocaleString()}`, name];
                                 }
-                                return [`${value} mentions`, name];
+                                const total = monthlyTrends.openGrantsMentions.reduce((acc: number, curr: any) => acc + curr.value, 0);
+                                const percent = total > 0 ? ((Number(value) / total) * 100).toFixed(1) : 0;
+                                return [`${percent}%`, name];
                               }}
                             />
                             <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: '500', paddingTop: '20px' }} />
