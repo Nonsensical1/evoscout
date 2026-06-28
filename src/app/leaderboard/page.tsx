@@ -112,20 +112,25 @@ export default function LeaderboardPage() {
                 if (mappedPaper && mappedPaper.paperId) {
                   // Find the original item to retrieve the scraped date
                   const originalNews = payloadItems.find(n => n.id === mappedPaper.originalId);
-                  
-                  paperMap[mappedPaper.paperId] = {
-                    id: mappedPaper.originalId,
-                    title: mappedPaper.title,
-                    authors: mappedPaper.authors,
-                    journal: "Semantic Scholar",
-                    doi: mappedPaper.paperId,
-                    rawAbstract: mappedPaper.abstract,
-                    url: mappedPaper.url,
-                    citationCount: mappedPaper.citationCount || 0,
-                    influentialCitationCount: mappedPaper.influentialCitationCount || 0,
-                    scrapedDate: originalNews?.scrapedDate,
-                    isoDate: new Date().toISOString()
-                  };
+                  if (!paperMap[mappedPaper.paperId]) {
+                    paperMap[mappedPaper.paperId] = {
+                      id: mappedPaper.originalId,
+                      title: mappedPaper.title,
+                      authors: mappedPaper.authors,
+                      journal: "Semantic Scholar",
+                      doi: mappedPaper.paperId,
+                      rawAbstract: mappedPaper.abstract,
+                      url: mappedPaper.url,
+                      citationCount: mappedPaper.citationCount || 0,
+                      influentialCitationCount: mappedPaper.influentialCitationCount || 0,
+                      scrapedDate: originalNews?.scrapedDate,
+                      isoDate: new Date().toISOString(),
+                      newsCoverageCount: 1 // Track collisions as native velocity
+                    };
+                  } else {
+                    // This specific DOI was reported on by multiple independent news outlets!
+                    paperMap[mappedPaper.paperId].newsCoverageCount += 1;
+                  }
                 }
               });
             }
@@ -153,11 +158,15 @@ export default function LeaderboardPage() {
 
         topics.forEach(t => {
           finalData[t] = finalGrouped[t]
-            .sort((a, b) => b.influentialCitationCount - a.influentialCitationCount || b.citationCount - a.citationCount)
+            .sort((a, b) => 
+               (b.newsCoverageCount || 0) - (a.newsCoverageCount || 0) || 
+               b.influentialCitationCount - a.influentialCitationCount || 
+               b.citationCount - a.citationCount
+            )
             .slice(0, 10); // Ensure max 10 rendered per topic
 
-          // Sum citations for this topic to determine section rendering order
-          newScores[t] = finalData[t].reduce((sum, paper) => sum + (paper.citationCount || 0) + (paper.influentialCitationCount || 0), 0);
+          // Sum news coverage (weighted heavily) + citations for this topic to determine section rendering order
+          newScores[t] = finalData[t].reduce((sum, paper) => sum + ((paper.newsCoverageCount || 0) * 100) + (paper.citationCount || 0) + (paper.influentialCitationCount || 0), 0);
         });
 
         setLeaderboardData(finalData);
@@ -238,6 +247,7 @@ export default function LeaderboardPage() {
                             rank={idx + 1}
                             citationCount={paper.citationCount}
                             influentialCitationCount={paper.influentialCitationCount}
+                            newsCoverageCount={paper.newsCoverageCount}
                             hideAbstract={true}
                           />
                         </div>
