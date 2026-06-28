@@ -48,11 +48,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .then((result) => {
             window.localStorage.removeItem('emailForSignIn');
             window.history.replaceState(null, '', '/');
-            const hasPassword = result.user.providerData.some(p => p.providerId === 'password');
-            if (!hasPassword) {
-              setPendingUser(result.user);
-              setShowSetPassword(true);
-            }
+            setPendingUser(result.user);
+            setShowSetPassword(true);
           })
           .catch((err) => {
             if (auth.currentUser) {
@@ -214,7 +211,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   onClick={() => setShowEmailLogin(true)}
                   className="w-full border-2 border-[#171717] dark:border-white text-[#171717] dark:text-white hover:bg-[#f0f0f0] dark:hover:bg-[#333] py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm transition-colors"
                 >
-                  Sign In via Institutional Email
+                  Sign In via Institutional Email / Password
                 </button>
               </>
             ) : emailSent ? (
