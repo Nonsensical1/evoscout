@@ -147,6 +147,15 @@ export default function ChessPage() {
     }
   }
 
+  function resetPuzzle() {
+    if (!puzzleData) return;
+    const c = new Chess(puzzleData.fen);
+    setGame(c);
+    setMoveIndex(0);
+    setStatus("playing");
+    setErrorMsg("");
+  }
+
   return (
     <div className="max-w-4xl mx-auto py-8">
       <Link href="/" className="inline-flex items-center gap-2 text-editorial-muted hover:text-editorial-text mb-8 transition-colors text-sm uppercase tracking-widest font-bold">
@@ -200,7 +209,7 @@ export default function ChessPage() {
                 <div>
                    <h2 className="text-2xl font-black uppercase text-red-600 mb-2 font-serif">Incorrect</h2>
                    <p className="text-editorial-muted text-sm">{errorMsg}</p>
-                   <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 border border-editorial-border text-xs uppercase tracking-widest hover:bg-gray-50 transition-colors">
+                   <button onClick={resetPuzzle} className="mt-4 px-4 py-2 border border-editorial-border text-xs uppercase tracking-widest hover:bg-gray-50 transition-colors">
                      Retry Puzzle
                    </button>
                 </div>
