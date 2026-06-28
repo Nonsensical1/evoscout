@@ -2,7 +2,7 @@
 
 import { ThemeProvider } from "next-themes";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { onAuthStateChanged, User, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink, updatePassword, signInWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -32,8 +32,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [showSetPassword, setShowSetPassword] = useState(false);
   const [pendingUser, setPendingUser] = useState<User | null>(null);
 
+  const isSignInFired = useRef(false);
+
   useEffect(() => {
     if (typeof window !== "undefined" && isSignInWithEmailLink(auth, window.location.href)) {
+      if (isSignInFired.current) return;
+      isSignInFired.current = true;
+      
       let email = window.localStorage.getItem('emailForSignIn');
       if (!email) {
         email = window.prompt('Please provide your email for confirmation');
@@ -50,7 +55,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           })
           .catch((err) => {
-            setAuthError(err.message);
+            if (auth.currentUser) {
+              window.localStorage.removeItem('emailForSignIn');
+              window.history.replaceState(null, '', '/');
+            } else {
+              setAuthError(err.message);
+            }
           });
       }
     }
