@@ -25,10 +25,10 @@ export default function LeaderboardPage() {
         const settings = settingsSnap.exists() ? settingsSnap.data() : {};
         
         let rawTopics = "";
-        if (settings.topics?.literature && settings.topics.literature.trim() !== '') {
-          rawTopics = settings.topics.literature;
+        if (settings.topics?.news && settings.topics.news.trim() !== '') {
+          rawTopics = settings.topics.news;
         } else {
-          rawTopics = "CRISPR, Cas9, RNA, DNA, synthetic biology, gene editing, cancer, oncology, metabolism, computational, epigenetic, genomics, SunTag, prime edit, prime editing, base edit";
+          rawTopics = "CRISPR, Cas9, Cas12, gene, cell, RNA, proteomics, synthetic biology, epigenetic, microbiome, cancer, DNA, pathology, zoology";
         }
         const topics = Array.from(new Set(rawTopics.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)));
 
@@ -60,14 +60,19 @@ export default function LeaderboardPage() {
         // 3. Group by topics BEFORE slicing to guarantee articles per topic!
         const preGrouped: Record<string, any[]> = {};
         topics.forEach(t => preGrouped[t] = []);
+        const addedPre = new Set<string>();
 
         allPapers.forEach(paper => {
           const content = `${paper.title || ''} ${paper.summary || ''}`.toLowerCase();
-          topics.forEach(topic => {
+          for (const topic of topics) {
             if (content.includes(topic)) {
-              preGrouped[topic].push(paper);
+              if (!addedPre.has(paper.id)) {
+                preGrouped[topic].push(paper);
+                addedPre.add(paper.id);
+                break;
+              }
             }
-          });
+          }
         });
 
         // 4. Extract the top 15 most recent articles FOR EACH TOPIC
@@ -142,14 +147,19 @@ export default function LeaderboardPage() {
         // 6. Map the resolved semantic scholar papers back into their topics
         const finalGrouped: Record<string, any[]> = {};
         topics.forEach(t => finalGrouped[t] = []);
+        const addedFinal = new Set<string>();
 
         Object.values(paperMap).forEach(paper => {
           const content = `${paper.title || ''} ${paper.rawAbstract || ''}`.toLowerCase();
-          topics.forEach(topic => {
+          for (const topic of topics) {
             if (content.includes(topic)) {
-              finalGrouped[topic].push(paper);
+              if (!addedFinal.has(paper.doi)) {
+                finalGrouped[topic].push(paper);
+                addedFinal.add(paper.doi);
+                break;
+              }
             }
-          });
+          }
         });
 
         // 7. Sort papers within topics, and tally up the total citations per topic
