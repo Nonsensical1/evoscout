@@ -163,6 +163,36 @@ export default function Home() {
       const history = new Set(historyArr);
       let dailyFeed: any = feedSnap.exists() ? feedSnap.data() : { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [], paddingCache: {} };
 
+      // BACKFILL PATCH: Fetch missing funding amounts for currently displayed grants sequentially
+      let feedChanged = false;
+      if (dailyFeed.openGovGrants && dailyFeed.openGovGrants.length > 0) {
+        for (const g of dailyFeed.openGovGrants) {
+          if (g.amount === "Details at Registry" && g.id.startsWith("GOV-")) {
+            const oppId = g.id.split('-')[1];
+            try {
+              const detailRes = await fetch("https://apply07.grants.gov/grantsws/rest/opportunity/details", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `oppId=${oppId}`
+              });
+              if (detailRes.ok) {
+                const detailData = await detailRes.json();
+                if (detailData.synopsis && detailData.synopsis.estimatedFunding) {
+                  const parsedAmount = parseInt(detailData.synopsis.estimatedFunding, 10);
+                  if (!isNaN(parsedAmount) && parsedAmount > 0) {
+                    g.amount = `$${parsedAmount.toLocaleString()}`;
+                    feedChanged = true;
+                  }
+                }
+              }
+            } catch (e) {}
+          }
+        }
+        if (feedChanged) {
+          await setDoc(doc(db, 'users', user.uid, 'daily', 'feed'), dailyFeed, { merge: true });
+        }
+      }
+
       // Make sure paddingCache is always materialized back by extracting retroactive chunks from the most recent ledger, preventing mid-day zero-arrays
       if (!dailyFeed.paddingCache) {
         const ledgerSnap = await getDocs(query(collection(db, 'users', user.uid, 'ledger'), orderBy('date', 'desc'), firestoreLimit(1)));
@@ -445,7 +475,7 @@ export default function Home() {
                   if (detailData.synopsis && detailData.synopsis.estimatedFunding) {
                     const parsedAmount = parseInt(detailData.synopsis.estimatedFunding, 10);
                     if (!isNaN(parsedAmount) && parsedAmount > 0) {
-                      item.amount = `${parsedAmount.toLocaleString()}`;
+                      item.amount = `$${parsedAmount.toLocaleString()}`;
                     }
                   }
                 }
