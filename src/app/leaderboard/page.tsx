@@ -154,53 +154,79 @@ export default function LeaderboardPage() {
   const topicKeys = Object.keys(leaderboardData).sort();
 
   return (
-    <div className="min-h-screen pt-24 pb-32 animate-in fade-in duration-500">
-      <div className="max-w-[1600px] mx-auto px-6">
-        <header className="mb-16 border-b border-editorial-border pb-8 text-center md:text-left">
-          <div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-4 mb-4">
-            <Trophy className="w-10 h-10 text-[#005587] dark:text-[#60a5fa]" />
-            <h1 className="text-4xl font-serif font-black tracking-tighter uppercase text-editorial-text">
-              Monthly Impact Leaderboard
+    <div className="min-h-screen pt-24 pb-32 animate-in fade-in duration-700 relative overflow-hidden">
+      {/* Background Aesthetic Orbs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#005587]/10 dark:bg-[#60a5fa]/5 blur-[120px] rounded-full pointer-events-none mix-blend-multiply dark:mix-blend-screen" />
+      <div className="absolute top-[20%] right-[-10%] w-[30%] h-[50%] bg-blue-400/10 dark:bg-blue-600/10 blur-[150px] rounded-full pointer-events-none mix-blend-multiply dark:mix-blend-screen" />
+
+      <div className="max-w-[1200px] mx-auto px-6 relative z-10">
+        <header className="mb-20 text-center md:text-left">
+          <div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-4 mb-6">
+            <div className="p-3 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-sm border border-gray-200/50 dark:border-gray-700/50">
+              <Trophy className="w-8 h-8 text-[#005587] dark:text-[#60a5fa]" />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-serif font-black tracking-tighter uppercase bg-gradient-to-r from-gray-900 via-[#005587] to-gray-900 dark:from-white dark:via-[#60a5fa] dark:to-gray-300 bg-clip-text text-transparent pb-1">
+              Impact Leaderboard
             </h1>
           </div>
-          <p className="text-sm font-sans font-medium text-editorial-muted uppercase tracking-widest max-w-3xl mx-auto md:mx-0">
-            Live velocity rankings. We aggregate all science journalism from the past 30 days and algorithmically reverse-map the news articles to their underlying primary academic papers using the Semantic Scholar Open Graph API, tracking real-world impact.
-          </p>
+          <div className="backdrop-blur-sm bg-white/40 dark:bg-black/20 border border-gray-200/50 dark:border-gray-800/50 rounded-xl p-6 md:p-8 max-w-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)]">
+            <p className="text-sm md:text-base font-sans font-medium text-editorial-text/80 dark:text-editorial-muted leading-relaxed">
+              Live velocity rankings computing real-world academic impact. We aggregate all science journalism from the past 30 days and algorithmically reverse-map news articles to their underlying primary papers using the Semantic Scholar Open Graph API.
+            </p>
+          </div>
         </header>
 
         {topicKeys.length === 0 ? (
-          <div className="text-center py-20 border border-editorial-border bg-gray-50/50 dark:bg-black/20">
-            <Search className="w-12 h-12 text-editorial-border mx-auto mb-4" />
+          <div className="text-center py-32 backdrop-blur-md bg-white/30 dark:bg-black/20 rounded-2xl border border-dashed border-gray-300 dark:border-gray-800">
+            <Search className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-4 animate-pulse" />
             <p className="text-lg font-serif italic text-editorial-muted">No highly cited literature found in the past 30 days matching your parameters.</p>
           </div>
         ) : (
-          <div className="space-y-24">
+          <div className="space-y-32">
             {topicKeys.map((topic) => (
-              <section key={topic}>
-                <div className="mb-8 border-l-4 border-[#005587] dark:border-[#2563eb] pl-4">
-                  <h2 className="text-2xl font-sans font-black uppercase tracking-widest text-editorial-text">
-                    {topic}
-                  </h2>
-                  <p className="text-xs font-sans font-bold text-editorial-muted uppercase tracking-wider mt-1">
-                    Top {leaderboardData[topic].length} Papers by Impact
-                  </p>
+              <section key={topic} className="relative">
+                {/* Sticky Glassmorphism Header */}
+                <div className="sticky top-16 z-20 backdrop-blur-xl bg-white/70 dark:bg-[#111111]/70 py-6 border-b border-gray-200/50 dark:border-gray-800/50 mb-10 -mx-6 px-6 md:mx-0 md:px-0 rounded-b-xl shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className="w-2 h-2 rounded-full bg-[#005587] dark:bg-[#60a5fa] shadow-[0_0_10px_rgba(0,85,135,0.8)] dark:shadow-[0_0_10px_rgba(96,165,250,0.8)] animate-pulse" />
+                    <div>
+                      <h2 className="text-2xl font-sans font-black uppercase tracking-widest text-gray-900 dark:text-white">
+                        {topic}
+                      </h2>
+                      <p className="text-[10px] md:text-xs font-sans font-bold text-[#005587] dark:text-[#60a5fa] uppercase tracking-[0.2em] mt-1">
+                        Top {leaderboardData[topic].length} Papers by Impact
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-col space-y-8">
+                <div className="flex flex-col space-y-12 pl-0 md:pl-6 relative">
+                  {/* Decorative Timeline Line */}
+                  <div className="hidden md:block absolute left-[-1px] top-0 bottom-0 w-[2px] bg-gradient-to-b from-transparent via-gray-200 dark:via-gray-800 to-transparent" />
+                  
                   {leaderboardData[topic].length > 0 ? (
                     leaderboardData[topic].map((paper, idx) => (
-                      <LiteratureCard
-                        key={paper.id}
-                        paper={paper}
-                        rank={idx + 1}
-                        citationCount={paper.citationCount}
-                        influentialCitationCount={paper.influentialCitationCount}
-                        hideAbstract={true}
-                      />
+                      <div key={paper.id} className="relative group/card">
+                        {/* Timeline Node */}
+                        <div className="hidden md:block absolute left-[-29px] top-4 w-2 h-2 rounded-full border-2 border-white dark:border-[#111] bg-gray-300 dark:bg-gray-700 group-hover/card:bg-[#005587] dark:group-hover/card:bg-[#60a5fa] group-hover/card:scale-150 transition-all duration-300" />
+                        
+                        <div className="bg-white/40 dark:bg-black/20 hover:bg-white/80 dark:hover:bg-black/40 p-6 md:p-8 rounded-2xl border border-gray-100 dark:border-[#222] transition-all duration-500 hover:shadow-xl hover:shadow-blue-900/5 dark:hover:shadow-blue-500/5 hover:-translate-y-1">
+                          <LiteratureCard
+                            paper={paper}
+                            rank={idx + 1}
+                            citationCount={paper.citationCount}
+                            influentialCitationCount={paper.influentialCitationCount}
+                            hideAbstract={true}
+                          />
+                        </div>
+                      </div>
                     ))
                   ) : (
-                    <div className="p-8 border border-dashed border-gray-300 dark:border-[#333333] text-center bg-gray-50/50 dark:bg-black/20">
-                      <p className="text-sm font-serif italic text-editorial-muted">
+                    <div className="p-12 rounded-2xl border border-dashed border-gray-300/50 dark:border-gray-800/50 text-center backdrop-blur-sm bg-gray-50/30 dark:bg-black/10">
+                      <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">
+                        <span className="text-gray-400 dark:text-gray-500 text-lg">/</span>
+                      </div>
+                      <p className="text-sm font-serif italic text-gray-500 dark:text-gray-400">
                         No high-impact news coverage was found reversing to primary literature for this topic in the past 30 days.
                       </p>
                     </div>
