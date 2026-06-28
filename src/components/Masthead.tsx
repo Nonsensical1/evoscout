@@ -54,7 +54,10 @@ export default function Masthead() {
          <Link href="/history" className="hover-underline">Ledger</Link>
          <Link href="/leaderboard" className="hover-underline">Leaderboard</Link>
          {isUnlocked && (
-           <Link href="/chess" className="hover-underline text-[#005587] dark:text-[#60a5fa]">Chess</Link>
+           <>
+             <Link href="/chess" className="hover-underline text-[#005587] dark:text-[#60a5fa]">Chess</Link>
+             <Link href="/surf" className="hover-underline text-[#005587] dark:text-[#60a5fa]">Surf</Link>
+           </>
          )}
          <Link href="/settings" className="hover-underline">Settings</Link>
          <UserMenu />
