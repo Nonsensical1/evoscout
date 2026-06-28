@@ -188,12 +188,8 @@ export default function LeaderboardPage() {
       <div className="max-w-[1400px] mx-auto px-6 md:px-12">
         {/* Newspaper Header */}
         <header className="mb-16 text-center border-b-[3px] border-black dark:border-white pb-6">
-          <h1 className="text-5xl md:text-7xl font-serif font-black tracking-tighter text-black dark:text-white uppercase mb-4">
-            The EvoScout Ledger
-          </h1>
           <div className="flex flex-col md:flex-row justify-between items-center border-y-[1.5px] border-black dark:border-white py-3 mt-4 gap-4 md:gap-0">
-            <span className="font-serif italic text-sm md:text-base font-bold text-[#005587] dark:text-[#60a5fa] uppercase tracking-widest w-full md:w-1/3 text-center md:text-left">
-              VOL. I — IMPACT METRICS
+            <span className="font-sans text-xs md:text-sm font-black uppercase tracking-[0.2em] text-black dark:text-white w-full md:w-1/3 text-center md:text-left">
             </span>
             <span className="font-sans text-xs md:text-sm font-black uppercase tracking-[0.2em] text-black dark:text-white w-full md:w-1/3 text-center">
               LIVE MONTHLY RANKINGS
