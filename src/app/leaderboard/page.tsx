@@ -48,6 +48,8 @@ export default function LeaderboardPage() {
             data.news.forEach((newsItem: any) => {
               if (!seenIds.has(newsItem.id)) {
                 seenIds.add(newsItem.id);
+                // Capture the exact date it was scraped into the database
+                newsItem.scrapedDate = data.date;
                 allPapers.push(newsItem);
               }
             });
@@ -84,6 +86,9 @@ export default function LeaderboardPage() {
               const data = await res.json();
               data.forEach((mappedPaper: any) => {
                 if (mappedPaper && mappedPaper.paperId) {
+                  // Find the original item to retrieve the scraped date
+                  const originalNews = recentNews.find(n => n.id === mappedPaper.originalId);
+                  
                   paperMap[mappedPaper.paperId] = {
                     id: mappedPaper.originalId,
                     title: mappedPaper.title,
@@ -94,6 +99,7 @@ export default function LeaderboardPage() {
                     url: mappedPaper.url,
                     citationCount: mappedPaper.citationCount || 0,
                     influentialCitationCount: mappedPaper.influentialCitationCount || 0,
+                    scrapedDate: originalNews?.scrapedDate,
                     isoDate: new Date().toISOString()
                   };
                 }
@@ -190,6 +196,7 @@ export default function LeaderboardPage() {
                       rank={idx + 1}
                       citationCount={paper.citationCount}
                       influentialCitationCount={paper.influentialCitationCount}
+                      hideAbstract={true}
                     />
                   ))}
                 </div>

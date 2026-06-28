@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { BookOpen } from 'lucide-react';
 
-export function LiteratureCard({ paper, rank, citationCount, influentialCitationCount }: { paper: any, rank?: number, citationCount?: number, influentialCitationCount?: number }) {
+export function LiteratureCard({ paper, rank, citationCount, influentialCitationCount, hideAbstract }: { paper: any, rank?: number, citationCount?: number, influentialCitationCount?: number, hideAbstract?: boolean }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [recommendedPapers, setRecommendedPapers] = useState<any[] | null>(null);
@@ -35,7 +35,9 @@ export function LiteratureCard({ paper, rank, citationCount, influentialCitation
           <h4 className="font-serif font-bold text-2xl leading-tight group-hover:text-blue-800 dark:group-hover:text-blue-400 transition-colors group-hover:underline decoration-[1.5px] underline-offset-4">{paper.title}</h4>
         </a>
         <p className="font-serif text-editorial-muted italic text-base">{paper.authors}</p>
-        <p className="font-sans text-sm text-editorial-text leading-relaxed mt-2">{paper.summary || paper.rawAbstract}</p>
+        {!hideAbstract && (
+          <p className="font-sans text-sm text-editorial-text leading-relaxed mt-2">{paper.summary || paper.rawAbstract}</p>
+        )}
         
         {paper.doi && (
           <div className="mt-4 pt-2">
@@ -95,7 +97,12 @@ export function LiteratureCard({ paper, rank, citationCount, influentialCitation
       </div>
       
       <div className="md:col-span-1 flex flex-col items-start md:items-end justify-start gap-3 border-l-0 md:border-l border-editorial-border md:pl-5 mt-2 md:mt-0">
-        <span className="text-[10px] font-sans font-bold uppercase tracking-widest bg-gray-100 dark:bg-[#262626] px-2 py-1 text-center border border-gray-200 dark:border-[#333333]">{paper.journal}</span>
+        <div className="flex flex-col items-start md:items-end w-full">
+          <span className="text-[10px] font-sans font-bold uppercase tracking-widest bg-gray-100 dark:bg-[#262626] px-2 py-1 text-center border border-gray-200 dark:border-[#333333] mb-1">{paper.journal}</span>
+          {paper.scrapedDate && (
+             <span className="text-[9px] font-sans font-bold uppercase tracking-widest text-[#005587] dark:text-[#60a5fa] mt-1">Scraped: {paper.scrapedDate}</span>
+          )}
+        </div>
         {paper.institution && (
           <span className="text-xs font-serif font-medium text-editorial-text text-left md:text-right opacity-80 leading-snug">
             {paper.institution}
