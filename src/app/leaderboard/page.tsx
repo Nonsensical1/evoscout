@@ -117,10 +117,10 @@ export default function LeaderboardPage() {
                       id: mappedPaper.originalId,
                       title: mappedPaper.title,
                       authors: mappedPaper.authors,
-                      journal: "Semantic Scholar",
+                      journal: originalNews?.source || "Semantic Scholar",
                       doi: mappedPaper.paperId,
                       rawAbstract: mappedPaper.abstract,
-                      url: mappedPaper.url,
+                      url: originalNews?.url || mappedPaper.url,
                       citationCount: mappedPaper.citationCount || 0,
                       influentialCitationCount: mappedPaper.influentialCitationCount || 0,
                       scrapedDate: originalNews?.scrapedDate,
@@ -193,8 +193,7 @@ export default function LeaderboardPage() {
   const topicKeys = Object.keys(leaderboardData).sort((a, b) => (topicScores[b] || 0) - (topicScores[a] || 0));
 
   return (
-    <div className="min-h-screen bg-[#f8f7f5] dark:bg-[#0f0f0f] pt-16 pb-32 transition-colors duration-500">
-      <div className="max-w-[1400px] mx-auto px-6 md:px-12">
+    <div className="animate-in fade-in duration-700">
         {/* Newspaper Header */}
         <header className="mb-16 text-center border-b-[3px] border-black dark:border-white pb-6">
           <div className="flex flex-col md:flex-row justify-between items-center border-y-[1.5px] border-black dark:border-white py-3 mt-4 gap-4 md:gap-0">
@@ -265,7 +264,6 @@ export default function LeaderboardPage() {
             ))}
           </div>
         )}
-      </div>
     </div>
   );
 }
