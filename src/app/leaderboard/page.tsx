@@ -138,6 +138,7 @@ export default function LeaderboardPage() {
                       url: originalNews?.url || mappedPaper.url,
                       citationCount: mappedPaper.citationCount || 0,
                       influentialCitationCount: mappedPaper.influentialCitationCount || 0,
+                      accessesCount: mappedPaper.accessesCount || 0,
                       scrapedDate: originalNews?.scrapedDate,
                       isoDate: new Date().toISOString(),
                       newsCoverageCount: 1, // Track collisions as native velocity
@@ -189,15 +190,17 @@ export default function LeaderboardPage() {
 
         topics.forEach(t => {
           finalData[t] = finalGrouped[t]
-            .sort((a, b) => 
-               (b.newsCoverageCount || 0) - (a.newsCoverageCount || 0) || 
-               b.influentialCitationCount - a.influentialCitationCount || 
-               b.citationCount - a.citationCount
-            )
+            .sort((a, b) => {
+               // Incorporate Cheerio accesses into the core algorithm as a ratio where citations weigh more
+               // 1 Citation = 100 Accesses. News coverage overrides both as a multiplier.
+               const aScore = ((a.newsCoverageCount || 0) * 100000) + (a.influentialCitationCount * 1000) + (a.citationCount * 100) + (a.accessesCount || 0);
+               const bScore = ((b.newsCoverageCount || 0) * 100000) + (b.influentialCitationCount * 1000) + (b.citationCount * 100) + (b.accessesCount || 0);
+               return bScore - aScore;
+            })
             .slice(0, 10); // Ensure max 10 rendered per topic
 
-          // Sum news coverage (weighted heavily) + citations for this topic to determine section rendering order
-          newScores[t] = finalData[t].reduce((sum, paper) => sum + ((paper.newsCoverageCount || 0) * 100) + (paper.citationCount || 0) + (paper.influentialCitationCount || 0), 0);
+          // Sum news coverage (weighted heavily) + citations + accesses for this topic to determine section rendering order
+          newScores[t] = finalData[t].reduce((sum, paper) => sum + ((paper.newsCoverageCount || 0) * 100000) + (paper.citationCount * 100) + (paper.accessesCount || 0), 0);
         });
 
         setLeaderboardData(finalData);
