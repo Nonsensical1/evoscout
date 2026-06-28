@@ -218,8 +218,7 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
   try {
     const rssFeeds = [
       { url: 'https://www.nature.com/nature.rss', source: 'Nature' },
-      { url: 'https://www.science.org/rss/news_current.xml', source: 'Science Mag' },
-      { url: 'https://phys.org/rss-feed/biology-news/', source: 'Phys.org' },
+      { url: 'https://www.science.org/rss/express.xml', source: 'Science (Journal)' },
       { url: 'https://www.cell.com/cell/inpress.rss', source: 'Cell Press' },
       { url: 'https://www.nature.com/nmicrobiol.rss', source: 'Nature Microbiology' },
       { url: 'https://www.nature.com/nbt.rss', source: 'Nature Biotechnology' },

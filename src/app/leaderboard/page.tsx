@@ -44,65 +44,58 @@ export default function LeaderboardPage() {
 
         ledgerSnap.forEach(doc => {
           const data = doc.data();
-          if (data.date >= dateLimit && data.literature) {
-            data.literature.forEach((paper: any) => {
-              if (!seenIds.has(paper.id)) {
-                seenIds.add(paper.id);
-                allPapers.push(paper);
+          if (data.date >= dateLimit && data.news) {
+            data.news.forEach((newsItem: any) => {
+              if (!seenIds.has(newsItem.id)) {
+                seenIds.add(newsItem.id);
+                allPapers.push(newsItem);
               }
             });
           }
         });
 
-        // 3. Format IDs for Semantic Scholar
-        const ssIds: string[] = [];
+        // 3. Format payload for Reverse Mapping API
+        const newsPayload = allPapers.map(p => ({
+          id: p.id,
+          title: p.title,
+          doi: p.doi || "",
+          snippet: p.rawSnippet || p.summary || "",
+          url: p.url || ""
+        }));
+
         const paperMap: Record<string, any> = {};
 
-        allPapers.forEach(p => {
-          let ssId = null;
-          
-          // STRICT FILTER: Exclude all pre-prints to ensure only primary, peer-reviewed literature is ranked.
-          if (p.id.startsWith("ARXIV-") || p.id.startsWith("BIORXIV-")) {
-            return; // Skip pre-prints entirely
-          }
-
-          if (p.id.startsWith("PUBMED-")) {
-            ssId = `PMID:${p.id.replace("PUBMED-", "")}`;
-          } else if (p.doi) {
-            let rawDoi = p.doi.replace("https://doi.org/", "").replace("http://doi.org/", "");
-            if (rawDoi.startsWith("10.")) {
-              ssId = `DOI:${rawDoi}`;
-            }
-          }
-          
-          if (ssId) {
-            ssIds.push(ssId);
-            paperMap[ssId] = { ...p, citationCount: 0, influentialCitationCount: 0 };
-          }
-        });
-
-        // 4. Batch query Semantic Scholar proxy
-        const CHUNK_SIZE = 500;
-        for (let i = 0; i < ssIds.length; i += CHUNK_SIZE) {
-          const chunk = ssIds.slice(i, i + CHUNK_SIZE);
+        // 4. Batch query Semantic Scholar proxy for Reverse Mapping
+        const CHUNK_SIZE = 15; // API caps at 15 items per batch
+        for (let i = 0; i < newsPayload.length; i += CHUNK_SIZE) {
+          const chunk = newsPayload.slice(i, i + CHUNK_SIZE);
           try {
             const res = await fetch("/api/leaderboard-batch", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ids: chunk })
+              body: JSON.stringify({ items: chunk })
             });
             if (res.ok) {
               const data = await res.json();
-              data.forEach((item: any, idx: number) => {
-                const requestedId = chunk[idx];
-                if (item) {
-                  paperMap[requestedId].citationCount = item.citationCount || 0;
-                  paperMap[requestedId].influentialCitationCount = item.influentialCitationCount || 0;
+              data.forEach((mappedPaper: any) => {
+                if (mappedPaper && mappedPaper.paperId) {
+                  paperMap[mappedPaper.paperId] = {
+                    id: mappedPaper.originalId,
+                    title: mappedPaper.title,
+                    authors: mappedPaper.authors,
+                    journal: "Semantic Scholar",
+                    doi: mappedPaper.paperId,
+                    rawAbstract: mappedPaper.abstract,
+                    url: mappedPaper.url,
+                    citationCount: mappedPaper.citationCount || 0,
+                    influentialCitationCount: mappedPaper.influentialCitationCount || 0,
+                    isoDate: new Date().toISOString()
+                  };
                 }
               });
             }
           } catch (e) {
-            console.error("Semantic Scholar batch failed:", e);
+            console.error("Reverse mapping batch failed:", e);
           }
         }
 
@@ -162,7 +155,7 @@ export default function LeaderboardPage() {
             </h1>
           </div>
           <p className="text-sm font-sans font-medium text-editorial-muted uppercase tracking-widest max-w-3xl mx-auto md:mx-0">
-            Live velocity rankings for primary literature scraped over the past 30 days. Pre-prints are strictly filtered out to prioritize peer-reviewed impact. Metrics are dynamically synced with the Semantic Scholar Open Graph API, emphasizing highly influential citations.
+            Live velocity rankings. We aggregate all science journalism from the past 30 days and algorithmically reverse-map the news articles to their underlying primary academic papers using the Semantic Scholar Open Graph API, tracking real-world impact.
           </p>
         </header>
 
