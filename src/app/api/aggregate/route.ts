@@ -412,82 +412,121 @@ async function fetchLiveData(topicsMap: any = {}, newsLimit: number = 12) {
       return item.isoDate ? (new Date(item.isoDate).getTime() > timeWindowLimit) : true;
     }).length;
 
-    if (freshNewsCount < newsLimit) {
-      console.log(`[News Pipeline] Quota uncompleted (${freshNewsCount}/${newsLimit}). Fetching PubMed fallback articles...`);
-      try {
-        const queryTerms = newsTermsSafe.split('|').slice(0, 5).map((t: string) => `(${t}[Title/Abstract])`).join(' OR ');
-        const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(queryTerms)}&retmode=json&retmax=15`;
-        const searchRes = await fetch(esearchUrl);
-        if (searchRes.ok) {
-          const searchData = await searchRes.json();
-          const pmids = searchData.esearchresult?.idlist || [];
-          if (pmids.length > 0) {
-            const esummaryUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${pmids.join(',')}&retmode=json`;
-            const summaryRes = await fetch(esummaryUrl);
-            if (summaryRes.ok) {
-              const summaryData = await summaryRes.json();
-              const uids = summaryData.result?.uids || [];
-              const pubmedNews = uids.map((uid: string) => {
-                const article = summaryData.result[uid];
-                if (!article) return null;
-                const authorStr = article.authors && Array.isArray(article.authors)
-                  ? article.authors.slice(0, 3).map((a: any) => a.name).join(', ') + (article.authors.length > 3 ? ' et al.' : '')
-                  : 'Various Authors';
-                const journal = article.source || 'PubMed';
-                const doiObj = article.articleids?.find((id: any) => id.idtype === 'doi');
-                const doi = doiObj ? doiObj.value : '';
-                const url = doi ? `https://doi.org/${doi}` : `https://pubmed.ncbi.nlm.nih.gov/${uid}`;
+    if (freshNewsCount < newsLimit && newsLimit > 35) {
+      const pubmedQuota = Math.round(newsLimit * 0.05);
+      if (pubmedQuota > 0) {
+        console.log(`[News Pipeline] Quota uncompleted (${freshNewsCount}/${newsLimit}). Fetching ${pubmedQuota} PubMed fallback articles...`);
+        try {
+          const queryTerms = newsTermsSafe.split('|').slice(0, 5).map((t: string) => `(${t}[Title/Abstract])`).join(' OR ');
+          const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(queryTerms)}&retmode=json&retmax=50`;
+          const searchRes = await fetch(esearchUrl);
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            const pmids = searchData.esearchresult?.idlist || [];
+            if (pmids.length > 0) {
+              const esummaryUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=${pmids.join(',')}&retmode=json`;
+              const summaryRes = await fetch(esummaryUrl);
+              if (summaryRes.ok) {
+                const summaryData = await summaryRes.json();
+                const uids = summaryData.result?.uids || [];
                 
-                let snippet = `Authors: ${authorStr}. Source: ${journal}.`;
-                if (article.pubdate) snippet += ` Published: ${article.pubdate}.`;
-                
-                let pubDate = new Date();
-                if (article.sortpubdate || article.pubdate) {
-                  const parsedDate = new Date(article.sortpubdate || article.pubdate);
-                  if (!isNaN(parsedDate.getTime())) {
-                    pubDate = parsedDate;
+                const validPubmedNews = [];
+                const journalImpactCache: Record<string, number> = {};
+
+                for (const uid of uids) {
+                  if (validPubmedNews.length >= pubmedQuota) break;
+
+                  const article = summaryData.result[uid];
+                  if (!article) continue;
+                  
+                  const doiObj = article.articleids?.find((id: any) => id.idtype === 'doi');
+                  const doi = doiObj ? doiObj.value : '';
+                  if (!doi) continue; 
+
+                  try {
+                    const oaWorkRes = await fetch(`https://api.openalex.org/works/https://doi.org/${doi}`);
+                    if (!oaWorkRes.ok) continue;
+                    const oaWork = await oaWorkRes.json();
+                    
+                    const sourceIdUrl = oaWork.primary_location?.source?.id;
+                    if (!sourceIdUrl) continue;
+                    const sourceId = sourceIdUrl.split('/').pop();
+
+                    let impactFactor = 0;
+                    if (journalImpactCache[sourceId as string] !== undefined) {
+                      impactFactor = journalImpactCache[sourceId as string];
+                    } else {
+                      const oaSourceRes = await fetch(`https://api.openalex.org/sources/${sourceId}`);
+                      if (oaSourceRes.ok) {
+                        const oaSource = await oaSourceRes.json();
+                        impactFactor = oaSource.summary_stats?.['2yr_mean_citedness'] || 0;
+                        journalImpactCache[sourceId as string] = impactFactor;
+                      }
+                    }
+
+                    if (impactFactor <= 15) continue;
+                    
+                  } catch (e) {
+                    continue;
+                  }
+
+                  const authorStr = article.authors && Array.isArray(article.authors)
+                    ? article.authors.slice(0, 3).map((a: any) => a.name).join(', ') + (article.authors.length > 3 ? ' et al.' : '')
+                    : 'Various Authors';
+                  const journal = article.source || 'PubMed';
+                  const url = `https://doi.org/${doi}`;
+                  
+                  let snippet = `Authors: ${authorStr}. Source: ${journal}.`;
+                  if (article.pubdate) snippet += ` Published: ${article.pubdate}.`;
+                  
+                  let pubDate = new Date();
+                  if (article.sortpubdate || article.pubdate) {
+                    const parsedDate = new Date(article.sortpubdate || article.pubdate);
+                    if (!isNaN(parsedDate.getTime())) {
+                      pubDate = parsedDate;
+                    }
+                  }
+
+                  validPubmedNews.push({
+                    id: `NEWS-PUBMED-${uid}`.replace(/[^a-zA-Z0-9-]/g, ''),
+                    title: (article.title || 'PubMed Publication').replace(/\.$/, ''),
+                    source: journal,
+                    url: url,
+                    image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100",
+                    rawSnippet: snippet,
+                    isoDate: pubDate.toISOString()
+                  });
+                }
+
+                for (let item of validPubmedNews) {
+                  if (item.image === "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100") {
+                    try {
+                      const searchKeyword = getProminentWord(item.title);
+                      const KeywordQuery = searchKeyword + " science";
+                      const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(KeywordQuery)}&per_page=30&size=large&orientation=landscape`, {
+                        headers: { Authorization: "c5w6mctmy3dgyaA69iUsDjgccGUojIlKEa3Y8JtsLU2yJm2HUp2gjQy6" }
+                      });
+                      if (pexelsRes.ok) {
+                        const pexelsData = await pexelsRes.json();
+                        if (pexelsData.photos && pexelsData.photos.length > 0) {
+                          const availablePhotos = pexelsData.photos.filter((p: any) => !usedImages.has(p.src.original));
+                          if (availablePhotos.length > 0) {
+                            const randomIdx = Math.floor(Math.random() * availablePhotos.length);
+                            item.image = availablePhotos[randomIdx].src.original;
+                            usedImages.add(item.image);
+                          }
+                        }
+                      }
+                    } catch (e) {}
                   }
                 }
 
-                return {
-                  id: `NEWS-PUBMED-${uid}`.replace(/[^a-zA-Z0-9-]/g, ''),
-                  title: (article.title || 'PubMed Publication').replace(/\.$/, ''),
-                  source: `PubMed / ${journal}`,
-                  url: url,
-                  image: "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100",
-                  rawSnippet: snippet,
-                  isoDate: pubDate.toISOString()
-                };
-              }).filter(Boolean);
-
-              for (let item of pubmedNews) {
-                if (item && item.image === "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?ixlib=rb-1.2.1&auto=format&fit=crop&w=2560&q=100") {
-                  try {
-                    const searchKeyword = getProminentWord(item.title);
-                    const KeywordQuery = searchKeyword + " science";
-                    const pexelsRes = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(KeywordQuery)}&per_page=30&size=large&orientation=landscape`, {
-                      headers: { Authorization: "c5w6mctmy3dgyaA69iUsDjgccGUojIlKEa3Y8JtsLU2yJm2HUp2gjQy6" }
-                    });
-                    if (pexelsRes.ok) {
-                      const pexelsData = await pexelsRes.json();
-                      if (pexelsData.photos && pexelsData.photos.length > 0) {
-                        const availablePhotos = pexelsData.photos.filter((p: any) => !usedImages.has(p.src.original));
-                        if (availablePhotos.length > 0) {
-                          const randomIdx = Math.floor(Math.random() * availablePhotos.length);
-                          item.image = availablePhotos[randomIdx].src.original;
-                          usedImages.add(item.image);
-                        }
-                      }
-                    }
-                  } catch (e) {}
-                }
+                allNews = allNews.concat(validPubmedNews);
               }
-
-              allNews = allNews.concat(pubmedNews.filter(Boolean));
             }
           }
-        }
-      } catch (e) { console.error("PubMed API Error:", e); }
+        } catch (e) { console.error("PubMed API Error:", e); }
+      }
     }
 
     results.news = allNews.sort((a, b) => new Date(b.isoDate).getTime() - new Date(a.isoDate).getTime());
