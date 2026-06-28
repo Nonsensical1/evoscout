@@ -423,6 +423,39 @@ export default function Home() {
           return true;
         });
 
+        const ledgerDocs = ledgerSnap.docs.map(d => d.data());
+
+        // Backfill missing funding amounts for the ledger before processing trends
+        const backfillPromises: Promise<void>[] = [];
+        const checkedOpps = new Set<string>();
+
+        ledgerDocs.forEach(day => {
+          (day.openGovGrants || []).forEach((item: any) => {
+            if (item.amount === "Details at Registry" && item.id.startsWith("GOV-")) {
+              const oppId = item.id.replace("GOV-", "");
+              if (checkedOpps.has(oppId)) return;
+              checkedOpps.add(oppId);
+              
+              backfillPromises.push(
+                fetch("https://apply07.grants.gov/grantsws/rest/opportunity/details", {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                  body: `oppId=${oppId}`
+                }).then(res => res.json()).then(detailData => {
+                  if (detailData.synopsis && detailData.synopsis.estimatedFunding) {
+                    const parsedAmount = parseInt(detailData.synopsis.estimatedFunding, 10);
+                    if (!isNaN(parsedAmount) && parsedAmount > 0) {
+                      item.amount = `$${parsedAmount.toLocaleString()}`;
+                    }
+                  }
+                }).catch(() => {})
+              );
+            }
+          });
+        });
+
+        await Promise.all(backfillPromises);
+
         const globalNewsTermCounts: Record<string, number> = {};
         const globalLitTermCounts: Record<string, number> = {};
         const globalGrantsTermCounts: Record<string, number> = {};
@@ -430,8 +463,7 @@ export default function Home() {
         const globalOpenGrantsTermCounts: Record<string, number> = {};
         const globalOpenGrantsTermFunding: Record<string, number> = {};
 
-        ledgerSnap.forEach(doc => {
-          const data = doc.data();
+        ledgerDocs.forEach(data => {
           if (data.date >= dateLimit) {
             let dailyNewsText = "";
             let dailyLitText = "";
