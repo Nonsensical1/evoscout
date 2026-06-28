@@ -54,8 +54,13 @@ export default function LeaderboardPage() {
           }
         });
 
-        // 3. Format payload for Reverse Mapping API
-        const newsPayload = allPapers.map(p => ({
+        // 3. Chronological sorting and aggressive slicing (Fix for infinite loading)
+        // Sort by recency to prioritize the absolute freshest breaking news
+        allPapers.sort((a, b) => new Date(b.isoDate || b.dateAdded || 0).getTime() - new Date(a.isoDate || a.dateAdded || 0).getTime());
+        const recentNews = allPapers.slice(0, 100);
+
+        // Format payload for Reverse Mapping API
+        const newsPayload = recentNews.map(p => ({
           id: p.id,
           title: p.title,
           doi: p.doi || "",
