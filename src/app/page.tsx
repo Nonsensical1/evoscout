@@ -170,17 +170,17 @@ export default function Home() {
           if (g.amount === "Details at Registry" && g.id.startsWith("GOV-")) {
             const oppId = g.id.split('-')[1];
             try {
-              const detailRes = await fetch("https://apply07.grants.gov/grantsws/rest/opportunity/details", {
+              const detailRes = await fetch("/api/grant-details", {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `oppId=${oppId}`
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ oppId })
               });
               if (detailRes.ok) {
                 const detailData = await detailRes.json();
-                if (detailData.synopsis && detailData.synopsis.estimatedFunding) {
-                  const parsedAmount = parseInt(detailData.synopsis.estimatedFunding, 10);
+                if (detailData.estimatedFunding) {
+                  const parsedAmount = parseInt(detailData.estimatedFunding, 10);
                   if (!isNaN(parsedAmount) && parsedAmount > 0) {
-                    g.amount = `$${parsedAmount.toLocaleString()}`;
+                    g.amount = `${parsedAmount.toLocaleString()}`;
                     feedChanged = true;
                   }
                 }
@@ -465,17 +465,17 @@ export default function Home() {
               if (checkedOpps.has(oppId)) continue;
               checkedOpps.add(oppId);
               try {
-                const detailRes = await fetch("https://apply07.grants.gov/grantsws/rest/opportunity/details", {
+                const detailRes = await fetch("/api/grant-details", {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                  body: `oppId=${oppId}`
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ oppId })
                 });
                 if (detailRes.ok) {
                   const detailData = await detailRes.json();
-                  if (detailData.synopsis && detailData.synopsis.estimatedFunding) {
-                    const parsedAmount = parseInt(detailData.synopsis.estimatedFunding, 10);
+                  if (detailData.estimatedFunding) {
+                    const parsedAmount = parseInt(detailData.estimatedFunding, 10);
                     if (!isNaN(parsedAmount) && parsedAmount > 0) {
-                      item.amount = `$${parsedAmount.toLocaleString()}`;
+                      item.amount = `${parsedAmount.toLocaleString()}`;
                     }
                   }
                 }
