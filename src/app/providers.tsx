@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authError, setAuthError] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [emailSent, setEmailSent] = useState(false);
-  const [showEmailLogin, setShowEmailLogin] = useState(false);
+  const [showEmailLogin, setShowEmailLogin] = useState<false | 'password' | 'magic'>(false);
   const [passwordInput, setPasswordInput] = useState("");
   const [showSetPassword, setShowSetPassword] = useState(false);
   const [pendingUser, setPendingUser] = useState<User | null>(null);
@@ -55,6 +55,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (auth.currentUser) {
               window.localStorage.removeItem('emailForSignIn');
               window.history.replaceState(null, '', '/');
+              setPendingUser(auth.currentUser);
+              setShowSetPassword(true);
             } else {
               setAuthError(err.message);
             }
@@ -208,10 +210,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   Sign In with Google
                 </button>
                 <button 
-                  onClick={() => setShowEmailLogin(true)}
-                  className="w-full border-2 border-[#171717] dark:border-white text-[#171717] dark:text-white hover:bg-[#f0f0f0] dark:hover:bg-[#333] py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm transition-colors"
+                  onClick={() => setShowEmailLogin('password')}
+                  className="w-full border-2 border-[#171717] dark:border-white text-[#171717] dark:text-white hover:bg-[#f0f0f0] dark:hover:bg-[#333] py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm transition-colors mb-4"
                 >
-                  Sign In via Institutional Email / Password
+                  Log In with Institutional Email
+                </button>
+                <button 
+                  onClick={() => setShowEmailLogin('magic')}
+                  className="w-full text-xs underline text-editorial-muted hover:text-editorial-text uppercase tracking-widest text-center"
+                >
+                  Sign Up / Reset Password (Magic Link)
                 </button>
               </>
             ) : emailSent ? (
@@ -219,7 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 <strong>Check your email!</strong><br/>
                 We sent a confirmation link to <strong>{emailInput}</strong>. Click the link in the email to instantly sign in. You can safely close this window.
               </div>
-            ) : (
+            ) : showEmailLogin === 'password' ? (
               <form onSubmit={handlePasswordSignIn} className="text-left font-sans">
                 <label className="block text-xs uppercase tracking-wider font-bold mb-2 text-editorial-text">
                   Institutional Email (.edu or .gov)
@@ -233,31 +241,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   className="w-full border-2 border-editorial-border p-3 mb-4 bg-transparent text-editorial-text focus:outline-none focus:border-black dark:focus:border-white"
                 />
                 <label className="block text-xs uppercase tracking-wider font-bold mb-2 text-editorial-text">
-                  Password (Leave blank if you don't have one)
+                  Password
                 </label>
                 <input
                   type="password"
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
                   placeholder="••••••••"
+                  required
                   className="w-full border-2 border-editorial-border p-3 mb-4 bg-transparent text-editorial-text focus:outline-none focus:border-black dark:focus:border-white"
                 />
-                
-                <div className="flex gap-2 mb-4">
-                  <button 
-                    type="submit"
-                    className="flex-1 bg-[#171717] dark:bg-black hover:bg-[#333] dark:hover:bg-[#262626] text-white py-3 px-2 font-bold font-sans uppercase tracking-widest text-xs transition-colors"
-                  >
-                    Sign In
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={handleEmailSignIn}
-                    className="flex-1 bg-white dark:bg-[#222] border-2 border-[#171717] dark:border-white text-[#171717] dark:text-white hover:bg-gray-100 dark:hover:bg-[#333] py-3 px-2 font-bold font-sans uppercase tracking-widest text-[10px] sm:text-xs transition-colors"
-                  >
-                    Send Magic Link
-                  </button>
-                </div>
+                <button 
+                  type="submit"
+                  className="w-full bg-[#171717] dark:bg-black hover:bg-[#333] dark:hover:bg-[#262626] text-white py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm transition-colors mb-4"
+                >
+                  Sign In
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setShowEmailLogin(false)}
+                  className="w-full text-xs underline text-editorial-muted hover:text-editorial-text uppercase tracking-widest text-center"
+                >
+                  &larr; Back to all login options
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleEmailSignIn} className="text-left font-sans">
+                <p className="text-xs text-editorial-muted mb-4">Enter your .edu or .gov email. We will send you a secure magic link to sign in or create your account instantly.</p>
+                <label className="block text-xs uppercase tracking-wider font-bold mb-2 text-editorial-text">
+                  Institutional Email (.edu or .gov)
+                </label>
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="name@university.edu"
+                  required
+                  className="w-full border-2 border-editorial-border p-3 mb-4 bg-transparent text-editorial-text focus:outline-none focus:border-black dark:focus:border-white"
+                />
+                <button 
+                  type="submit"
+                  className="w-full bg-[#171717] dark:bg-black hover:bg-[#333] dark:hover:bg-[#262626] text-white py-3 px-6 font-bold font-sans uppercase tracking-widest text-sm transition-colors mb-4"
+                >
+                  Send Magic Link
+                </button>
                 <button 
                   type="button"
                   onClick={() => setShowEmailLogin(false)}
