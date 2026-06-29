@@ -47,20 +47,43 @@ export default function ChessPage() {
   }, [user]);
 
   useEffect(() => {
-    fetch('https://lichess.org/api/puzzle/daily')
+    // Generate a pseudo-random seed based on today's date to get a daily puzzle
+    const today = new Date();
+    const dateStr = today.getFullYear() + "-" + (today.getMonth() + 1) + "-" + today.getDate();
+    let hash = 0;
+    for (let i = 0; i < dateStr.length; i++) {
+        hash = (hash << 5) - hash + dateStr.charCodeAt(i);
+        hash |= 0; 
+    }
+    const seed = Math.abs(hash);
+    
+    // Use the seed to pick a rating bracket between 1000 and 1999
+    const minRating = 1000 + (seed % 1000);
+    const maxRating = minRating + 50;
+    
+    fetch(`https://chess-puzzles-api.vercel.app/puzzles?themes=mate&min_rating=${minRating}&max_rating=${maxRating}&limit=50`)
       .then(res => res.json())
       .then(data => {
-        const c = new Chess(data.puzzle.fen);
+        if (!data || data.length === 0) throw new Error("No puzzles found");
+        // Use the seed to pick a puzzle from the results
+        const randomPuzzle = data[seed % data.length];
+        const c = new Chess(randomPuzzle.FEN);
         setGame(c);
-        setSolution(data.puzzle.solution);
+        const sol = randomPuzzle.Moves.split(' ');
+        setSolution(sol);
         setOrientation(c.turn() === 'w' ? 'white' : 'black');
-        setPuzzleData(data.puzzle);
+        setPuzzleData({
+           id: randomPuzzle.PuzzleId,
+           rating: randomPuzzle.Rating,
+           fen: randomPuzzle.FEN,
+           solution: sol
+        });
         setStatus("playing");
       })
       .catch(err => {
         console.error(err);
         setStatus("failed");
-        setErrorMsg("Failed to load daily puzzle.");
+        setErrorMsg("Failed to load daily checkmate puzzle.");
       });
   }, []);
 
@@ -118,7 +141,7 @@ export default function ChessPage() {
     } else {
       // Wrong move
       setStatus("failed");
-      setErrorMsg("Incorrect move! Try again tomorrow.");
+      setErrorMsg("Incorrect move!");
       return false; // reject the piece drop on the board
     }
   }
@@ -156,6 +179,11 @@ export default function ChessPage() {
     setErrorMsg("");
   }
 
+  function retryMove() {
+    setStatus("playing");
+    setErrorMsg("");
+  }
+
   return (
     <div className="max-w-4xl mx-auto py-8">
       <Link href="/" className="inline-flex items-center gap-2 text-editorial-muted hover:text-editorial-text mb-8 transition-colors text-sm uppercase tracking-widest font-bold">
@@ -165,10 +193,10 @@ export default function ChessPage() {
       <div className="flex justify-between items-end mb-8 border-b border-editorial-border pb-4">
         <div>
           <h1 className="text-4xl font-serif font-black tracking-tight text-editorial-text uppercase mb-2">
-            Chess Problem of the Day
+            Checkmate Problem of the Day
           </h1>
           <p className="text-editorial-muted font-sans text-sm max-w-2xl">
-            Test your strategic vision. Can you solve the daily Lichess puzzle?
+            Test your tactical vision. Can you find the checkmate in the daily puzzle?
           </p>
         </div>
       </div>
@@ -209,9 +237,14 @@ export default function ChessPage() {
                 <div>
                    <h2 className="text-2xl font-black uppercase text-red-600 mb-2 font-serif">Incorrect</h2>
                    <p className="text-editorial-muted text-sm">{errorMsg}</p>
-                   <button onClick={resetPuzzle} className="mt-4 px-4 py-2 border border-editorial-border text-xs uppercase tracking-widest hover:bg-gray-50 transition-colors">
-                     Retry Puzzle
-                   </button>
+                   <div className="mt-4 flex flex-col md:flex-row gap-2 justify-center md:justify-start">
+                     <button onClick={retryMove} className="px-4 py-2 border border-editorial-border text-xs uppercase tracking-widest hover:bg-gray-50 transition-colors">
+                       Retry Move
+                     </button>
+                     <button onClick={resetPuzzle} className="px-4 py-2 border border-editorial-border text-xs uppercase tracking-widest hover:bg-gray-50 transition-colors">
+                       Restart Puzzle
+                     </button>
+                   </div>
                 </div>
             )}
          </div>

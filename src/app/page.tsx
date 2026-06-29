@@ -165,35 +165,7 @@ export default function Home() {
       const history = new Set(historyArr);
       let dailyFeed: any = feedSnap.exists() ? feedSnap.data() : { date: today, grants: [], openGovGrants: [], news: [], literature: [], positions: [], paddingCache: {} };
 
-      // BACKFILL PATCH: Fetch missing funding amounts for currently displayed grants sequentially
-      let feedChanged = false;
-      if (dailyFeed.openGovGrants && dailyFeed.openGovGrants.length > 0) {
-        for (const g of dailyFeed.openGovGrants) {
-          if (g.amount === "Details at Registry" && g.id.startsWith("GOV-")) {
-            const oppId = g.id.split('-')[1];
-            try {
-              const detailRes = await fetch("/api/grant-details", {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ oppId })
-              });
-              if (detailRes.ok) {
-                const detailData = await detailRes.json();
-                if (detailData.estimatedFunding) {
-                  const parsedAmount = parseInt(detailData.estimatedFunding, 10);
-                  if (!isNaN(parsedAmount) && parsedAmount > 0) {
-                    g.amount = `${parsedAmount.toLocaleString()}`;
-                    feedChanged = true;
-                  }
-                }
-              }
-            } catch (e) {}
-          }
-        }
-        if (feedChanged) {
-          await setDoc(doc(db, 'users', user.uid, 'daily', 'feed'), dailyFeed, { merge: true });
-        }
-      }
+
 
       // Make sure paddingCache is always materialized back by extracting retroactive chunks from the most recent ledger, preventing mid-day zero-arrays
       if (!dailyFeed.paddingCache) {
@@ -280,7 +252,11 @@ export default function Home() {
             // Update existing entry with fresh fields (e.g. if amount or URL was enriched)
             const idx = combined.findIndex((i: any) => i.id === item.id);
             if (idx !== -1) {
+              const oldAmount = combined[idx].amount;
               combined[idx] = { ...combined[idx], ...item };
+              if (item.amount === "Details at Registry" && oldAmount && oldAmount !== "Details at Registry") {
+                combined[idx].amount = oldAmount;
+              }
             }
           }
         }
@@ -307,6 +283,31 @@ export default function Home() {
       // Positions are processed but NOT tracked in 'history.has' backfilling to avoid stale listings.
       // We always refresh positions entirely.
       dailyFeed.positions = liveData.positions ? liveData.positions.slice(0, settings.positionsLimit || 12) : [];
+
+      // BACKFILL PATCH: Fetch missing funding amounts for newly fetched grants sequentially
+      if (dailyFeed.openGovGrants && dailyFeed.openGovGrants.length > 0) {
+        for (const g of dailyFeed.openGovGrants) {
+          if (g.amount === "Details at Registry" && g.id.startsWith("GOV-")) {
+            const oppId = g.id.split('-')[1];
+            try {
+              const detailRes = await fetch("/api/grant-details", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ oppId })
+              });
+              if (detailRes.ok) {
+                const detailData = await detailRes.json();
+                if (detailData.estimatedFunding) {
+                  const parsedAmount = parseInt(detailData.estimatedFunding, 10);
+                  if (!isNaN(parsedAmount) && parsedAmount > 0) {
+                    g.amount = `$${parsedAmount.toLocaleString()}`;
+                  }
+                }
+              }
+            } catch (e) {}
+          }
+        }
+      }
 
       const populateDisplay = (active: any[], padding: any[], limit: number) => {
         const out = [...(active || [])];
@@ -477,7 +478,7 @@ export default function Home() {
                   if (detailData.estimatedFunding) {
                     const parsedAmount = parseInt(detailData.estimatedFunding, 10);
                     if (!isNaN(parsedAmount) && parsedAmount > 0) {
-                      item.amount = `${parsedAmount.toLocaleString()}`;
+                      item.amount = `$${parsedAmount.toLocaleString()}`;
                     }
                   }
                 }
