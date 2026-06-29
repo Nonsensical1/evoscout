@@ -61,22 +61,38 @@ export default function ChessPage() {
     const minRating = 1000 + (seed % 1000);
     const maxRating = minRating + 50;
     
-    fetch(`https://chess-puzzles-api.vercel.app/puzzles?themes=mate&min_rating=${minRating}&max_rating=${maxRating}&limit=50`)
+    fetch(`/api/puzzle?minRating=${minRating}&maxRating=${maxRating}`)
       .then(res => res.json())
       .then(data => {
         if (!data || data.length === 0) throw new Error("No puzzles found");
         // Use the seed to pick a puzzle from the results
         const randomPuzzle = data[seed % data.length];
+        
+        // The Lichess puzzle FEN is the position before the opponent's move.
         const c = new Chess(randomPuzzle.FEN);
-        setGame(c);
         const sol = randomPuzzle.Moves.split(' ');
-        setSolution(sol);
-        setOrientation(c.turn() === 'w' ? 'white' : 'black');
+        
+        // Apply opponent's first move to get to the actual puzzle starting position
+        const oppMoveUci = sol[0];
+        const oppFrom = oppMoveUci.substring(0, 2);
+        const oppTo = oppMoveUci.substring(2, 4);
+        const oppProm = oppMoveUci.length > 4 ? oppMoveUci[4] : undefined;
+        c.move({ from: oppFrom, to: oppTo, promotion: oppProm });
+        
+        // Now it's the user's turn
+        const userGame = new Chess(c.fen());
+        setGame(userGame);
+        
+        // Remove the opponent's move from the solution array
+        const userSolution = sol.slice(1);
+        setSolution(userSolution);
+        
+        setOrientation(userGame.turn() === 'w' ? 'white' : 'black');
         setPuzzleData({
            id: randomPuzzle.PuzzleId,
            rating: randomPuzzle.Rating,
-           fen: randomPuzzle.FEN,
-           solution: sol
+           fen: userGame.fen(),
+           solution: userSolution
         });
         setStatus("playing");
       })
