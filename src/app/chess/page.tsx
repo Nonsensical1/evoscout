@@ -267,7 +267,7 @@ export default function ChessPage() {
       </div>
 
       {history.length > 0 && (
-        <div className="mt-12 bg-white border border-editorial-border p-6 shadow-sm">
+        <div className="mt-12 bg-editorial-bg border border-editorial-border p-6 shadow-sm">
           <h3 className="text-xl font-serif font-bold uppercase border-b border-editorial-border pb-2 mb-4 text-editorial-text">
             Your Solved Puzzles
           </h3>

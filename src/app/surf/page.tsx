@@ -32,51 +32,26 @@ export default function SurfPage() {
   const [history, setHistory] = useState<SurfHistoryRecord[]>([]);
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (user) {
-      const fetchHistory = async () => {
-        try {
-          const docRef = doc(db, 'users', user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            if (data.surf_history) {
-              setHistory(data.surf_history);
-            }
-          }
-        } catch (e) {
-          console.error("Error fetching surf history:", e);
-        }
-      };
-      fetchHistory();
-    }
-  }, [user]);
-
   const saveToHistory = async (lat: number, lng: number) => {
     if (!user) return;
     
-    // Check if exactly same coordinates exist
-    const filtered = history.filter(h => h.lat !== lat || h.lng !== lng);
-    
-    const newRecord: SurfHistoryRecord = {
-      lat,
-      lng,
-      date: new Date().toLocaleDateString()
-    };
-    
-    // Keep last 10
-    const newHistory = [newRecord, ...filtered].slice(0, 10);
-    setHistory(newHistory);
-
-    try {
-      const docRef = doc(db, 'users', user.uid);
-      await setDoc(docRef, { surf_history: newHistory }, { merge: true });
-    } catch (e) {
-      console.error("Error saving surf history:", e);
-    }
+    setHistory(prev => {
+        const filtered = prev.filter(h => h.lat !== lat || h.lng !== lng);
+        const newRecord: SurfHistoryRecord = {
+          lat,
+          lng,
+          date: new Date().toLocaleDateString()
+        };
+        const newHistory = [newRecord, ...filtered].slice(0, 10);
+        
+        const docRef = doc(db, 'users', user.uid);
+        setDoc(docRef, { surf_history: newHistory }, { merge: true }).catch(e => console.error("Error saving surf history:", e));
+        
+        return newHistory;
+    });
   };
 
-  const handleLocationSelect = async (lat: number, lng: number) => {
+  const handleLocationSelect = async (lat: number, lng: number, skipHistorySave = false) => {
     setCoords({ lat, lng });
     setLoading(true);
     setError("");
@@ -116,13 +91,39 @@ export default function SurfPage() {
       }
 
       setData(todayData);
-      saveToHistory(lat, lng);
+      if (!skipHistorySave) {
+        saveToHistory(lat, lng);
+      }
     } catch (err: any) {
       setError(err.message || "An unknown error occurred.");
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (user) {
+      const fetchHistory = async () => {
+        try {
+          const docRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.surf_history) {
+              setHistory(data.surf_history);
+              if (data.surf_history.length > 0) {
+                // Auto-load most recent, skip saving to history since it's already there
+                handleLocationSelect(data.surf_history[0].lat, data.surf_history[0].lng, true);
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Error fetching surf history:", e);
+        }
+      };
+      fetchHistory();
+    }
+  }, [user]);
 
   return (
     <div className="max-w-6xl mx-auto py-8">
@@ -208,7 +209,7 @@ export default function SurfPage() {
                   <button
                      key={idx}
                      onClick={() => handleLocationSelect(record.lat, record.lng)}
-                     className="px-4 py-2 border border-editorial-border bg-white text-xs font-mono hover:bg-gray-50 transition-colors text-left"
+                     className="px-4 py-2 border border-editorial-border bg-editorial-bg text-xs font-mono hover:bg-editorial-border/30 transition-colors text-left"
                   >
                      <div className="text-editorial-text">LAT {record.lat.toFixed(4)}</div>
                      <div className="text-editorial-text">LNG {record.lng.toFixed(4)}</div>
